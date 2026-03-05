@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(python -c \"import sys, json; data = json.load\\(sys.stdin\\); print\\(data[0][''text'']\\)\")",
-      "Bash(python -c \":*)",
-      "Bash(python -c \"import json; data = json.load\\(open\\(''c:/Users/VIP/testeDev/collab_generator/mago_api_server.ipynb'', encoding=''utf-8''\\)\\); print\\(''Valid JSON''\\); print\\(''nbformat:'', data.get\\(''nbformat''\\)\\); print\\(''cells:'', len\\(data.get\\(''cells'', []\\)\\)\\)\")"
-    ]
-  }
-}
