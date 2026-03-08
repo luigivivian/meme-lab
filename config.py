@@ -123,3 +123,26 @@ COMFYUI_IMG2IMG_DENOISE = 0.55
 
 # Diretorio com imagens de referencia do Mago Mestre (geradas no Leonardo AI)
 COMFYUI_REFERENCE_DIR = ASSETS_DIR / "backgrounds" / "mago"
+
+# ===== Multi-Agent Pipeline Settings =====
+
+# Timeout para cada agente individual (segundos)
+AGENT_FETCH_TIMEOUT = 30
+
+# Tamanho maximo da fila do TrendBroker
+BROKER_MAX_QUEUE_SIZE = 100
+
+# Semaforo para ComfyUI — evitar OOM na GPU (RTX 4060 Ti 8GB)
+COMFYUI_MAX_CONCURRENT = 1
+
+# Semaforo para chamadas simultaneas ao Claude API
+CLAUDE_MAX_CONCURRENT = 3
+
+# Post-production: legenda Instagram
+CAPTION_MAX_LENGTH = 2200
+
+# Post-production: quantidade de hashtags por post
+HASHTAG_COUNT = 20
+
+# Post-production: score minimo de qualidade para considerar valido
+QUALITY_MIN_SCORE = 0.5

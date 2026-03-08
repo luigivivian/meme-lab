@@ -21,9 +21,9 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["once", "schedule"],
+        choices=["once", "schedule", "agents"],
         default="once",
-        help="Modo: 'once' para executar uma vez, 'schedule' para agendamento automático",
+        help="Modo: 'once' (sequencial), 'schedule' (agendado), 'agents' (multi-agente paralelo)",
     )
     parser.add_argument(
         "--count",
@@ -88,6 +88,39 @@ def main():
             for c in result.content:
                 print(f"  - {c.phrase[:60]}...")
                 print(f"    -> {c.image_path}")
+        if result.errors:
+            print(f"\nErros ({len(result.errors)}):")
+            for err in result.errors:
+                print(f"  ! {err}")
+        print(f"{'=' * 50}")
+
+    elif args.mode == "agents":
+        import asyncio
+        from src.pipeline.async_orchestrator import AsyncPipelineOrchestrator
+
+        orchestrator = AsyncPipelineOrchestrator(
+            images_per_run=images_per_run,
+            use_comfyui=use_comfyui,
+        )
+        result = asyncio.run(orchestrator.run())
+
+        print(f"\n{'=' * 50}")
+        print("Resultado do pipeline multi-agente:")
+        print(f"  Trends coletados:    {result.trends_fetched}")
+        print(f"  Eventos enfileirados:{result.trend_events_queued}")
+        print(f"  Work orders:         {result.work_orders_emitted}")
+        print(f"  Imagens geradas:     {result.images_generated}")
+        print(f"  Pacotes produzidos:  {result.packages_produced}")
+        if result.content:
+            print("\nConteudo gerado:")
+            for pkg in result.content:
+                print(f"  - {pkg.phrase[:60]}...")
+                print(f"    -> {pkg.image_path}")
+                if pkg.caption:
+                    print(f"    Legenda: {pkg.caption[:80]}...")
+                if pkg.hashtags:
+                    print(f"    Hashtags: {' '.join(pkg.hashtags[:5])}...")
+                print(f"    Quality: {pkg.quality_score:.2f}")
         if result.errors:
             print(f"\nErros ({len(result.errors)}):")
             for err in result.errors:
