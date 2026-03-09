@@ -116,12 +116,13 @@ def _extract_text(response) -> str:
 def generate_json(
     system_prompt: str,
     user_message: str,
-    max_tokens: int = 2048,
+    max_tokens: int = 4096,
     model_name: str | None = None,
 ) -> str:
     """Gera JSON via Gemini com response_mime_type.
 
     Retorna string JSON (caller faz o parse).
+    Thinking desabilitado para garantir que todo o budget vai para o JSON.
     """
     client = _get_client()
     response = client.models.generate_content(
@@ -132,6 +133,7 @@ def generate_json(
             max_output_tokens=max_tokens,
             temperature=0.7,
             response_mime_type="application/json",
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         ),
     )
     return _extract_text(response)
