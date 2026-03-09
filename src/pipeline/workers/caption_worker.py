@@ -16,7 +16,7 @@ logger = logging.getLogger("clip-flow.worker.caption")
 # Reutiliza semaforo global do Gemini
 _gemini_semaphore = asyncio.Semaphore(GEMINI_MAX_CONCURRENT)
 
-CAPTION_PROMPT = """Voce e o social media manager do perfil @omagomestre no Instagram.
+CAPTION_PROMPT = """Voce e o social media manager do perfil @magomestre420 no Instagram.
 O perfil publica memes com frases engracadas de um mago sabio e zoeiro.
 
 Crie uma legenda para Instagram que:

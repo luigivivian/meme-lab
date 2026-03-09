@@ -23,7 +23,7 @@ GLOW_COLOR = (255, 200, 80, 15)      # Glow bem sutil
 FONT_SIZE = 48                       # Fonte menor e mais legivel
 WATERMARK_FONT_SIZE = 22
 WATERMARK_COLOR = (200, 180, 130, 120)  # Dourado sutil semi-transparente
-WATERMARK_TEXT = "@omagomestre"
+WATERMARK_TEXT = "@magomestre420"
 TEXT_VERTICAL_POSITION = 0.80         # Texto no terco inferior (0.0=topo, 1.0=base)
 
 # Prompt base para geracao de frases

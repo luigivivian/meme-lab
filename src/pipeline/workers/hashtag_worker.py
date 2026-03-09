@@ -12,7 +12,7 @@ logger = logging.getLogger("clip-flow.worker.hashtag")
 
 # Hashtags fixas do perfil (sempre incluidas)
 BRANDED_HASHTAGS = [
-    "#omagomestre",
+    "#magomestre420",
     "#magomestre",
     "#gandalf",
     "#memesmago",
