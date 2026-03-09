@@ -46,7 +46,7 @@ class ContentGenerator:
         extensions = ("*.jpg", "*.jpeg", "*.png", "*.webp")
         backgrounds = []
         for ext in extensions:
-            backgrounds.extend(BACKGROUNDS_DIR.glob(ext))
+            backgrounds.extend(BACKGROUNDS_DIR.rglob(ext))
         bg_paths = [str(p) for p in backgrounds]
         if not bg_paths:
             BACKGROUNDS_DIR.mkdir(parents=True, exist_ok=True)
