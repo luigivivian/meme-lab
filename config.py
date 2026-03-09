@@ -12,15 +12,15 @@ IMAGE_WIDTH = 1080
 IMAGE_HEIGHT = 1350
 
 # Estilo visual — tema mago místico medieval
-TEXT_COLOR = (255, 248, 220)          # Branco pergaminho (cornsilk)
-TEXT_STROKE_COLOR = (0, 0, 0)         # Contorno preto forte
-TEXT_STROKE_WIDTH = 3                 # Espessura do contorno
-SHADOW_COLOR = (0, 0, 0, 200)        # Sombra preta forte
-SHADOW_OFFSET = 4                    # Offset da sombra em px
-OVERLAY_COLOR = (10, 10, 30, 100)    # Azul noturno semi-transparente (leve p/ nao esconder background)
-VIGNETTE_STRENGTH = 180              # Intensidade da vinheta escura nas bordas (0-255)
-GLOW_COLOR = (255, 200, 80, 25)      # Dourado sutil para brilho mistico
-FONT_SIZE = 60                       # Fonte maior para impacto
+TEXT_COLOR = (255, 255, 255)          # Branco puro (melhor legibilidade)
+TEXT_STROKE_COLOR = (0, 0, 0)         # Contorno preto
+TEXT_STROKE_WIDTH = 2                 # Contorno mais fino e limpo
+SHADOW_COLOR = (0, 0, 0, 120)        # Sombra mais suave
+SHADOW_OFFSET = 3                    # Offset da sombra em px
+OVERLAY_COLOR = (10, 10, 30, 40)     # Overlay bem leve — mago visivel
+VIGNETTE_STRENGTH = 80               # Vinheta sutil nas bordas (0-255)
+GLOW_COLOR = (255, 200, 80, 15)      # Glow bem sutil
+FONT_SIZE = 48                       # Fonte menor e mais legivel
 WATERMARK_FONT_SIZE = 22
 WATERMARK_COLOR = (200, 180, 130, 120)  # Dourado sutil semi-transparente
 WATERMARK_TEXT = "@omagomestre"
