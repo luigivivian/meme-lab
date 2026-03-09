@@ -68,7 +68,7 @@ def generate(
             temperature=0.9,
         ),
     )
-    return response.text
+    return _extract_text(response)
 
 
 async def agenerate(
@@ -101,6 +101,18 @@ async def agenerate(
     return await _call()
 
 
+def _extract_text(response) -> str:
+    """Extrai apenas texto do modelo, ignorando thinking tokens (gemini-2.5+)."""
+    try:
+        parts = response.candidates[0].content.parts
+        text_parts = [p.text for p in parts if p.text and not getattr(p, "thought", False)]
+        if text_parts:
+            return "".join(text_parts)
+    except (AttributeError, IndexError):
+        pass
+    return response.text or ""
+
+
 def generate_json(
     system_prompt: str,
     user_message: str,
@@ -122,4 +134,4 @@ def generate_json(
             response_mime_type="application/json",
         ),
     )
-    return response.text
+    return _extract_text(response)
