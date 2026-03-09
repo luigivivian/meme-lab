@@ -151,6 +151,21 @@ COMFYUI_IMG2IMG_DENOISE = 0.55
 # Diretorio com imagens de referencia do Mago Mestre (geradas no Leonardo AI)
 COMFYUI_REFERENCE_DIR = ASSETS_DIR / "backgrounds" / "mago"
 
+# ===== Gemini Image Generation Settings =====
+
+# Habilitar geracao de backgrounds via Gemini API (com referencias visuais)
+GEMINI_IMAGE_ENABLED = True
+
+# Temperatura para geracao de imagem (0.0-2.0, mais alto = mais criativo)
+GEMINI_IMAGE_TEMPERATURE = 0.85
+
+# Quantas imagens de referencia enviar por geracao (3-7 recomendado, max 14)
+GEMINI_IMAGE_N_REFS = 5
+
+# Retry para rate limit 429
+GEMINI_IMAGE_MAX_RETRIES = 2
+GEMINI_IMAGE_WAIT_BASE = 60
+
 # ===== Multi-Agent Pipeline Settings =====
 
 # Timeout para cada agente individual (segundos)

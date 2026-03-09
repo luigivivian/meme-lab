@@ -37,6 +37,7 @@ class AsyncPipelineOrchestrator:
         images_per_run: int = 5,
         phrases_per_topic: int | None = None,
         use_comfyui: bool | None = None,
+        use_gemini_image: bool | None = None,
     ):
         self.images_per_run = images_per_run
         self.phrases_per_topic = phrases_per_topic or PIPELINE_PHRASES_PER_TOPIC
@@ -64,7 +65,10 @@ class AsyncPipelineOrchestrator:
         use_comfyui_flag = use_comfyui if use_comfyui is not None else False
         self.generation = GenerationLayer(
             phrase_worker=PhraseWorker(),
-            image_worker=ImageWorker(use_comfyui=use_comfyui_flag),
+            image_worker=ImageWorker(
+                use_comfyui=use_comfyui_flag,
+                use_gemini_image=use_gemini_image,
+            ),
             phrases_per_topic=self.phrases_per_topic,
         )
 
