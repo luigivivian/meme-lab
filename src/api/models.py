@@ -64,6 +64,7 @@ class PipelineRunRequest(BaseModel):
     phrases_per_topic: int = Field(default=1, ge=1, le=5, description="Frases por topico")
     use_comfyui: bool = Field(default=False, description="Usar ComfyUI local")
     use_gemini_image: bool | None = Field(default=None, description="Usar Gemini para backgrounds")
+    use_phrase_context: bool = Field(default=False, description="Background contextualizado pela frase (mais coerente, mas mais lento)")
 
 
 class GeneratePhrasesRequest(BaseModel):
@@ -80,3 +81,4 @@ class ComposeImageRequest(BaseModel):
     cenario_custom: str = Field(default="", description="Cenario customizado")
     auto_refine: bool = Field(default=False, description="Refinar background")
     refinement_passes: int = Field(default=1, ge=1, le=3)
+    use_phrase_context: bool = Field(default=False, description="Background contextualizado pela frase")

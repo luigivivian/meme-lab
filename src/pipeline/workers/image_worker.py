@@ -28,9 +28,15 @@ _gemini_image_semaphore = asyncio.Semaphore(GEMINI_MAX_CONCURRENT)
 class ImageWorker:
     """Gera background via Gemini/ComfyUI/estatico e compoe imagem final com Pillow."""
 
-    def __init__(self, use_comfyui: bool = False, use_gemini_image: bool | None = None):
+    def __init__(
+        self,
+        use_comfyui: bool = False,
+        use_gemini_image: bool | None = None,
+        use_phrase_context: bool = False,
+    ):
         self._generator = ContentGenerator(use_comfyui=use_comfyui)
         self._use_gemini_image = use_gemini_image if use_gemini_image is not None else GEMINI_IMAGE_ENABLED
+        self._use_phrase_context = use_phrase_context
         self._gemini_client = None
 
         if self._use_gemini_image:
@@ -72,11 +78,14 @@ class ImageWorker:
         # 1. Tentar Gemini Image API (prioridade)
         if self._gemini_client:
             try:
+                phrase_ctx = phrase if self._use_phrase_context else ""
                 bg = await self._gemini_client.agenerate_for_topic(
-                    topic, semaphore=_gemini_image_semaphore
+                    topic, semaphore=_gemini_image_semaphore,
+                    phrase_context=phrase_ctx,
                 )
                 if bg:
-                    logger.info(f"[{work_order.order_id}] Background via Gemini: {bg}")
+                    ctx_label = " (com contexto da frase)" if phrase_ctx else ""
+                    logger.info(f"[{work_order.order_id}] Background via Gemini{ctx_label}: {bg}")
             except Exception as e:
                 logger.warning(f"[{work_order.order_id}] Gemini Image falhou: {e}")
 

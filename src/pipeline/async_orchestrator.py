@@ -38,6 +38,7 @@ class AsyncPipelineOrchestrator:
         phrases_per_topic: int | None = None,
         use_comfyui: bool | None = None,
         use_gemini_image: bool | None = None,
+        use_phrase_context: bool = False,
     ):
         self.images_per_run = images_per_run
         self.phrases_per_topic = phrases_per_topic or PIPELINE_PHRASES_PER_TOPIC
@@ -68,6 +69,7 @@ class AsyncPipelineOrchestrator:
             image_worker=ImageWorker(
                 use_comfyui=use_comfyui_flag,
                 use_gemini_image=use_gemini_image,
+                use_phrase_context=use_phrase_context,
             ),
             phrases_per_topic=self.phrases_per_topic,
         )

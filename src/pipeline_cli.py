@@ -53,6 +53,11 @@ def main():
         action="store_true",
         help="Forçar uso de backgrounds estáticos (ignora config)",
     )
+    parser.add_argument(
+        "--phrase-context",
+        action="store_true",
+        help="Background contextualizado pela frase (mais coerente, mais lento)",
+    )
 
     args = parser.parse_args()
     setup_logging(args.verbose)
@@ -101,6 +106,7 @@ def main():
         orchestrator = AsyncPipelineOrchestrator(
             images_per_run=images_per_run,
             use_comfyui=use_comfyui,
+            use_phrase_context=args.phrase_context,
         )
         result = asyncio.run(orchestrator.run())
 

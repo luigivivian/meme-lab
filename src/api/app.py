@@ -251,6 +251,7 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
             phrases_per_topic=request.phrases_per_topic,
             use_comfyui=request.use_comfyui,
             use_gemini_image=request.use_gemini_image,
+            use_phrase_context=request.use_phrase_context,
         )
         result = await orchestrator.run()
 
@@ -452,6 +453,8 @@ async def compose_image(req: ComposeImageRequest):
     client = GeminiImageClient()
     bg_path = None
 
+    phrase_ctx = req.phrase if req.use_phrase_context else ""
+
     if client.is_available():
         if req.auto_refine:
             bg_path = await asyncio.to_thread(
@@ -461,8 +464,12 @@ async def compose_image(req: ComposeImageRequest):
             )
         else:
             bg_path = await asyncio.to_thread(
-                client.generate_image,
-                req.situacao, None, req.descricao_custom, req.cenario_custom,
+                lambda: client.generate_image(
+                    situacao_key=req.situacao,
+                    descricao_custom=req.descricao_custom,
+                    cenario_custom=req.cenario_custom,
+                    phrase_context=phrase_ctx,
+                )
             )
 
     if bg_path is None:
@@ -759,7 +766,9 @@ async def list_agents():
         try:
             mod = importlib.import_module(module_path)
             cls = getattr(mod, class_name)
-            available = cls().is_available()
+            result = cls().is_available()
+            import asyncio
+            available = (await result) if asyncio.iscoroutine(result) else result
         except Exception:
             available = False
         agents.append({"name": name, "available": available, "type": "source"})
@@ -967,4 +976,4 @@ def start_server(port: int = 8000, ngrok_token: str | None = None):
         except Exception as e:
             print(f"Erro ngrok: {e}")
 
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="127.0.0.1", port=port)

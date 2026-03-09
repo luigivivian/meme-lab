@@ -86,6 +86,8 @@ NEGATIVE_TRAITS = (
     "NOT young wizard, NOT clean/new clothing, NOT bright saturated colors, "
     "NOT centered in frame, NOT bright white background, NOT without hat, NOT short beard, "
     "NOT threatening expression, NOT different colored robes, "
+    "ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CAPTIONS, NO WATERMARKS, NO TYPOGRAPHY in the image. "
+    "The image must contain ZERO written text of any kind. "
     "photorealism only, no stylization whatsoever"
 )
 
@@ -225,8 +227,18 @@ def construir_prompt_completo(
     situacao_key: str,
     descricao_custom: str = "",
     cenario_custom: str = "",
+    phrase_context: str = "",
 ) -> str:
-    """Constroi prompt completo para geracao de imagem."""
+    """Constroi prompt completo para geracao de imagem.
+
+    Args:
+        situacao_key: chave da situacao base (ex: "cafe", "tecnologia")
+        descricao_custom: acao/pose customizada (sobrescreve a da situacao)
+        cenario_custom: cenario customizado (sobrescreve o da situacao)
+        phrase_context: frase que sera sobreposta na imagem — quando fornecida,
+            o Gemini adapta pose/expressao/cenario para refletir o conteudo da frase,
+            mantendo a situacao base como ponto de partida.
+    """
     if situacao_key == "custom" or situacao_key not in SITUACOES:
         acao = descricao_custom or "standing pose holding staff, wise expression"
         cenario = cenario_custom or "dark moody medieval forest with golden atmospheric lighting"
@@ -235,10 +247,25 @@ def construir_prompt_completo(
         acao = descricao_custom or sit["acao"]
         cenario = cenario_custom or sit["cenario"]
 
+    phrase_block = ""
+    if phrase_context:
+        phrase_block = (
+            f"\nPHRASE CONTEXT (for mood/atmosphere reference ONLY — DO NOT render this text in the image):\n"
+            f'"{phrase_context}"\n'
+            f"CRITICAL: Do NOT write, render, or include ANY text, letters, words, or captions "
+            f"in the generated image. The phrase above is ONLY for understanding the mood. "
+            f"Adapt the wizard's expression, body language, pose, and scene "
+            f"atmosphere to visually reflect the MOOD and MEANING of the phrase. "
+            f"The background scene should feel like a natural visual companion to the text. "
+            f"Use the ACTION/POSE and SETTING below as a starting point, but feel free to "
+            f"adjust details (props, expressions, ambient elements) to better match the phrase.\n"
+        )
+
     return (
         f"Generate a PHOTOREALISTIC cinematic portrait of this wizard character "
         f"matching the reference images EXACTLY.\n\n"
         f"CHARACTER (replicate precisely from reference):\n{CHARACTER_DNA}\n\n"
+        f"{phrase_block}\n"
         f"ACTION/POSE:\n{acao}\n\n"
         f"SETTING/BACKGROUND:\n{cenario}\n\n"
         f"COMPOSITION:\n{COMPOSITION}\n\n"
@@ -369,8 +396,13 @@ class GeminiImageClient:
         descricao_custom: str = "",
         cenario_custom: str = "",
         nome_arquivo: str = "",
+        phrase_context: str = "",
     ) -> str | None:
         """Gera uma imagem do mago para uma situacao.
+
+        Args:
+            phrase_context: frase para contextualizar o background (opcional).
+                Quando fornecido, o Gemini adapta a cena ao conteudo da frase.
 
         Returns:
             caminho da imagem gerada ou None se falhar
@@ -382,7 +414,9 @@ class GeminiImageClient:
             return None
 
         refs = _selecionar_referencias(self._referencias, n=self.n_referencias)
-        prompt_texto = construir_prompt_completo(situacao_key, descricao_custom, cenario_custom)
+        prompt_texto = construir_prompt_completo(
+            situacao_key, descricao_custom, cenario_custom, phrase_context
+        )
 
         partes = []
         for img in refs:
@@ -537,12 +571,18 @@ class GeminiImageClient:
         descricao_custom: str = "",
         cenario_custom: str = "",
         semaphore: asyncio.Semaphore | None = None,
+        phrase_context: str = "",
     ) -> str | None:
         """Versao async de generate_image."""
         async def _call():
             return await asyncio.to_thread(
-                self.generate_image,
-                situacao_key, output_path, descricao_custom, cenario_custom,
+                lambda: self.generate_image(
+                    situacao_key=situacao_key,
+                    output_path=output_path,
+                    descricao_custom=descricao_custom,
+                    cenario_custom=cenario_custom,
+                    phrase_context=phrase_context,
+                )
             )
         if semaphore:
             async with semaphore:
@@ -568,21 +608,38 @@ class GeminiImageClient:
                 return await _call()
         return await _call()
 
-    def generate_for_topic(self, topic, output_path: str | None = None) -> str | None:
-        """Gera imagem a partir de um AnalyzedTopic ou string."""
+    def generate_for_topic(
+        self, topic, output_path: str | None = None,
+        phrase_context: str = "",
+    ) -> str | None:
+        """Gera imagem a partir de um AnalyzedTopic ou string.
+
+        Args:
+            phrase_context: frase para contextualizar o background.
+                Quando fornecido, o cenario reflete o conteudo da frase.
+        """
         if isinstance(topic, str):
             situacao_key = _mapear_situacao(topic)
         else:
             situacao_key = _mapear_situacao(
                 topic.gandalf_topic, getattr(topic, "humor_angle", "")
             )
-        return self.generate_image(situacao_key=situacao_key, output_path=output_path)
+        return self.generate_image(
+            situacao_key=situacao_key, output_path=output_path,
+            phrase_context=phrase_context,
+        )
 
     async def agenerate_for_topic(
         self, topic, output_path: str | None = None,
         semaphore: asyncio.Semaphore | None = None,
+        phrase_context: str = "",
     ) -> str | None:
-        """Versao async de generate_for_topic."""
+        """Versao async de generate_for_topic.
+
+        Args:
+            phrase_context: frase para contextualizar o background.
+                Quando fornecido, o cenario reflete o conteudo da frase.
+        """
         if isinstance(topic, str):
             situacao_key = _mapear_situacao(topic)
         else:
@@ -590,5 +647,6 @@ class GeminiImageClient:
                 topic.gandalf_topic, getattr(topic, "humor_angle", "")
             )
         return await self.agenerate_image(
-            situacao_key=situacao_key, output_path=output_path, semaphore=semaphore,
+            situacao_key=situacao_key, output_path=output_path,
+            semaphore=semaphore, phrase_context=phrase_context,
         )
