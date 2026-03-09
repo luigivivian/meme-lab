@@ -50,7 +50,7 @@ class ClaudeAnalyzer:
         raw = generate_json(
             system_prompt=prompt,
             user_message=f"Tópicos em alta:\n{trends_text}",
-            max_tokens=2048,
+            max_tokens=4096,
         )
 
         selections = self._parse_json(raw)
