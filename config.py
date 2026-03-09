@@ -17,14 +17,14 @@ TEXT_STROKE_COLOR = (0, 0, 0)         # Contorno preto forte
 TEXT_STROKE_WIDTH = 3                 # Espessura do contorno
 SHADOW_COLOR = (0, 0, 0, 200)        # Sombra preta forte
 SHADOW_OFFSET = 4                    # Offset da sombra em px
-OVERLAY_COLOR = (10, 10, 30, 150)    # Azul noturno semi-transparente
+OVERLAY_COLOR = (10, 10, 30, 100)    # Azul noturno semi-transparente (leve p/ nao esconder background)
 VIGNETTE_STRENGTH = 180              # Intensidade da vinheta escura nas bordas (0-255)
 GLOW_COLOR = (255, 200, 80, 25)      # Dourado sutil para brilho mistico
 FONT_SIZE = 60                       # Fonte maior para impacto
 WATERMARK_FONT_SIZE = 22
 WATERMARK_COLOR = (200, 180, 130, 120)  # Dourado sutil semi-transparente
 WATERMARK_TEXT = "@omagomestre"
-TEXT_VERTICAL_POSITION = 0.35         # Texto no terco superior (0.0=topo, 1.0=base)
+TEXT_VERTICAL_POSITION = 0.80         # Texto no terco inferior (0.0=topo, 1.0=base)
 
 # Prompt base para geracao de frases
 SYSTEM_PROMPT = """Voce e o Mago Mestre — um mago sabio, misterioso e zoeiro que fala verdades da vida com humor viral brasileiro.

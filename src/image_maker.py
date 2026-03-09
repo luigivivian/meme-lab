@@ -149,8 +149,8 @@ def _create_glow_layer(width: int, height: int, glow_color: tuple) -> Image.Imag
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(glow)
 
-    # Circulo de luz suave no centro-superior
-    cx, cy = width // 2, int(height * 0.35)
+    # Circulo de luz suave na area do texto
+    cx, cy = width // 2, int(height * TEXT_VERTICAL_POSITION)
     radius = int(width * 0.5)
     r, g, b, a = glow_color
 
@@ -209,9 +209,10 @@ def create_image(text: str, background_path: str, output_path: str | None = None
         line_heights.append(bbox[3] - bbox[1])
     total_height = sum(line_heights) + line_spacing * (len(lines) - 1)
 
-    # Posicao vertical configuravel (terco superior por padrao)
+    # Posicao vertical configuravel
     y = int(IMAGE_HEIGHT * TEXT_VERTICAL_POSITION) - (total_height // 2)
     y = max(margin, y)  # Nao deixar sair do topo
+    y = min(y, IMAGE_HEIGHT - total_height - 70)  # Nao sobrepor watermark
 
     # Desenhar cada linha com contorno + sombra
     for i, line in enumerate(lines):
