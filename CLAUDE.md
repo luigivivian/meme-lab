@@ -1,167 +1,159 @@
 # Clip-Flow
 
-Automacao de memes "O Mago Mestre" para Instagram (@omagomestre). Pipeline que busca trends virais, gera frases engracadas via Claude API, e cria imagens formatadas com estilo mistico medieval.
+Automacao de memes "O Mago Mestre" para Instagram (@magomestre420). Pipeline multi-agente que busca trends virais, gera frases via Gemini API, cria backgrounds com Gemini Image, e compoe imagens formatadas 1080x1350.
 
 ## Stack
 
 - **Python 3.14** / Windows 11
 - **Pillow** — composicao de imagens 1080x1350 (4:5 Instagram)
-- **Anthropic SDK** — Claude API para geracao de frases e analise de trends
+- **Google Gemini API** — geracao de frases, analise de trends, e geracao de backgrounds com referencias visuais
 - **trendspyg** — Google Trends RSS (substitui pytrends, arquivado em 2025)
 - **feedparser** — RSS feeds (Reddit + Sensacionalista)
 - **APScheduler** — agendamento automatico do pipeline
+- **FastAPI + uvicorn** — API REST para controlar o pipeline
+- **pyngrok** — tunel publico para a API (opcional)
 
 ## Estrutura do Projeto
 
 ```
 clip-flow/
-  config.py                  # Configuracoes centralizadas (imagem, prompts, pipeline)
+  config.py                    # Configuracoes centralizadas (imagem, prompts, pipeline, Gemini, ComfyUI)
+  config/themes.yaml           # Situacoes visuais para backgrounds (YAML)
   requirements.txt
-  .env                       # ANTHROPIC_API_KEY (nao committar)
+  .env                         # GOOGLE_API_KEY (nao committar)
   assets/
-    character_model.md       # DNA do personagem + prompts AI para gerar backgrounds consistentes
-    backgrounds/             # Imagens de fundo do Mago (.jpg/.png/.webp) — cartoon mistico medieval
-    fonts/                   # Fontes customizadas (.ttf/.otf) — fallback: Impact/Arial do Windows
-  output/                    # Imagens geradas (gitignored)
+    character_model.md         # DNA do personagem + prompts AI
+    backgrounds/mago/          # Imagens de referencia do Mago (usadas pelo Gemini Image)
+    fonts/                     # Fontes customizadas — fallback: Impact/Arial do Windows
+  output/                      # Imagens geradas (gitignored)
   src/
-    cli.py                   # CLI original: --topic "tema" --count N / --text "frase"
-    phrases.py               # generate_phrases(topic, count) via Claude API
-    image_maker.py           # create_image(text, bg_path) — composicao Pillow com vinheta, glow, contorno
-    pipeline_cli.py          # CLI do pipeline: --mode once|schedule --count N --interval N
+    cli.py                     # CLI original: --topic "tema" --count N / --text "frase"
+    llm_client.py              # Client unificado Gemini (google.genai)
+    phrases.py                 # generate_phrases(topic, count) via Gemini API
+    image_maker.py             # create_image(text, bg_path) — composicao Pillow
+    pipeline_cli.py            # CLI: --mode once|schedule|agents --comfyui --phrase-context
+    image_gen/
+      gemini_client.py         # GeminiImageClient — geracao via Gemini com refs visuais + refinamento
+      prompt_builder.py        # KEYWORD_MAP + SCENE_TEMPLATES para mapear temas a situacoes
+      comfyui_client.py        # ComfyUIClient REST/WS (fallback local)
+    api/
+      app.py                   # FastAPI — rotas de pipeline, geracao, themes, agents
+      models.py                # Pydantic request/response models
+      __main__.py              # python -m src.api [--port] [--ngrok]
     pipeline/
-      models.py              # Dataclasses: TrendItem, AnalyzedTopic, GeneratedContent, PipelineResult
-      orchestrator.py        # Coordena: agents -> aggregator -> analyzer -> generator
-      scheduler.py           # APScheduler BlockingScheduler com IntervalTrigger
+      models.py                # Dataclasses originais: TrendItem, AnalyzedTopic
+      models_v2.py             # TrendEvent, WorkOrder, ContentPackage, AgentPipelineResult
+      async_orchestrator.py    # AsyncPipelineOrchestrator (L1→L2→L3→L4→L5)
+      monitoring.py            # MonitoringLayer — fetch paralelo de agents
+      broker.py                # TrendBroker — asyncio.Queue + dedup
+      curator.py               # CuratorAgent — ClaudeAnalyzer + KEYWORD_MAP → WorkOrders
       agents/
-        base.py              # BaseSourceAgent (ABC): fetch() -> list[TrendItem]
-        google_trends.py     # GoogleTrendsAgent — trendspyg RSS (geo="BR")
-        reddit_memes.py      # RedditMemesAgent — RSS via feedparser (6 subreddits)
-        rss_feeds.py         # RSSFeedAgent — feedparser (reddit RSS + sensacionalista)
+        async_base.py          # AsyncSourceAgent ABC + SyncAgentAdapter
+        google_trends.py       # GoogleTrendsAgent — trendspyg RSS (geo="BR")
+        reddit_memes.py        # RedditMemesAgent — RSS via feedparser
+        rss_feeds.py           # RSSFeedAgent — feedparser
+        tiktok_trends.py       # Stub — requer API key
+        instagram_explore.py   # Stub — requer API key
+        twitter_x.py           # Stub — requer API key
       processors/
-        aggregator.py        # TrendAggregator — merge, dedup por similaridade, boost multi-fonte
-        analyzer.py          # ClaudeAnalyzer — Claude seleciona melhores temas para humor
-        generator.py         # ContentGenerator — wrapper de phrases.py + image_maker.py
+        aggregator.py          # TrendAggregator — merge, dedup, boost multi-fonte
+        analyzer.py            # ClaudeAnalyzer — seleciona melhores temas (JSON)
+        generator.py           # ContentGenerator — wrapper sync
+      workers/
+        phrase_worker.py       # PhraseWorker — async wrapper de generate_phrases()
+        image_worker.py        # ImageWorker — Gemini/ComfyUI/estatico + Pillow compose
+        caption_worker.py      # CaptionWorker — legenda Instagram com CTA
+        hashtag_worker.py      # HashtagWorker — hashtags trending + branded
+        quality_worker.py      # QualityWorker — score de qualidade
+        generation_layer.py    # GenerationLayer — processa WorkOrders em paralelo
+        post_production.py     # PostProductionLayer — caption + hashtags + quality
+  scripts/
+    setup_comfyui.py           # Instalacao ComfyUI + Flux Dev GGUF
 ```
 
 ## Como Executar
 
 ```bash
-# CLI manual (frase avulsa ou por tema)
+python -m pip install -r requirements.txt
+
+# CLI manual
 python -m src.cli --topic "segunda-feira" --count 5
-python -m src.cli --text "Voce nao passa... da primeira fase"
 
-# Pipeline automatizado (uma vez)
-python -m src.pipeline_cli --mode once --count 5 --verbose
+# Pipeline multi-agente
+python -m src.pipeline_cli --mode agents --count 5 --verbose
 
-# Pipeline com agendamento
-python -m src.pipeline_cli --mode schedule --interval 6 --count 5
+# Pipeline com background contextualizado pela frase
+python -m src.pipeline_cli --mode agents --count 5 --phrase-context
+
+# API REST (localhost:8000/docs para Swagger)
+python -m src.api --port 8000
 ```
 
-## Fluxo do Pipeline
+## Arquitetura Multi-Agente (5 Camadas)
 
 ```
-[Google Trends] + [Reddit RSS] + [RSS Feeds]
-        |                |              |
-        v                v              v
-            [TrendAggregator]
-            merge + dedup + ranking
-                    |
-                    v
-            [ClaudeAnalyzer]
-            seleciona N melhores temas
-            retorna JSON com gandalf_topic + humor_angle
-                    |
-                    v
-            [ContentGenerator]
-            generate_phrases() + create_image()
-                    |
-                    v
-              output/*.png
+L1 Monitoring ── fetch paralelo: GoogleTrends + RedditRSS + RSSFeeds + stubs
+L2 Broker ────── dedup + ranking via TrendAggregator (asyncio.Queue)
+L3 Curator ───── ClaudeAnalyzer seleciona N temas → WorkOrders com situacao_key
+L4 Generation ── PhraseWorker + ImageWorker em paralelo por WorkOrder
+L5 PostProd ──── CaptionWorker + HashtagWorker + QualityWorker em paralelo
+                 → output/*.png + metadados
 ```
 
-## Estilo Visual — Mago Mistico Medieval
+## Geracao de Backgrounds
 
-A composicao de imagem segue camadas nesta ordem:
+Fallback: **Gemini Image API → ComfyUI local → backgrounds estaticos**
 
-```
-1. Background (assets/backgrounds/)  — imagem do mago cartoon mistico
-2. Overlay azul noturno              — OVERLAY_COLOR (10,10,30, alpha 150)
-3. Vinheta escura nas bordas         — VIGNETTE_STRENGTH=180
-4. Glow dourado sutil no centro      — GLOW_COLOR (255,200,80, alpha 25)
-5. Texto com contorno preto          — cor pergaminho + stroke 3px
-6. Watermark dourado                 — @omagomestre canto inferior direito
-```
+- **Gemini Image**: 5 refs do mago + prompt fotorrealista com situacao/pose/cenario
+- **use_phrase_context**: injeta frase no prompt para adaptar cenario ao conteudo. Prompt proibe renderizar texto na imagem (apenas mood reference).
+- **ComfyUI**: Flux Dev GGUF + LoRA. Requer GPU (--lowvram).
 
-**Paleta de cores:**
-- Texto: branco pergaminho `(255, 248, 220)` com contorno preto 3px
-- Overlay: azul noturno `(10, 10, 30, 150)`
-- Watermark: dourado sutil `(200, 180, 130, 120)`
-- Glow: dourado `(255, 200, 80, 25)`
+13 situacoes em `gemini_client.py` + extras em `config/themes.yaml`.
 
-**Posicao do texto:** terco superior (`TEXT_VERTICAL_POSITION=0.35`) — area inferior reservada para o personagem do mago no background.
+## API REST
 
-**Character Model completo:** ver `assets/character_model.md` para DNA do personagem, prompts por plataforma (Midjourney/Leonardo/DALL-E/Flux), variacoes de cenario, e checklist de consistencia.
+`http://localhost:8000/docs` para Swagger. Principais rotas:
+- `POST /pipeline/run` — pipeline completo (`use_phrase_context`, `use_gemini_image`, `count`)
+- `POST /generate/compose` — background + frase = imagem final
+- `POST /phrases/generate` — gerar frases por tema
+- `GET /themes` / `POST /themes/generate` — gerenciar situacoes visuais
+- `GET /agents` — listar agents e status
 
-**Prompt base para gerar backgrounds (resumo):**
-```
-Semi-realistic cartoon elderly wizard, long white wavy beard, tall pointed
-blue-grey hat, dark midnight blue robes with subtle gold trim, gnarled wooden
-staff with golden glow, bright blue twinkling eyes, warm wise expression.
-Dark moody fantasy atmosphere, soft golden lighting. Vertical 4:5 ratio,
-character centered in lower third, upper area open for text overlay.
-```
+## Estilo Visual
 
-## Configuracoes Importantes (config.py)
+Composicao Pillow: background → overlay (10,10,30,40) → vinheta(80) → glow(255,200,80,15) → texto branco stroke 2px → watermark @magomestre420.
 
-- `IMAGE_WIDTH=1080, IMAGE_HEIGHT=1350` — formato Instagram 4:5
-- `FONT_SIZE=60` — fonte principal das frases
-- `TEXT_STROKE_WIDTH=3` — contorno preto para legibilidade
-- `TEXT_VERTICAL_POSITION=0.35` — texto no terco superior
-- `WATERMARK_TEXT="@omagomestre"` — marca d'agua
-- `PIPELINE_IMAGES_PER_RUN=5` — imagens por execucao
-- `PIPELINE_INTERVAL_HOURS=6` — intervalo entre execucoes
-- `PIPELINE_PHRASES_PER_TOPIC=1` — frases por tema selecionado
-- `PIPELINE_GOOGLE_TRENDS_GEO="BR"` — Google Trends Brasil
+Texto no terco inferior (`TEXT_VERTICAL_POSITION=0.80`), fonte 48px. Backgrounds Gemini: fotorrealista cinematico, `NEGATIVE_TRAITS` proibe texto/letras.
 
-## Modelo Claude
+## Configuracoes Chave (config.py)
 
-Usar `claude-sonnet-4-20250514` para todas as chamadas (phrases.py e analyzer.py).
+- `IMAGE_WIDTH=1080, IMAGE_HEIGHT=1350` — Instagram 4:5
+- `FONT_SIZE=48`, `TEXT_STROKE_WIDTH=2`, `TEXT_VERTICAL_POSITION=0.80`
+- `WATERMARK_TEXT="@magomestre420"`
+- `GEMINI_IMAGE_ENABLED=True`, `GEMINI_MAX_CONCURRENT=5`
+- `COMFYUI_MAX_CONCURRENT=1` (semaforo GPU)
+- `PIPELINE_IMAGES_PER_RUN=5`, `PIPELINE_GOOGLE_TRENDS_GEO="BR"`
 
 ## Tom do Conteudo — CRITICO
 
-O conteudo DEVE ser **VIRAL, ENGRACADO, LEVE e RELATABLE**. Estilo memes brasileiros do Twitter/TikTok.
+**VIRAL, ENGRACADO, LEVE, RELATABLE**. Memes brasileiros estilo Twitter/TikTok. Tom de "tio sabio zoeiro".
 
-**FAZER:**
-- Humor sobre cotidiano (trabalho, segunda-feira, wifi, transito, comida)
-- Frases que geram identificacao ("MEU DEUS SOU EU")
-- Ironia leve estilo Museu de Memes / Chapolin Sincero
-- Tom de "tio sabio zoeiro"
-
-**NAO FAZER:**
-- NUNCA frases desmotivacionais, negativas, pessimistas
-- NUNCA humor acido, ofensivo ou grosseiro
-- NUNCA politica, religiao, temas polemicos
-- NUNCA conteudo que magoa ou desanima
-
-Exemplos corretos:
-- "Eu no domingo a noite fingindo que segunda nao existe"
-- "WiFi caiu e eu descobri que nao sei viver sem internet"
-- "Cafe e o unico relacionamento estavel que eu mantenho"
+**NUNCA**: desmotivacional, ofensivo, politica, religiao, conteudo que magoa.
 
 ## Decisoes Tecnicas
 
-- **Reddit JSON API bloqueada (403)** — usar RSS via feedparser em vez de JSON API
-- **Acentos em filenames** — usar `unicodedata.normalize("NFKD", slug)` para remover
-- **Pipeline tolerante a falhas** — se um agent falha, os outros continuam normalmente
-- **JSON parsing robusto** — analyzer.py tem 3 fallbacks (direto, code block, regex)
-- **Fontes** — prioriza assets/fonts/, fallback para Windows system fonts (Impact, Arial)
+- **Gemini API** para frases + analise + imagem (substituiu Anthropic SDK)
+- **Reddit JSON API bloqueada (403)** — RSS via feedparser
+- **asyncio.to_thread()** para wrapping sync existente
+- **Semaphore**: GPU=1, Gemini=5
+- **NO TEXT em backgrounds**: Gemini proibido de renderizar texto; overlay feito pelo Pillow
 
 ## Requisitos
 
-- `ANTHROPIC_API_KEY` configurada no `.env`
-- Python 3.12+ (usa `type | None` syntax)
-- Dependencias: `pip install -r requirements.txt`
+- `GOOGLE_API_KEY` no `.env`
+- Python 3.12+
+- `python -m pip install -r requirements.txt`
 
 ## Idioma
 
-O projeto, comentarios, prompts e mensagens de log sao em **portugues brasileiro**. Manter esse padrao.
+Projeto, comentarios, prompts e logs em **portugues brasileiro**.
