@@ -1,4 +1,4 @@
-"""PhraseWorker — gera frases via Claude API.
+"""PhraseWorker — gera frases via Gemini API.
 
 Wrapper async de src.phrases.generate_phrases().
 """
@@ -6,18 +6,18 @@ Wrapper async de src.phrases.generate_phrases().
 import asyncio
 import logging
 
-from config import CLAUDE_MAX_CONCURRENT
+from config import GEMINI_MAX_CONCURRENT
 from src.phrases import generate_phrases
 from src.pipeline.models_v2 import WorkOrder
 
 logger = logging.getLogger("clip-flow.worker.phrase")
 
-# Semaforo global para limitar chamadas simultaneas ao Claude
-_claude_semaphore = asyncio.Semaphore(CLAUDE_MAX_CONCURRENT)
+# Semaforo global para limitar chamadas simultaneas ao Gemini
+_gemini_semaphore = asyncio.Semaphore(GEMINI_MAX_CONCURRENT)
 
 
 class PhraseWorker:
-    """Gera frases humoristicas via Claude API."""
+    """Gera frases humoristicas via Gemini API."""
 
     async def generate(self, work_order: WorkOrder, count: int = 1) -> list[str]:
         """Gera frases para um WorkOrder.
@@ -29,7 +29,7 @@ class PhraseWorker:
         Returns:
             lista de frases geradas
         """
-        async with _claude_semaphore:
+        async with _gemini_semaphore:
             logger.info(
                 f"[{work_order.order_id}] Gerando {count} frase(s) "
                 f"para '{work_order.gandalf_topic}'"

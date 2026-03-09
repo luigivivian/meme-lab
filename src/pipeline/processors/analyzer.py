@@ -1,14 +1,9 @@
 import json
-import os
 import re
 import logging
 
-from dotenv import load_dotenv
-import anthropic
-
 from src.pipeline.models import TrendItem, AnalyzedTopic, TrendSource
-
-load_dotenv()
+from src.llm_client import generate_json
 
 logger = logging.getLogger("clip-flow.analyzer")
 
@@ -41,19 +36,10 @@ Responda APENAS em JSON válido, no formato:
 
 
 class ClaudeAnalyzer:
-    """Usa Claude para analisar trends e selecionar os melhores temas."""
-
-    def __init__(self):
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key or api_key == "your-api-key-here":
-            raise ValueError(
-                "ANTHROPIC_API_KEY não configurada. "
-                "Obtenha sua chave em: https://console.anthropic.com/settings/keys"
-            )
-        self.client = anthropic.Anthropic(api_key=api_key)
+    """Usa Gemini para analisar trends e selecionar os melhores temas."""
 
     def analyze(self, trends: list[TrendItem], count: int = 5) -> list[AnalyzedTopic]:
-        """Envia trends para Claude e recebe tópicos curados para Gandalf Sincero."""
+        """Envia trends para Gemini e recebe tópicos curados para Gandalf Sincero."""
         trends_text = "\n".join(
             f"- {t.title} (fonte: {t.source.value}, tráfego: {t.traffic or 'N/A'})"
             for t in trends
@@ -61,16 +47,12 @@ class ClaudeAnalyzer:
 
         prompt = ANALYZER_PROMPT.format(count=count)
 
-        message = self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+        raw = generate_json(
+            system_prompt=prompt,
+            user_message=f"Tópicos em alta:\n{trends_text}",
             max_tokens=2048,
-            system=prompt,
-            messages=[
-                {"role": "user", "content": f"Tópicos em alta:\n{trends_text}"}
-            ],
         )
 
-        raw = message.content[0].text
         selections = self._parse_json(raw)
 
         # Mapear de volta para AnalyzedTopic
@@ -95,14 +77,12 @@ class ClaudeAnalyzer:
         return analyzed
 
     def _parse_json(self, raw: str) -> list[dict]:
-        """Parse JSON da resposta do Claude com fallbacks."""
-        # Tentar parse direto
+        """Parse JSON da resposta com fallbacks."""
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
             pass
 
-        # Tentar extrair de code block markdown
         if "```" in raw:
             match = re.search(r"```(?:json)?\s*(.*?)```", raw, re.DOTALL)
             if match:
@@ -111,7 +91,6 @@ class ClaudeAnalyzer:
                 except json.JSONDecodeError:
                     pass
 
-        # Último recurso: encontrar array JSON no texto
         match = re.search(r"\[.*\]", raw, re.DOTALL)
         if match:
             try:
@@ -119,5 +98,5 @@ class ClaudeAnalyzer:
             except json.JSONDecodeError:
                 pass
 
-        logger.error(f"Não foi possível parsear JSON do Claude: {raw[:200]}")
+        logger.error(f"Não foi possível parsear JSON: {raw[:200]}")
         return []

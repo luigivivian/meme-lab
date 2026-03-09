@@ -89,9 +89,9 @@ class ContentGenerator:
             return None
 
         try:
-            if COMFYUI_PROMPT_STRATEGY == "claude":
-                from src.image_gen.prompt_builder import build_prompt_with_claude
-                prompt = build_prompt_with_claude(topic)
+            if COMFYUI_PROMPT_STRATEGY in ("claude", "gemini"):
+                from src.image_gen.prompt_builder import build_prompt_with_llm
+                prompt = build_prompt_with_llm(topic)
             else:
                 from src.image_gen.prompt_builder import build_prompt
                 prompt = build_prompt(topic)

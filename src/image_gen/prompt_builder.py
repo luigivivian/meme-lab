@@ -5,11 +5,6 @@ incluindo DNA do personagem, cenario tematico e composicao.
 """
 
 import logging
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
 
 logger = logging.getLogger("clip-flow.prompt_builder")
 
@@ -273,17 +268,12 @@ def build_prompt(topic) -> str:
     return prompt
 
 
-def build_prompt_with_claude(topic) -> str:
-    """Usa Claude para gerar um prompt de imagem mais criativo e especifico.
+def build_prompt_with_llm(topic) -> str:
+    """Usa LLM (Gemini) para gerar um prompt de imagem mais criativo e especifico.
 
     Fallback para build_prompt() se a API falhar.
     Aceita AnalyzedTopic ou string.
     """
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key or api_key == "your-api-key-here":
-        logger.warning("ANTHROPIC_API_KEY nao configurada, usando prompt estatico")
-        return build_prompt(topic)
-
     if isinstance(topic, str):
         gandalf_topic = topic
         humor_angle = "humor leve e relatable"
@@ -292,31 +282,25 @@ def build_prompt_with_claude(topic) -> str:
         humor_angle = topic.humor_angle
 
     try:
-        import anthropic
+        from src.llm_client import generate
 
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=300,
-            system=(
+        prompt = generate(
+            system_prompt=(
                 "Voce gera prompts curtos para Stable Diffusion / Flux. "
                 "O personagem e SEMPRE o mesmo: um mago idoso cartoon semi-realista "
                 "com barba branca longa, chapeu pontudo cinza-azulado, tunica azul noturno "
                 "com detalhes dourados, cajado de madeira com brilho dourado, olhos azuis. "
                 "Responda APENAS com o prompt em ingles, uma unica linha, sem explicacao."
             ),
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Crie um prompt de imagem para o cenario: '{gandalf_topic}' "
-                    f"com angulo de humor: '{humor_angle}'. "
-                    f"O mago deve estar no terco inferior, area superior livre para texto. "
-                    f"Formato vertical 4:5, atmosfera escura mistica com iluminacao dourada. "
-                    f"Comece com 'ohwx_mago' como trigger word."
-                ),
-            }],
-        )
-        prompt = message.content[0].text.strip()
+            user_message=(
+                f"Crie um prompt de imagem para o cenario: '{gandalf_topic}' "
+                f"com angulo de humor: '{humor_angle}'. "
+                f"O mago deve estar no terco inferior, area superior livre para texto. "
+                f"Formato vertical 4:5, atmosfera escura mistica com iluminacao dourada. "
+                f"Comece com 'ohwx_mago' como trigger word."
+            ),
+            max_tokens=300,
+        ).strip()
 
         # Garantir trigger word
         if not prompt.lower().startswith("ohwx_mago"):
@@ -326,9 +310,9 @@ def build_prompt_with_claude(topic) -> str:
         if "vertical" not in prompt.lower():
             prompt += f", {COMPOSITION}"
 
-        logger.info(f"Prompt via Claude: {prompt[:100]}...")
+        logger.info(f"Prompt via LLM: {prompt[:100]}...")
         return prompt
 
     except Exception as e:
-        logger.warning(f"Falha no Claude para prompt de imagem: {e}")
+        logger.warning(f"Falha no LLM para prompt de imagem: {e}")
         return build_prompt(topic)
