@@ -10,6 +10,11 @@ DEFAULT_SUBREDDITS = [
     "memes",
     "dankmemes",
     "meirl",
+    "trees",
+    "see",
+    "StonerMemes",
+    "weed",
+    "highdeas",
 ]
 
 
