@@ -5,9 +5,7 @@ DEFAULT_FEEDS = [
     "https://www.reddit.com/r/brasil/hot/.rss",
     "https://www.reddit.com/r/eu_nvr/hot/.rss",
     "https://www.reddit.com/r/memes/hot/.rss",
-    "https://www.reddit.com/r/trees/hot/.rss",
-    "https://www.reddit.com/r/StonerMemes/hot/.rss",
-    "https://www.reddit.com/r/highdeas/hot/.rss",
+    "https://www.reddit.com/r/funny/hot/.rss",
     "https://www.sensacionalista.com.br/feed/",
 ]
 

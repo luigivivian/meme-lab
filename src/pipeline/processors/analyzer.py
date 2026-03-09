@@ -7,38 +7,39 @@ from src.llm_client import generate_json
 
 logger = logging.getLogger("clip-flow.analyzer")
 
-ANALYZER_PROMPT = """Você é o curador de conteúdo para o "Mago Mestre" — um bruxo velho maconheiro que posta
-memes virais com humor stoner brasileiro. Ele conhece da rua, fuma um e filosofa.
+ANALYZER_PROMPT = """Você é o curador de conteúdo para o "Mago Mestre" — um bruxo velho e sábio que posta
+memes virais com humor brasileiro. Ele já viu de tudo na vida e comenta o cotidiano com sabedoria cômica.
 
 Abaixo está uma lista de tópicos em alta (trending). Sua tarefa:
 1. Filtre APENAS tópicos que rendem MEMES virais (ignore notícias sérias, política, tragédias)
-2. Selecione até {count} tópicos que combinem com humor stoner/maconheiro/cotidiano
+2. Selecione até {count} tópicos que combinem com humor do cotidiano, preguiça, comida, etc.
 3. Se NENHUM trend for bom para meme, use temas CLICHÊ que sempre funcionam (veja abaixo)
 
 Para cada tópico, forneça:
-   - gandalf_topic: tema adaptado para humor do mago maconheiro
-   - humor_angle: como tornar isso engraçado (perspectiva de chapado)
+   - gandalf_topic: tema adaptado para humor do mago sábio
+   - humor_angle: como tornar isso engraçado (perspectiva do velho sábio zoeiro)
    - relevance_score: 0 a 1
 
 TEMAS CLICHÊ (use quando os trends não prestam):
-- Larica de madrugada, delivery 3h da manhã
-- Fumar um e filosofar sobre a vida
-- Segunda-feira vs ficar em casa chapado
+- Fome de madrugada, delivery 3h da manhã
+- Segunda-feira vs ficar em casa
 - Cancelar planos pra ficar deitado
-- Munchies, geladeira vazia, miojo gourmet
-- Pensamentos de chapado ("e se o universo for um baseado gigante?")
+- Geladeira vazia, miojo gourmet, dieta que nunca começa
+- Pensamentos aleatórios de madrugada
 - Preguiça extrema, dormir 14h, alarme ignorado
-- WiFi caiu e a larica bateu junto
+- WiFi caiu e a fome bateu junto
+- Procrastinação, "amanhã eu faço"
+- Café como combustível de vida
 
 PRIORIZE:
 - Memes, humor, coisas engraçadas e relatables
-- Temas que combinam com maconha, larica, preguiça, filosofia de chapado
-- Coisas do cotidiano que ficam engraçadas com perspectiva stoner
+- Temas do cotidiano: preguiça, comida, trabalho, tecnologia, relacionamentos
+- Coisas banais que ficam engraçadas com perspectiva de sábio
 
 EVITE COMPLETAMENTE:
 - Notícias sérias, política, religião, tragédias, violência
 - Qualquer coisa que não renda meme engraçado
-- Drogas pesadas (só maconha, sempre leve e humorístico)
+- Temas pesados ou polêmicos
 
 IMPORTANTE: Se nenhum trend é bom, INVENTE temas clichê dos listados acima.
 Retorne SEMPRE {count} itens, nunca zero.
@@ -47,8 +48,8 @@ Responda APENAS em JSON válido:
 [
   {{
     "original_title": "título original do trend (ou 'cliche' se inventado)",
-    "gandalf_topic": "tema adaptado para o mago maconheiro",
-    "humor_angle": "ângulo engraçado stoner",
+    "gandalf_topic": "tema adaptado para o mago sábio",
+    "humor_angle": "ângulo engraçado e relatable",
     "relevance_score": 0.9
   }}
 ]"""
