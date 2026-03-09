@@ -38,7 +38,7 @@ def _get_client() -> genai.Client:
 
 def _model_name(model_name: str | None = None) -> str:
     """Retorna nome do modelo."""
-    return model_name or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    return model_name or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 
 def generate(
