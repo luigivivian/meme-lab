@@ -76,6 +76,7 @@ class GeneratePhrasesRequest(BaseModel):
 class ComposeImageRequest(BaseModel):
     """Compor imagem final: frase + background."""
     phrase: str = Field(description="Texto da frase")
+    background_filename: str = Field(default="", description="Usar background existente (nome do arquivo)")
     situacao: str = Field(default="sabedoria", description="Situacao para o background")
     descricao_custom: str = Field(default="", description="Acao customizada")
     cenario_custom: str = Field(default="", description="Cenario customizado")

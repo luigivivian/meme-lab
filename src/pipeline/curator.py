@@ -25,12 +25,13 @@ class CuratorAgent:
     def __init__(self, analyzer: ClaudeAnalyzer | None = None):
         self._analyzer = analyzer or ClaudeAnalyzer()
 
-    async def curate(self, events: list[TrendEvent], count: int = 5) -> list[WorkOrder]:
+    async def curate(self, events: list[TrendEvent], count: int = 5, on_step=None) -> list[WorkOrder]:
         """Analisa TrendEvents via Claude e emite WorkOrders.
 
         Args:
             events: lista de TrendEvents para analisar
             count: quantidade de temas a selecionar
+            on_step: callback(step, status, detail) para progresso granular.
 
         Returns:
             lista de WorkOrders prontos para a camada de geracao
@@ -42,13 +43,22 @@ class CuratorAgent:
         # Converter para TrendItem para reutilizar ClaudeAnalyzer.analyze()
         trend_items = [event_to_trend_item(e) for e in events]
 
+        if on_step:
+            on_step("analyze", "running", f"Gemini analisando {len(trend_items)} trends...")
+
         logger.info(f"Curador analisando {len(trend_items)} trends, selecionando {count}...")
         analyzed = await asyncio.to_thread(
             self._analyzer.analyze, trend_items, count
         )
 
+        if on_step:
+            on_step("analyze", "done", f"{len(analyzed)} temas selecionados")
+
         # Criar mapa para encontrar TrendEvent original
         event_map = {e.title.lower().strip(): e for e in events}
+
+        if on_step:
+            on_step("work_orders", "running", f"Criando WorkOrders...")
 
         work_orders = []
         for topic in analyzed:
@@ -78,6 +88,9 @@ class CuratorAgent:
                 f"  WorkOrder [{order.order_id}]: "
                 f"{order.gandalf_topic} -> situacao={order.situacao_key}"
             )
+
+        if on_step:
+            on_step("work_orders", "done", f"{len(work_orders)} orders emitidos")
 
         logger.info(f"Curador emitiu {len(work_orders)} work orders")
         return work_orders

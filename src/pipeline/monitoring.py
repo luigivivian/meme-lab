@@ -19,8 +19,12 @@ class MonitoringLayer:
     def __init__(self, agents: list[AsyncSourceAgent]):
         self.agents = agents
 
-    async def fetch_all(self) -> list[TrendEvent]:
-        """Executa todos os agentes em paralelo via asyncio.gather."""
+    async def fetch_all(self, on_step=None) -> list[TrendEvent]:
+        """Executa todos os agentes em paralelo via asyncio.gather.
+
+        Args:
+            on_step: callback(step, status, detail) para progresso granular.
+        """
         tasks = []
         for agent in self.agents:
             try:
@@ -29,9 +33,13 @@ class MonitoringLayer:
                 available = False
 
             if available:
-                tasks.append(self._safe_fetch(agent))
+                if on_step:
+                    on_step(agent.name, "running", "Fetching...")
+                tasks.append(self._safe_fetch(agent, on_step))
             else:
                 logger.warning(f"Agent '{agent.name}' nao disponivel, pulando")
+                if on_step:
+                    on_step(agent.name, "idle", "Indisponivel")
 
         if not tasks:
             logger.warning("Nenhum agent disponivel para monitoramento")
@@ -45,7 +53,7 @@ class MonitoringLayer:
         logger.info(f"Monitoramento coletou {len(all_events)} eventos de {len(tasks)} agentes")
         return all_events
 
-    async def _safe_fetch(self, agent: AsyncSourceAgent) -> list[TrendEvent]:
+    async def _safe_fetch(self, agent: AsyncSourceAgent, on_step=None) -> list[TrendEvent]:
         """Fetch com timeout e tratamento de erro — agente nunca derruba o pipeline."""
         try:
             events = await asyncio.wait_for(
@@ -53,10 +61,16 @@ class MonitoringLayer:
                 timeout=AGENT_FETCH_TIMEOUT,
             )
             logger.info(f"Agent '{agent.name}': {len(events)} eventos")
+            if on_step:
+                on_step(agent.name, "done", f"{len(events)} eventos")
             return events
         except asyncio.TimeoutError:
             logger.error(f"Agent '{agent.name}' timeout ({AGENT_FETCH_TIMEOUT}s)")
+            if on_step:
+                on_step(agent.name, "error", f"Timeout {AGENT_FETCH_TIMEOUT}s")
             return []
         except Exception as e:
             logger.error(f"Agent '{agent.name}' falhou: {e}")
+            if on_step:
+                on_step(agent.name, "error", str(e)[:60])
             return []

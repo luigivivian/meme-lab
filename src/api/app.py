@@ -244,6 +244,23 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
 
     run = _pipeline_runs[run_id]
     run["status"] = "running"
+    run["layers"] = {
+        "L1": {"status": "idle", "detail": "", "steps": {}},
+        "L2": {"status": "idle", "detail": "", "steps": {}},
+        "L3": {"status": "idle", "detail": "", "steps": {}},
+        "L4": {"status": "idle", "detail": "", "steps": {}},
+        "L5": {"status": "idle", "detail": "", "steps": {}},
+    }
+    run["current_layer"] = None
+
+    def on_layer_update(layer: str, status: str, detail: str = "", step: str = ""):
+        if step:
+            run["layers"][layer]["steps"][step] = {"status": status, "detail": detail}
+        else:
+            run["layers"][layer]["status"] = status
+            run["layers"][layer]["detail"] = detail
+            if status == "running":
+                run["current_layer"] = layer
 
     try:
         orchestrator = AsyncPipelineOrchestrator(
@@ -252,6 +269,7 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
             use_comfyui=request.use_comfyui,
             use_gemini_image=request.use_gemini_image,
             use_phrase_context=request.use_phrase_context,
+            on_layer_update=on_layer_update,
         )
         result = await orchestrator.run()
 
@@ -449,28 +467,40 @@ def refine_existing(req: RefineRequest):
 async def compose_image(req: ComposeImageRequest):
     from src.image_gen.gemini_client import GeminiImageClient
     from src.image_maker import create_image
+    from config import GENERATED_BACKGROUNDS_DIR, OUTPUT_DIR
 
-    client = GeminiImageClient()
     bg_path = None
 
-    phrase_ctx = req.phrase if req.use_phrase_context else ""
-
-    if client.is_available():
-        if req.auto_refine:
-            bg_path = await asyncio.to_thread(
-                client.generate_with_refinement,
-                req.situacao, req.descricao_custom, req.cenario_custom,
-                req.refinement_passes,
-            )
+    # Se um background existente foi especificado, usar ele
+    if req.background_filename:
+        candidate = GENERATED_BACKGROUNDS_DIR / req.background_filename
+        if not candidate.exists():
+            candidate = OUTPUT_DIR / req.background_filename
+        if candidate.exists():
+            bg_path = str(candidate)
         else:
-            bg_path = await asyncio.to_thread(
-                lambda: client.generate_image(
-                    situacao_key=req.situacao,
-                    descricao_custom=req.descricao_custom,
-                    cenario_custom=req.cenario_custom,
-                    phrase_context=phrase_ctx,
+            raise HTTPException(status_code=404, detail=f"Background '{req.background_filename}' nao encontrado")
+    else:
+        # Gerar novo background
+        client = GeminiImageClient()
+        phrase_ctx = req.phrase if req.use_phrase_context else ""
+
+        if client.is_available():
+            if req.auto_refine:
+                bg_path = await asyncio.to_thread(
+                    client.generate_with_refinement,
+                    req.situacao, req.descricao_custom, req.cenario_custom,
+                    req.refinement_passes,
                 )
-            )
+            else:
+                bg_path = await asyncio.to_thread(
+                    lambda: client.generate_image(
+                        situacao_key=req.situacao,
+                        descricao_custom=req.descricao_custom,
+                        cenario_custom=req.cenario_custom,
+                        phrase_context=phrase_ctx,
+                    )
+                )
 
     if bg_path is None:
         from config import BACKGROUNDS_DIR
@@ -698,6 +728,14 @@ async def run_pipeline(request: PipelineRunRequest, background_tasks: Background
         "run_id": run_id, "status": "queued",
         "trends_fetched": 0, "work_orders": 0, "images_generated": 0,
         "packages_produced": 0, "errors": [], "content": [], "duration_seconds": 0,
+        "layers": {
+            "L1": {"status": "idle", "detail": "", "steps": {}},
+            "L2": {"status": "idle", "detail": "", "steps": {}},
+            "L3": {"status": "idle", "detail": "", "steps": {}},
+            "L4": {"status": "idle", "detail": "", "steps": {}},
+            "L5": {"status": "idle", "detail": "", "steps": {}},
+        },
+        "current_layer": None,
     }
     background_tasks.add_task(_run_pipeline_task, run_id, request)
     return _pipeline_runs[run_id]
@@ -711,6 +749,14 @@ async def run_pipeline_sync(request: PipelineRunRequest):
         "run_id": run_id, "status": "queued",
         "trends_fetched": 0, "work_orders": 0, "images_generated": 0,
         "packages_produced": 0, "errors": [], "content": [], "duration_seconds": 0,
+        "layers": {
+            "L1": {"status": "idle", "detail": "", "steps": {}},
+            "L2": {"status": "idle", "detail": "", "steps": {}},
+            "L3": {"status": "idle", "detail": "", "steps": {}},
+            "L4": {"status": "idle", "detail": "", "steps": {}},
+            "L5": {"status": "idle", "detail": "", "steps": {}},
+        },
+        "current_layer": None,
     }
     await _run_pipeline_task(run_id, request)
     return _pipeline_runs[run_id]
@@ -779,6 +825,275 @@ async def list_agents():
     return agents
 
 
+# ============================================================
+# TRENDS FEED ROUTES
+# ============================================================
+
+# Categorias default para o feed de trends
+DEFAULT_CATEGORIES = [
+    {"key": "humor", "label": "😂 Humor", "keywords": ["meme", "humor", "piada", "comedia", "zoeira", "engraçado", "funny", "zueira", "rir", "hue"]},
+    {"key": "cultura_pop", "label": "🎬 Cultura Pop", "keywords": ["filme", "serie", "anime", "marvel", "netflix", "disney", "game", "jogo", "cinema", "tv", "streaming"]},
+    {"key": "tecnologia", "label": "💻 Tecnologia", "keywords": ["tech", "ia", "ai", "app", "celular", "iphone", "android", "software", "programacao", "code", "robot", "chatgpt"]},
+    {"key": "esportes", "label": "⚽ Esportes", "keywords": ["futebol", "gol", "selecao", "copa", "brasileirao", "flamengo", "corinthians", "palmeiras", "nba", "ufc", "f1"]},
+    {"key": "musica", "label": "🎵 Música", "keywords": ["musica", "show", "funk", "sertanejo", "rap", "rock", "album", "spotify", "cantora", "cantor", "clipe"]},
+    {"key": "cotidiano", "label": "☕ Cotidiano", "keywords": ["segunda", "sexta", "trabalho", "cafe", "home office", "feriado", "chuva", "calor", "transito", "pix", "salario"]},
+    {"key": "politica", "label": "🏛️ Política", "keywords": ["governo", "presidente", "congresso", "senado", "ministerio", "stf", "eleicao", "politica", "lei", "imposto"]},
+    {"key": "ciencia", "label": "🔬 Ciência", "keywords": ["ciencia", "nasa", "espaco", "saude", "vacina", "pesquisa", "estudo", "descoberta", "medicina", "nature"]},
+    {"key": "viral", "label": "🔥 Viral", "keywords": ["viral", "trending", "bombou", "trend", "challenge", "tiktok", "reels", "hype"]},
+    {"key": "geral", "label": "📰 Geral", "keywords": []},
+]
+
+# Preferencias de categorias do usuario (in-memory, pode evoluir para arquivo)
+_user_category_prefs: dict = {
+    "favorites": ["humor", "cultura_pop", "cotidiano", "viral"],
+    "hidden": [],
+}
+
+
+def _categorize_trend(title: str) -> str:
+    """Infere a categoria de um trend pelo titulo."""
+    title_lower = title.lower()
+    best_cat = "geral"
+    best_score = 0
+    for cat in DEFAULT_CATEGORIES:
+        if not cat["keywords"]:
+            continue
+        score = sum(1 for kw in cat["keywords"] if kw in title_lower)
+        if score > best_score:
+            best_score = score
+            best_cat = cat["key"]
+    return best_cat
+
+
+@app.get("/trends/feed", summary="Feed completo de trends (todos os agents em paralelo)", tags=["Trends"])
+async def trends_feed(limit: int = Query(default=50, ge=1, le=200)):
+    """Fetch paralelo de TODOS os agents ativos. Retorna itens categorizados."""
+    from src.pipeline.models_v2 import TrendEvent, TrendSource
+
+    agent_configs = [
+        ("google_trends", "src.pipeline.agents.google_trends", "GoogleTrendsAgent", False),
+        ("reddit_memes", "src.pipeline.agents.reddit_memes", "RedditMemesAgent", False),
+        ("rss_feeds", "src.pipeline.agents.rss_feeds", "RSSFeedAgent", False),
+        ("youtube_rss", "src.pipeline.agents.youtube_rss", "YouTubeRSSAgent", True),
+        ("gemini_web_trends", "src.pipeline.agents.gemini_web_trends", "GeminiWebTrendsAgent", True),
+        ("brazil_viral_rss", "src.pipeline.agents.brazil_viral_rss", "BrazilViralRSSAgent", True),
+    ]
+
+    async def _fetch_one(name: str, module_path: str, class_name: str, is_async: bool):
+        try:
+            mod = importlib.import_module(module_path)
+            cls = getattr(mod, class_name)
+            agent = cls()
+            if is_async:
+                items = await agent.fetch()
+            else:
+                items = await asyncio.to_thread(agent.fetch)
+            result = []
+            for item in items:
+                if isinstance(item, TrendEvent):
+                    result.append({
+                        "title": item.title,
+                        "source": item.source.value,
+                        "score": item.score,
+                        "url": item.url or "",
+                        "traffic": item.traffic,
+                        "category": item.category if item.category != "geral" else _categorize_trend(item.title),
+                        "velocity": item.velocity,
+                        "sentiment": item.sentiment,
+                        "event_id": item.event_id,
+                        "fetched_at": item.fetched_at.isoformat(),
+                        "_agent": name,
+                    })
+                else:
+                    # TrendItem (sync agents)
+                    result.append({
+                        "title": item.title,
+                        "source": item.source.value,
+                        "score": item.score,
+                        "url": item.url or "",
+                        "traffic": item.traffic,
+                        "category": _categorize_trend(item.title),
+                        "velocity": 0,
+                        "sentiment": "neutro",
+                        "event_id": "",
+                        "fetched_at": item.fetched_at.isoformat() if hasattr(item, "fetched_at") else datetime.now().isoformat(),
+                        "_agent": name,
+                    })
+            return name, result
+        except Exception as e:
+            logger.warning(f"Trends feed: agent {name} falhou: {e}")
+            return name, []
+
+    tasks = [_fetch_one(*cfg) for cfg in agent_configs]
+    results = await asyncio.gather(*tasks)
+
+    all_items = []
+    agent_counts = {}
+    for agent_name, items in results:
+        agent_counts[agent_name] = len(items)
+        all_items.extend(items)
+
+    # Ordenar por score desc
+    all_items.sort(key=lambda x: x["score"], reverse=True)
+
+    # Contagem por categoria
+    category_counts = {}
+    for item in all_items:
+        cat = item["category"]
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+
+    return {
+        "total": len(all_items),
+        "items": all_items[:limit],
+        "agent_counts": agent_counts,
+        "category_counts": category_counts,
+    }
+
+
+@app.get("/trends/search", summary="Buscar trends sobre um topico especifico via Gemini", tags=["Trends"])
+async def trends_search(q: str = Query(..., min_length=2, max_length=200, description="Termo de busca")):
+    """Usa Gemini + Google Search grounding para buscar trends sobre um topico especifico."""
+    import os
+    import re
+    from google import genai
+    from google.genai import types
+
+    api_key = os.getenv("GOOGLE_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GOOGLE_API_KEY nao configurada")
+
+    system_prompt = (
+        "Voce e um analista de tendencias digitais especializado em cultura brasileira.\n"
+        "Sua tarefa: pesquisar o que esta sendo falado sobre o TOPICO solicitado no Brasil.\n\n"
+        "Retorne informacoes REAIS e ATUAIS encontradas na busca. "
+        "Inclua noticias, memes, discussoes, trends de redes sociais e qualquer conteudo relevante.\n\n"
+        "NUNCA incluir: conteudo ofensivo, violento ou ilegal.\n\n"
+        "Responda SOMENTE com um array JSON valido, sem markdown, sem texto extra:\n"
+        '[{"titulo": "topico aqui", "categoria": "geral|humor|tecnologia|entretenimento|cotidiano|cultura_pop|esportes|musica|ciencia|viral", "score": 0.0, "resumo": "breve descricao"}]'
+    )
+
+    user_prompt = (
+        f"Pesquise sobre '{q}' no Brasil. O que esta sendo falado, noticiado ou viralizando "
+        f"sobre este assunto? Retorne ate 15 resultados relevantes no formato JSON especificado. "
+        f"Use sua busca para encontrar informacoes ATUAIS."
+    )
+
+    try:
+        client = genai.Client(api_key=api_key)
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                temperature=0.4,
+                max_output_tokens=2048,
+            ),
+        )
+
+        # Log de debug: verificar se resposta foi bloqueada
+        if hasattr(response, "candidates") and response.candidates:
+            cand = response.candidates[0]
+            finish = getattr(cand, "finish_reason", None)
+            if finish and str(finish) not in ("STOP", "FinishReason.STOP", "1"):
+                logger.warning(f"Trends search '{q}': finish_reason={finish}")
+        else:
+            logger.warning(f"Trends search '{q}': sem candidates na resposta")
+
+        # Extrair texto (ignorar thinking tokens)
+        raw_text = ""
+        try:
+            parts = response.candidates[0].content.parts
+            # Incluir TODOS os parts com texto (thinking pode conter o JSON)
+            text_parts = []
+            for p in parts:
+                if hasattr(p, "text") and p.text:
+                    if not getattr(p, "thought", False):
+                        text_parts.append(p.text)
+            raw_text = "".join(text_parts)
+            # Se nao encontrou texto nao-thinking, tentar todos os parts
+            if not raw_text:
+                raw_text = "".join(p.text for p in parts if hasattr(p, "text") and p.text)
+        except (AttributeError, IndexError):
+            raw_text = getattr(response, "text", "") or ""
+
+        logger.info(f"Trends search '{q}': raw_text ({len(raw_text)} chars): {raw_text[:300]}")
+
+        if not raw_text:
+            return {"total": 0, "items": [], "query": q}
+
+        # Parsear JSON — tentar direto, depois extrair array com regex greedy
+        items_data = []
+        text = raw_text.strip()
+        # Remover markdown code block se presente
+        if text.startswith("```"):
+            text = re.sub(r"^```\w*\n?", "", text)
+            text = re.sub(r"\n?```$", "", text)
+            text = text.strip()
+
+        try:
+            items_data = json.loads(text)
+        except json.JSONDecodeError:
+            # Regex greedy: do primeiro [ ao ultimo ]
+            match = re.search(r"\[.*\]", text, re.DOTALL)
+            if match:
+                try:
+                    items_data = json.loads(match.group())
+                except json.JSONDecodeError:
+                    logger.warning(f"Trends search '{q}': JSON parse falhou. Texto: {text[:500]}")
+
+        if not isinstance(items_data, list):
+            items_data = []
+
+        results = []
+        for item in items_data:
+            titulo = str(item.get("titulo", "")).strip()
+            if not titulo or len(titulo) < 3:
+                continue
+            score_raw = item.get("score", 0.75)
+            try:
+                score = max(0.0, min(1.0, float(score_raw)))
+            except (ValueError, TypeError):
+                score = 0.75
+            results.append({
+                "title": titulo,
+                "source": "gemini_trends",
+                "score": score,
+                "url": "",
+                "traffic": None,
+                "category": str(item.get("categoria", "geral")).strip(),
+                "velocity": 0,
+                "sentiment": "neutro",
+                "event_id": uuid.uuid4().hex[:8],
+                "fetched_at": datetime.now().isoformat(),
+                "_agent": "gemini_search",
+                "_resumo": str(item.get("resumo", "")).strip(),
+            })
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return {"total": len(results), "items": results, "query": q}
+
+    except Exception as e:
+        logger.error(f"Trends search falhou: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro na busca: {str(e)}")
+
+
+@app.get("/trends/categories", summary="Categorias disponiveis e preferencias", tags=["Trends"])
+async def trends_categories():
+    return {
+        "categories": DEFAULT_CATEGORIES,
+        "preferences": _user_category_prefs,
+    }
+
+
+@app.post("/trends/categories/preferences", summary="Salvar preferencias de categorias", tags=["Trends"])
+async def save_category_preferences(favorites: list[str] = [], hidden: list[str] = []):
+    _user_category_prefs["favorites"] = favorites
+    _user_category_prefs["hidden"] = hidden
+    return _user_category_prefs
+
+
 @app.post("/agents/{agent_name}/fetch", summary="Fetch de um agente especifico", tags=["Agentes"])
 async def fetch_from_agent(agent_name: str, limit: int = 10):
     agent_map = {
@@ -786,6 +1101,16 @@ async def fetch_from_agent(agent_name: str, limit: int = 10):
         "reddit_memes": ("src.pipeline.agents.reddit_memes", "RedditMemesAgent"),
         "rss_feeds": ("src.pipeline.agents.rss_feeds", "RSSFeedAgent"),
     }
+
+    # Workers nao suportam fetch — retornar resposta vazia em vez de 404
+    worker_names = ["phrase_worker", "image_worker", "caption_worker", "hashtag_worker", "quality_worker"]
+    if agent_name in worker_names:
+        return {"agent": agent_name, "count": 0, "items": []}
+
+    # Stubs (tiktok, instagram, etc.) — retornar resposta vazia com aviso
+    stub_names = ["tiktok_trends", "instagram_explore", "twitter_x", "facebook_viral", "youtube_shorts"]
+    if agent_name in stub_names:
+        return {"agent": agent_name, "count": 0, "items": []}
 
     if agent_name not in agent_map:
         raise HTTPException(status_code=404, detail=f"Agente '{agent_name}' nao encontrado")
@@ -869,8 +1194,13 @@ def _parse_theme_from_filename(stem: str) -> str:
 
 
 def _list_drive_images(theme_filter: str | None = None) -> list[dict]:
+    from config import OUTPUT_DIR
     out = _output_dir()
-    files = sorted(out.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
+    # Combina imagens de backgrounds_generated + output (memes compostos)
+    bg_files = set(out.glob("*.png"))
+    out_files = set(OUTPUT_DIR.glob("*.png"))
+    all_files = bg_files | out_files
+    files = sorted(all_files, key=lambda f: f.stat().st_mtime, reverse=True)
     result = []
     for f in files:
         theme = _parse_theme_from_filename(f.stem)
@@ -911,7 +1241,11 @@ def images_by_theme(theme_key: str):
 def get_image(filename: str):
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Nome de arquivo invalido")
+    # Procura em backgrounds_generated e depois em output/
     path = _output_dir() / filename
+    if not path.exists():
+        from config import OUTPUT_DIR
+        path = OUTPUT_DIR / filename
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Imagem '{filename}' nao encontrada")
     return FileResponse(str(path), media_type="image/png", filename=filename)
@@ -928,11 +1262,13 @@ def list_image_themes():
 @drive_app.get("/health", summary="Estado da conexao")
 def drive_health():
     out = _output_dir()
-    from config import COMFYUI_REFERENCE_DIR
+    from config import COMFYUI_REFERENCE_DIR, OUTPUT_DIR
+    bg_count = len(list(out.glob("*.png"))) if out.exists() else 0
+    out_count = len(list(OUTPUT_DIR.glob("*.png"))) if OUTPUT_DIR.exists() else 0
     return {
         "output_folder": str(out),
         "output_exists": out.exists(),
-        "total_images": len(list(out.glob("*.png"))) if out.exists() else 0,
+        "total_images": bg_count + out_count,
         "refs_folder": str(COMFYUI_REFERENCE_DIR),
         "refs_exists": COMFYUI_REFERENCE_DIR.exists(),
     }

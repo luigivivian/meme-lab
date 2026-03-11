@@ -28,41 +28,79 @@ class PostProductionLayer:
         self.hashtag_worker = hashtag_worker or HashtagWorker()
         self.quality_worker = quality_worker or QualityWorker()
 
-    async def enhance(self, packages: list[ContentPackage]) -> list[ContentPackage]:
-        """Enriquece todos os pacotes em paralelo."""
+    async def enhance(self, packages: list[ContentPackage], on_step=None) -> list[ContentPackage]:
+        """Enriquece todos os pacotes em paralelo.
+
+        Args:
+            on_step: callback(step, status, detail) para progresso granular.
+        """
         if not packages:
             return []
 
-        logger.info(f"Pos-producao iniciada: {len(packages)} pacotes")
-        tasks = [self._enhance_one(pkg) for pkg in packages]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        total = len(packages)
+        caption_done = 0
+        hashtag_done = 0
+        quality_done = 0
+
+        if on_step:
+            on_step("caption", "running", f"0/{total}")
+            on_step("hashtags", "running", f"0/{total}")
+            on_step("quality", "running", f"0/{total}")
+
+        async def enhance_one_tracked(pkg: ContentPackage) -> ContentPackage:
+            nonlocal caption_done, hashtag_done, quality_done
+
+            async def tracked_caption():
+                nonlocal caption_done
+                result = await self._safe_caption(pkg)
+                caption_done += 1
+                if on_step:
+                    s = "done" if caption_done >= total else "running"
+                    on_step("caption", s, f"{caption_done}/{total}")
+                return result
+
+            async def tracked_hashtags():
+                nonlocal hashtag_done
+                result = await self._safe_hashtags(pkg)
+                hashtag_done += 1
+                if on_step:
+                    s = "done" if hashtag_done >= total else "running"
+                    on_step("hashtags", s, f"{hashtag_done}/{total}")
+                return result
+
+            async def tracked_quality():
+                nonlocal quality_done
+                result = await self._safe_quality(pkg)
+                quality_done += 1
+                if on_step:
+                    s = "done" if quality_done >= total else "running"
+                    on_step("quality", s, f"{quality_done}/{total}")
+                return result
+
+            caption, hashtags, quality_score = await asyncio.gather(
+                tracked_caption(), tracked_hashtags(), tracked_quality()
+            )
+            pkg.caption = caption
+            pkg.hashtags = hashtags
+            pkg.quality_score = quality_score
+            return pkg
+
+        logger.info(f"Pos-producao iniciada: {total} pacotes")
+        results = await asyncio.gather(
+            *[enhance_one_tracked(pkg) for pkg in packages],
+            return_exceptions=True,
+        )
 
         enhanced = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.error(f"Pos-producao falhou para pacote {i}: {result}")
-                enhanced.append(packages[i])  # retorna pacote sem enriquecimento
+                enhanced.append(packages[i])
             else:
                 enhanced.append(result)
 
         logger.info(f"Pos-producao concluida: {len(enhanced)} pacotes enriquecidos")
         return enhanced
-
-    async def _enhance_one(self, package: ContentPackage) -> ContentPackage:
-        """Enriquece um unico pacote com caption, hashtags e quality em paralelo."""
-        caption_task = self._safe_caption(package)
-        hashtag_task = self._safe_hashtags(package)
-        quality_task = self._safe_quality(package)
-
-        caption, hashtags, quality_score = await asyncio.gather(
-            caption_task, hashtag_task, quality_task
-        )
-
-        package.caption = caption
-        package.hashtags = hashtags
-        package.quality_score = quality_score
-
-        return package
 
     async def _safe_caption(self, package: ContentPackage) -> str:
         """Caption com fallback para string vazia."""

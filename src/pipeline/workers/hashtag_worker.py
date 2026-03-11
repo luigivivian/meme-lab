@@ -32,6 +32,10 @@ HUMOR_HASHTAGS = [
     "#comedia",
     "#viral",
     "#trending",
+    "#420",
+    "#weed",
+    "#maconha",
+    "#larica"
 ]
 
 # Mapa de temas para hashtags especificas

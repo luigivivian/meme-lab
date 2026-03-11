@@ -26,56 +26,75 @@ class GenerationLayer:
         self.image_worker = image_worker or ImageWorker()
         self.phrases_per_topic = phrases_per_topic
 
-    async def process(self, work_orders: list[WorkOrder]) -> list[ContentPackage]:
+    async def process(self, work_orders: list[WorkOrder], on_step=None) -> list[ContentPackage]:
         """Processa todos os WorkOrders em paralelo.
+
+        Args:
+            on_step: callback(step, status, detail) para progresso granular.
 
         Para cada WorkOrder: gera frases -> compoe imagens -> empacota.
         """
         if not work_orders:
             return []
 
-        logger.info(f"Geracao iniciada: {len(work_orders)} work orders")
-        tasks = [self._process_one(wo) for wo in work_orders]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        total = len(work_orders)
+        phrases_done = 0
+        images_done = 0
+
+        if on_step:
+            on_step("phrases", "running", f"0/{total}")
+            on_step("images", "idle", "Aguardando frases...")
+
+        async def process_one_tracked(wo: WorkOrder) -> list[ContentPackage]:
+            nonlocal phrases_done, images_done
+
+            count = wo.phrases_count or self.phrases_per_topic
+            phrases = await self.phrase_worker.generate(wo, count)
+            phrases_done += 1
+            if on_step:
+                s = "done" if phrases_done >= total else "running"
+                on_step("phrases", s, f"{phrases_done}/{total}")
+
+            if not phrases:
+                logger.warning(f"[{wo.order_id}] Nenhuma frase gerada, pulando")
+                return []
+
+            if on_step and images_done == 0:
+                on_step("images", "running", f"0/{total}")
+
+            pkgs = []
+            for phrase in phrases:
+                try:
+                    image_path = await self.image_worker.compose(phrase, wo)
+                    pkgs.append(ContentPackage(
+                        phrase=phrase,
+                        image_path=image_path,
+                        topic=wo.gandalf_topic,
+                        source=wo.trend_event.source,
+                        work_order=wo,
+                    ))
+                except Exception as e:
+                    logger.error(f"[{wo.order_id}] Falha na composicao de '{phrase[:30]}...': {e}")
+
+            images_done += 1
+            if on_step:
+                s = "done" if images_done >= total else "running"
+                on_step("images", s, f"{images_done}/{total}")
+
+            return pkgs
+
+        logger.info(f"Geracao iniciada: {total} work orders")
+        results = await asyncio.gather(
+            *[process_one_tracked(wo) for wo in work_orders],
+            return_exceptions=True,
+        )
 
         packages = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(
-                    f"WorkOrder [{work_orders[i].order_id}] falhou: {result}"
-                )
+                logger.error(f"WorkOrder [{work_orders[i].order_id}] falhou: {result}")
             elif isinstance(result, list):
                 packages.extend(result)
 
         logger.info(f"Geracao concluida: {len(packages)} pacotes produzidos")
-        return packages
-
-    async def _process_one(self, work_order: WorkOrder) -> list[ContentPackage]:
-        """Processa um unico WorkOrder: frases -> imagens -> pacotes."""
-        count = work_order.phrases_count or self.phrases_per_topic
-        phrases = await self.phrase_worker.generate(work_order, count)
-
-        if not phrases:
-            logger.warning(
-                f"[{work_order.order_id}] Nenhuma frase gerada, pulando"
-            )
-            return []
-
-        packages = []
-        for phrase in phrases:
-            try:
-                image_path = await self.image_worker.compose(phrase, work_order)
-                package = ContentPackage(
-                    phrase=phrase,
-                    image_path=image_path,
-                    topic=work_order.gandalf_topic,
-                    source=work_order.trend_event.source,
-                    work_order=work_order,
-                )
-                packages.append(package)
-            except Exception as e:
-                logger.error(
-                    f"[{work_order.order_id}] Falha na composicao de '{phrase[:30]}...': {e}"
-                )
-
         return packages

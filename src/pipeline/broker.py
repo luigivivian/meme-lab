@@ -25,21 +25,36 @@ class TrendBroker:
         self.queue: asyncio.Queue[TrendEvent] = asyncio.Queue(maxsize=max_queue_size)
         self._aggregator = TrendAggregator()
 
-    async def ingest(self, events: list[TrendEvent]) -> int:
+    async def ingest(self, events: list[TrendEvent], on_step=None) -> int:
         """Recebe eventos, deduplica via TrendAggregator, enfileira.
+
+        Args:
+            on_step: callback(step, status, detail) para progresso granular.
 
         Retorna quantidade de eventos enfileirados apos dedup.
         """
         if not events:
             return 0
 
+        if on_step:
+            on_step("ingest", "running", f"{len(events)} eventos recebidos")
+
         # Converter para TrendItem para reutilizar logica do aggregator
         trend_items = [event_to_trend_item(e) for e in events]
+
+        if on_step:
+            on_step("dedup", "running", "Deduplicando...")
         deduplicated_items = self._aggregator.aggregate(trend_items)
+        removed = len(events) - len(deduplicated_items)
+        if on_step:
+            on_step("dedup", "done", f"{removed} duplicados removidos")
 
         # Converter de volta para TrendEvent preservando dados extras
         # Criar mapa de scores atualizados pelo aggregator
         event_map = {e.title.lower().strip(): e for e in events}
+
+        if on_step:
+            on_step("queue", "running", "Enfileirando...")
 
         queued = 0
         for item in deduplicated_items:
@@ -59,6 +74,10 @@ class TrendBroker:
             except asyncio.QueueFull:
                 logger.warning(f"Fila cheia ({self.queue.maxsize}), descartando evento: {event.title[:50]}")
                 break
+
+        if on_step:
+            on_step("ingest", "done", f"{queued} enfileirados")
+            on_step("queue", "done", f"{queued} na fila")
 
         logger.info(f"Broker: {len(events)} recebidos -> {queued} enfileirados (dedup: {len(events) - queued} removidos)")
         return queued

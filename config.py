@@ -188,3 +188,21 @@ HASHTAG_COUNT = 20
 
 # Post-production: score minimo de qualidade para considerar valido
 QUALITY_MIN_SCORE = 0.5
+
+# ===== YouTube RSS Agent =====
+
+# Max itens por categoria de trending (geral, comedy, entertainment)
+YOUTUBE_RSS_MAX_PER_CATEGORY = 30
+
+# ===== Gemini Web Trends Agent =====
+
+# Modelo para busca grounded de trends (precisa suportar google_search tool)
+GEMINI_TRENDS_MODEL = "gemini-2.5-flash"
+
+# Quantos topicos virais pedir ao Gemini por fetch
+GEMINI_TRENDS_MAX_TOPICS = 15
+
+# ===== Brazil Viral RSS Agent =====
+
+# Max itens por feed curado de memes BR
+BRAZIL_VIRAL_RSS_MAX_PER_FEED = 10

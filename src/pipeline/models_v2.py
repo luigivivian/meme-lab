@@ -22,6 +22,8 @@ class TrendSource(Enum):
     TWITTER_X = "twitter_x"
     FACEBOOK = "facebook"
     YOUTUBE = "youtube"
+    GEMINI_TRENDS = "gemini_trends"
+    BRAZIL_VIRAL = "brazil_viral"
 
 
 @dataclass

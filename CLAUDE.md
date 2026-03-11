@@ -49,9 +49,12 @@ clip-flow/
       curator.py               # CuratorAgent — ClaudeAnalyzer + KEYWORD_MAP → WorkOrders
       agents/
         async_base.py          # AsyncSourceAgent ABC + SyncAgentAdapter
-        google_trends.py       # GoogleTrendsAgent — trendspyg RSS (geo="BR")
-        reddit_memes.py        # RedditMemesAgent — RSS via feedparser
-        rss_feeds.py           # RSSFeedAgent — feedparser
+        google_trends.py       # GoogleTrendsAgent — trendspyg RSS (geo="BR") [sync/SyncAgentAdapter]
+        reddit_memes.py        # RedditMemesAgent — 8 subreddits RSS BR [sync/SyncAgentAdapter]
+        rss_feeds.py           # RSSFeedAgent — Sensacionalista + Reddit [sync/SyncAgentAdapter]
+        youtube_rss.py         # YouTubeRSSAgent — RSS de canais BR verificados [async nativo]
+        gemini_web_trends.py   # GeminiWebTrendsAgent — Gemini + Google Search grounding, 15 topics BR [async nativo]
+        brazil_viral_rss.py    # BrazilViralRSSAgent — subreddits meme BR + portais (Hypeness, Metropoles) [async nativo]
         tiktok_trends.py       # Stub — requer API key
         instagram_explore.py   # Stub — requer API key
         twitter_x.py           # Stub — requer API key
@@ -92,9 +95,10 @@ python -m src.api --port 8000
 ## Arquitetura Multi-Agente (5 Camadas)
 
 ```
-L1 Monitoring ── fetch paralelo: GoogleTrends + RedditRSS + RSSFeeds + stubs
-L2 Broker ────── dedup + ranking via TrendAggregator (asyncio.Queue)
-L3 Curator ───── ClaudeAnalyzer seleciona N temas → WorkOrders com situacao_key
+L1 Monitoring ── fetch paralelo: GoogleTrends + RedditRSS + RSSFeeds + YouTubeRSS + GeminiWebTrends + BrazilViralRSS + stubs
+                 6 agents ativos, ~227 eventos por run
+L2 Broker ────── Ingest → Dedup → Rank via TrendAggregator (asyncio.Queue)
+L3 Curator ───── Gemini Analyzer → Keyword Map → WorkOrders com situacao_key
 L4 Generation ── PhraseWorker + ImageWorker em paralelo por WorkOrder
 L5 PostProd ──── CaptionWorker + HashtagWorker + QualityWorker em paralelo
                  → output/*.png + metadados
@@ -144,9 +148,12 @@ Texto no terco inferior (`TEXT_VERTICAL_POSITION=0.80`), fonte 48px. Backgrounds
 
 - **Gemini API** para frases + analise + imagem (substituiu Anthropic SDK)
 - **Reddit JSON API bloqueada (403)** — RSS via feedparser
-- **asyncio.to_thread()** para wrapping sync existente
+- **asyncio.to_thread()** para wrapping sync existente (SyncAgentAdapter)
 - **Semaphore**: GPU=1, Gemini=5
 - **NO TEXT em backgrounds**: Gemini proibido de renderizar texto; overlay feito pelo Pillow
+- **YouTube trending RSS desativado** (400) — usa RSS por channel_id de canais BR verificados
+- **Gemini web grounding**: `types.Tool(google_search=...)` — incompativel com `response_mime_type="application/json"`, usa texto + regex parse
+- **gemini-2.5-flash** para GeminiWebTrendsAgent (gemini-2.0-flash descontinuado)
 
 ## Requisitos
 

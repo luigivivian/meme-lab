@@ -1,5 +1,37 @@
-.env
-output/
+# Python
 __pycache__/
 *.pyc
+*.pyo
 .venv/
+
+# Secrets
+.env
+
+# Output
+output/
+
+# Node
+node_modules/
+
+# Next.js
+memelab/.next/
+
+# LoRA training data & logs
+lora_training/
+
+# IDE / Editor
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Claude Code local config
+.claude/
+
+# Misc build artifacts
+*.npz
+*.tfevents*
