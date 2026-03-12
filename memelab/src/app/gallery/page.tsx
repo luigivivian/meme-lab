@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
+import { staggerContainer, staggerItem } from "@/lib/animations";
+import { SOURCE_COLORS } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +23,16 @@ import {
   type ImageInfo,
 } from "@/lib/api";
 
+function inferSource(filename: string): string {
+  const f = filename.toLowerCase();
+  if (f.includes("gemini")) return "gemini";
+  if (f.includes("comfyui") || f.includes("flux")) return "comfyui";
+  return "static";
+}
+
 export default function GalleryPage() {
   const [themeFilter, setThemeFilter] = useState<string>("");
+  const [sourceFilter, setSourceFilter] = useState<string>("");
   const [page, setPage] = useState(0);
   const limit = 12;
 
@@ -33,7 +44,10 @@ export default function GalleryPage() {
   const { data: driveThemesData } = useDriveThemes();
   const { data: themesData } = useThemes();
 
-  const images = driveData?.images ?? [];
+  const rawImages = driveData?.images ?? [];
+  const images = sourceFilter
+    ? rawImages.filter((img) => inferSource(img.filename) === sourceFilter)
+    : rawImages;
   const totalImages = driveData?.total ?? 0;
 
   // Compose dialog
@@ -153,7 +167,7 @@ export default function GalleryPage() {
   const hasMore = images.length >= limit && (page + 1) * limit < totalImages;
 
   return (
-    <div className="space-y-6 animate-page-in">
+    <div className="space-y-6">
       {/* Filters + Actions */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={themeFilter || "all"} onValueChange={(v) => { setThemeFilter(v === "all" ? "" : v); setPage(0); }}>
@@ -167,6 +181,18 @@ export default function GalleryPage() {
                 {t} {driveThemesData?.counts[t] != null && `(${driveThemesData.counts[t]})`}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={sourceFilter || "all"} onValueChange={(v) => { setSourceFilter(v === "all" ? "" : v); setPage(0); }}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Filtrar por fonte" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as fontes</SelectItem>
+            <SelectItem value="gemini">Gemini</SelectItem>
+            <SelectItem value="comfyui">ComfyUI</SelectItem>
+            <SelectItem value="static">Estatico</SelectItem>
           </SelectContent>
         </Select>
 
@@ -198,12 +224,13 @@ export default function GalleryPage() {
           ))}
         </div>
       ) : images.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {images.map((img: ImageInfo, idx) => (
-            <div
+        <motion.div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" variants={staggerContainer} initial="initial" animate="animate">
+          {images.map((img: ImageInfo) => (
+            <motion.div
               key={img.filename}
-              className="stagger-item group relative aspect-[4/5] overflow-hidden rounded-xl border bg-secondary cursor-pointer transition-all duration-200 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
-              style={{ animationDelay: `${idx * 40}ms` }}
+              className="group relative aspect-[4/5] overflow-hidden rounded-xl border bg-secondary cursor-pointer transition-all duration-200 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+              variants={staggerItem}
+              whileHover={{ y: -4 }}
               onClick={() => setPreviewImage(img.filename)}
             >
               <img
@@ -211,6 +238,11 @@ export default function GalleryPage() {
                 alt={img.filename}
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
+              <div className="absolute top-2 left-2">
+                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${SOURCE_COLORS[inferSource(img.filename)] ?? "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"}`}>
+                  {inferSource(img.filename)}
+                </span>
+              </div>
               <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition-all duration-200 group-hover:opacity-100">
                 <div className="flex w-full items-center justify-between p-3">
                   <div className="min-w-0">
@@ -237,9 +269,9 @@ export default function GalleryPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       ) : (
         <Card>
           <CardContent className="flex items-center justify-center py-12">

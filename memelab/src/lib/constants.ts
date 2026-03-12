@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  Users,
   Bot,
   Workflow,
   Image,
@@ -11,6 +12,7 @@ import {
 
 export const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Personagens", href: "/characters", icon: Users },
   { label: "Agents", href: "/agents", icon: Bot },
   { label: "Pipeline", href: "/pipeline", icon: Workflow },
   { label: "Gallery", href: "/gallery", icon: Image },
@@ -32,4 +34,22 @@ export const STATUS_COLORS: Record<string, string> = {
   offline: "bg-zinc-600",
   running: "bg-amber-500",
   error: "bg-red-500",
+};
+
+export const SOURCE_COLORS: Record<string, string> = {
+  gemini: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  comfyui: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  static: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+};
+
+export const TREND_SOURCE_COLORS: Record<string, string> = {
+  google_trends: "bg-red-500/20 text-red-400",
+  reddit: "bg-orange-500/20 text-orange-400",
+  rss_feed: "bg-amber-500/20 text-amber-400",
+  youtube: "bg-rose-500/20 text-rose-400",
+  gemini_trends: "bg-cyan-500/20 text-cyan-400",
+  brazil_viral: "bg-green-500/20 text-green-400",
+  bluesky: "bg-sky-500/20 text-sky-400",
+  hackernews: "bg-orange-500/20 text-orange-300",
+  lemmy: "bg-teal-500/20 text-teal-400",
 };

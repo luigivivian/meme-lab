@@ -67,37 +67,33 @@ body {
   animation: indeterminate 1.5s ease-in-out infinite;
 }
 
-/* ── Page transitions ───────────────────────────────────────────── */
+/* ── Animations ────────────────────────────────────────────────── */
 
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes slideUp {
-  from { transform: translateY(10px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes slideDown {
-  from { transform: translateY(-8px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.animate-page-in {
-  animation: slideUp 0.3s ease-out both;
-}
-
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out both;
 }
 
-.animate-slide-down {
-  animation: slideDown 0.3s ease-out both;
+/* ── Skeleton shimmer ──────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-.stagger-item {
-  animation: slideUp 0.3s ease-out both;
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-secondary) 25%,
+    color-mix(in srgb, var(--color-secondary), var(--color-muted-foreground) 8%) 37%,
+    var(--color-secondary) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 /* ── Pulse glow ─────────────────────────────────────────────────── */

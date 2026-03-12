@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Layers, Play, RefreshCw, CheckCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,7 +99,7 @@ export default function JobsPage() {
   };
 
   return (
-    <div className="space-y-6 animate-page-in">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Batch Jobs</h2>
@@ -167,15 +169,16 @@ export default function JobsPage() {
           <CardHeader>
             <CardTitle className="text-base">Historico de Jobs</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 max-h-[500px] overflow-auto">
-            {jobs.map((job, idx) => {
+          <CardContent>
+            <motion.div className="space-y-2 max-h-[500px] overflow-auto" variants={staggerContainer} initial="initial" animate="animate">
+            {jobs.map((job) => {
               const Icon = STATUS_ICON[job.status] ?? AlertCircle;
               const jobProgress = job.total > 0 ? Math.round((job.done / job.total) * 100) : 0;
               return (
-                <div
+                <motion.div
                   key={job.job_id}
-                  className="stagger-item rounded-xl bg-secondary/50 px-4 py-3 cursor-pointer hover:bg-secondary/80 transition-all duration-200"
-                  style={{ animationDelay: `${idx * 30}ms` }}
+                  className="rounded-xl bg-secondary/50 px-4 py-3 cursor-pointer hover:bg-secondary/80 transition-all duration-200"
+                  variants={staggerItem}
                   onClick={() => handleViewJob(job.job_id)}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -213,9 +216,10 @@ export default function JobsPage() {
                   {job.status === "completed" && (
                     <Progress value={100} className="h-1.5" indicatorClassName="bg-emerald-500" />
                   )}
-                </div>
+                </motion.div>
               );
             })}
+            </motion.div>
           </CardContent>
         </Card>
       ) : (
@@ -326,21 +330,21 @@ export default function JobsPage() {
               {detailJob.results.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">Resultados</p>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <motion.div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" variants={staggerContainer} initial="initial" animate="animate">
                     {detailJob.results.map((r, i) => (
-                      <div
+                      <motion.div
                         key={i}
-                        className="stagger-item group relative aspect-[4/5] overflow-hidden rounded-xl border bg-secondary"
-                        style={{ animationDelay: `${i * 50}ms` }}
+                        className="group relative aspect-[4/5] overflow-hidden rounded-xl border bg-secondary"
+                        variants={staggerItem}
                       >
                         <img src={imageUrl(r.file)} alt={r.theme} className="h-full w-full object-cover" />
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
                           <p className="text-xs text-white/80 truncate">{r.theme}</p>
                           <p className="text-[10px] text-white/50 truncate">{r.file}</p>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
-                  </div>
+                  </motion.div>
                 </div>
               )}
 

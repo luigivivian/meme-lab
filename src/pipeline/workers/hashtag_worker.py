@@ -10,8 +10,8 @@ from src.pipeline.models_v2 import ContentPackage
 
 logger = logging.getLogger("clip-flow.worker.hashtag")
 
-# Hashtags fixas do perfil (sempre incluidas)
-BRANDED_HASHTAGS = [
+# Hashtags padrao do mago-mestre (usadas quando personagem nao tem branded_hashtags)
+_DEFAULT_BRANDED_HASHTAGS = [
     "#magomestre420",
     "#magomestre",
     "#gandalf",
@@ -55,13 +55,20 @@ TOPIC_HASHTAGS = {
 class HashtagWorker:
     """Pesquisa e monta lista de hashtags relevantes."""
 
+    def __init__(self, branded_hashtags: list[str] | None = None):
+        self._branded = branded_hashtags if branded_hashtags else _DEFAULT_BRANDED_HASHTAGS
+        if branded_hashtags:
+            logger.info(f"HashtagWorker usando branded_hashtags customizadas: {branded_hashtags}")
+        else:
+            logger.info("HashtagWorker usando branded_hashtags padrao (mago-mestre)")
+
     async def research(self, package: ContentPackage) -> list[str]:
         """Gera lista de hashtags para um ContentPackage.
 
         Returns:
             lista de hashtags (com #) limitada a HASHTAG_COUNT
         """
-        hashtags = list(BRANDED_HASHTAGS)
+        hashtags = list(self._branded)
 
         # Adicionar hashtags tematicas baseadas no topico
         topic_lower = package.topic.lower()

@@ -11,7 +11,7 @@ def generate_phrases(topic: str, count: int = 5) -> list[str]:
     raw_text = generate(
         system_prompt=SYSTEM_PROMPT,
         user_message=f"Gere {count} frases sobre o tema: {topic}",
-        max_tokens=1024,
+        max_tokens=2048,
     )
 
     phrases = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]

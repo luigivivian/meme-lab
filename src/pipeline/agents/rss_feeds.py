@@ -2,11 +2,14 @@ from src.pipeline.agents.base import BaseSourceAgent
 from src.pipeline.models import TrendItem, TrendSource
 
 DEFAULT_FEEDS = [
-    "https://www.reddit.com/r/brasil/hot/.rss",
-    "https://www.reddit.com/r/eu_nvr/hot/.rss",
-    "https://www.reddit.com/r/memes/hot/.rss",
-    "https://www.reddit.com/r/funny/hot/.rss",
+    # Humor BR
     "https://www.sensacionalista.com.br/feed/",
+    # Cannabis BR — noticias, ciencia, legalizacao
+    "https://www.smokebuddies.com.br/feed/",
+    "https://maryjuana.com.br/feed/",
+    # Cultura/cotidiano BR
+    "https://www.reddit.com/r/desabafos/top/.rss?t=day",
+    "https://www.reddit.com/r/antitrampo/top/.rss?t=day",
 ]
 
 

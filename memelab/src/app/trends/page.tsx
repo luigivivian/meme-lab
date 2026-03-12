@@ -2,11 +2,13 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   TrendingUp, RefreshCw, ExternalLink, Sparkles, Loader2,
   Search, Star, StarOff, Filter, Flame,
   ArrowUpRight, Clock, Settings2, X,
 } from "lucide-react";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,9 +108,9 @@ function TrendCard({
   const source = SOURCE_META[item._agent] ?? { label: item.source, icon: "?", color: "text-muted-foreground" };
 
   return (
+    <motion.div variants={staggerItem} whileHover={{ y: -3 }}>
     <Card
-      className="stagger-item group transition-all duration-200 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5"
-      style={{ animationDelay: `${index * 25}ms` }}
+      className="group transition-all duration-200 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5"
     >
       <CardContent className="p-4 space-y-3">
         {/* Header: title + score */}
@@ -181,6 +183,7 @@ function TrendCard({
         </div>
       </CardContent>
     </Card>
+    </motion.div>
   );
 }
 
@@ -388,7 +391,7 @@ export default function TrendsPage() {
   const hasActiveFilters = activeCategories.size > 0 || searchTerms.length > 0 || activeAgents.size < ALL_AGENTS.length;
 
   return (
-    <div className="space-y-4 animate-page-in">
+    <div className="space-y-4">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -603,7 +606,7 @@ export default function TrendsPage() {
           ))}
         </div>
       ) : filtered.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <motion.div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" variants={staggerContainer} initial="initial" animate="animate">
           {filtered.map((item, i) => (
             <TrendCard
               key={`${item.event_id || item.title}-${item._agent}-${i}`}
@@ -613,7 +616,7 @@ export default function TrendsPage() {
               searchTerms={searchTerms}
             />
           ))}
-        </div>
+        </motion.div>
       ) : items.length > 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 gap-3">

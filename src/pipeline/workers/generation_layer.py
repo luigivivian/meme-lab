@@ -65,13 +65,16 @@ class GenerationLayer:
             pkgs = []
             for phrase in phrases:
                 try:
-                    image_path = await self.image_worker.compose(phrase, wo)
+                    compose_result = await self.image_worker.compose(phrase, wo)
                     pkgs.append(ContentPackage(
                         phrase=phrase,
-                        image_path=image_path,
+                        image_path=compose_result.image_path,
                         topic=wo.gandalf_topic,
                         source=wo.trend_event.source,
                         work_order=wo,
+                        background_path=compose_result.background_path,
+                        background_source=compose_result.background_source,
+                        image_metadata=compose_result.image_metadata,
                     ))
                 except Exception as e:
                     logger.error(f"[{wo.order_id}] Falha na composicao de '{phrase[:30]}...': {e}")

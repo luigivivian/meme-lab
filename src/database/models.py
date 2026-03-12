@@ -1,0 +1,444 @@
+"""ORM models — 10 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+
+from datetime import datetime
+from typing import Optional
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.database.base import Base, TimestampMixin
+
+
+# ============================================================
+# 1. characters
+# ============================================================
+
+class Character(TimestampMixin, Base):
+    __tablename__ = "characters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    handle: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    watermark: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
+
+    # Persona (LLM) — TEXT/JSON sem server_default (MySQL nao suporta)
+    system_prompt: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    humor_style: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    tone: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    catchphrases: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    rules_max_chars: Mapped[int] = mapped_column(Integer, default=120, server_default="120")
+    rules_forbidden: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+
+    # Visual DNA (Gemini Image)
+    character_dna: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    negative_traits: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    composition: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    # Visual DNA (ComfyUI)
+    comfyui_trigger_word: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    comfyui_character_dna: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    comfyui_lora_path: Mapped[str] = mapped_column(String(500), default="", server_default="")
+
+    # Branding
+    branded_hashtags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    caption_prompt: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    # Rendering (estilo artistico, iluminacao, camera) — JSON
+    rendering: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+    # Style (composicao Pillow) — JSON serializado
+    style: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+    # Refs config
+    refs_min_approved: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
+    refs_ideal_approved: Mapped[int] = mapped_column(Integer, default=15, server_default="15")
+    refs_batch_size: Mapped[int] = mapped_column(Integer, default=15, server_default="15")
+    refs_priority: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+
+    # Soft delete
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
+    # Relationships
+    refs: Mapped[list["CharacterRef"]] = relationship(
+        back_populates="character", cascade="all, delete-orphan"
+    )
+    themes: Mapped[list["Theme"]] = relationship(
+        back_populates="character", cascade="all, delete-orphan"
+    )
+    pipeline_runs: Mapped[list["PipelineRun"]] = relationship(back_populates="character")
+    content_packages: Mapped[list["ContentPackage"]] = relationship(back_populates="character")
+    batch_jobs: Mapped[list["BatchJob"]] = relationship(back_populates="character")
+    generated_images: Mapped[list["GeneratedImage"]] = relationship(back_populates="character")
+
+    __table_args__ = (
+        Index("idx_characters_status", "status"),
+        Index("idx_characters_is_deleted", "is_deleted"),
+    )
+
+
+# ============================================================
+# 2. character_refs
+# ============================================================
+
+class CharacterRef(TimestampMixin, Base):
+    __tablename__ = "character_refs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    character_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("characters.id", ondelete="CASCADE"), nullable=False
+    )
+    filename: Mapped[str] = mapped_column(String(300), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    width: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    height: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    source: Mapped[str] = mapped_column(String(50), default="generated", server_default="generated")
+    generation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Relationship
+    character: Mapped["Character"] = relationship(back_populates="refs")
+
+    __table_args__ = (
+        Index("idx_refs_character_id", "character_id"),
+        Index("idx_refs_status", "status"),
+        Index("idx_refs_character_status", "character_id", "status"),
+    )
+
+
+# ============================================================
+# 3. themes
+# ============================================================
+
+class Theme(TimestampMixin, Base):
+    __tablename__ = "themes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id", ondelete="CASCADE"), nullable=True
+    )
+    key: Mapped[str] = mapped_column(String(100), nullable=False)
+    label: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    acao: Mapped[str] = mapped_column(Text, nullable=False)
+    cenario: Mapped[str] = mapped_column(Text, nullable=False)
+    count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
+    # Relationship
+    character: Mapped[Optional["Character"]] = relationship(back_populates="themes")
+
+    __table_args__ = (
+        UniqueConstraint("character_id", "key", name="uq_themes_character_key"),
+        Index("idx_themes_character_id", "character_id"),
+        Index("idx_themes_key", "key"),
+    )
+
+
+# ============================================================
+# 4. pipeline_runs
+# ============================================================
+
+class PipelineRun(TimestampMixin, Base):
+    __tablename__ = "pipeline_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default="queued")
+    mode: Mapped[str] = mapped_column(String(20), default="agents", server_default="agents")
+
+    # Parametros do run
+    requested_count: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
+    phrases_per_topic: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    use_comfyui: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    use_gemini_image: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    use_phrase_context: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    theme_tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+
+    # Resultados
+    trends_fetched: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    trend_events_queued: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    work_orders_emitted: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    images_generated: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    packages_produced: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    duration_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Snapshots — JSON sem server_default (MySQL)
+    layers_snapshot: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    errors: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+
+    started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    character: Mapped[Optional["Character"]] = relationship(back_populates="pipeline_runs")
+    trend_events: Mapped[list["TrendEvent"]] = relationship(
+        back_populates="pipeline_run", cascade="all, delete-orphan"
+    )
+    work_orders: Mapped[list["WorkOrder"]] = relationship(
+        back_populates="pipeline_run", cascade="all, delete-orphan"
+    )
+    content_packages: Mapped[list["ContentPackage"]] = relationship(
+        back_populates="pipeline_run", cascade="all, delete-orphan"
+    )
+    agent_stats: Mapped[list["AgentStat"]] = relationship(
+        back_populates="pipeline_run", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index("idx_runs_status", "status"),
+        Index("idx_runs_character_id", "character_id"),
+        Index("idx_runs_started_at", "started_at"),
+    )
+
+
+# ============================================================
+# 5. trend_events
+# ============================================================
+
+class TrendEvent(Base):
+    __tablename__ = "trend_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    pipeline_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("pipeline_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    source: Mapped[str] = mapped_column(String(30), nullable=False)
+    score: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
+    velocity: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
+    category: Mapped[str] = mapped_column(String(50), default="geral", server_default="geral")
+    sentiment: Mapped[str] = mapped_column(String(30), default="neutro", server_default="neutro")
+    traffic: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    related_keywords: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    sources_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    # Relationship
+    pipeline_run: Mapped["PipelineRun"] = relationship(back_populates="trend_events")
+    work_orders: Mapped[list["WorkOrder"]] = relationship(back_populates="trend_event")
+
+    __table_args__ = (
+        Index("idx_trends_pipeline_run_id", "pipeline_run_id"),
+        Index("idx_trends_source", "source"),
+        Index("idx_trends_category", "category"),
+        Index("idx_trends_fetched_at", "fetched_at"),
+    )
+
+
+# ============================================================
+# 6. work_orders
+# ============================================================
+
+class WorkOrder(Base):
+    __tablename__ = "work_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    pipeline_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("pipeline_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    trend_event_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("trend_events.id", ondelete="CASCADE"), nullable=False
+    )
+    gandalf_topic: Mapped[str] = mapped_column(String(500), nullable=False)
+    humor_angle: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    situacao_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    relevance_score: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
+    priority: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    phrases_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    # Relationships
+    pipeline_run: Mapped["PipelineRun"] = relationship(back_populates="work_orders")
+    trend_event: Mapped["TrendEvent"] = relationship(back_populates="work_orders")
+    content_packages: Mapped[list["ContentPackage"]] = relationship(back_populates="work_order")
+
+    __table_args__ = (
+        Index("idx_wo_pipeline_run_id", "pipeline_run_id"),
+        Index("idx_wo_trend_event_id", "trend_event_id"),
+        Index("idx_wo_situacao_key", "situacao_key"),
+    )
+
+
+# ============================================================
+# 7. content_packages
+# ============================================================
+
+class ContentPackage(Base):
+    __tablename__ = "content_packages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pipeline_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("pipeline_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    work_order_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("work_orders.id", ondelete="SET NULL"), nullable=True
+    )
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
+    )
+    phrase: Mapped[str] = mapped_column(Text, nullable=False)
+    topic: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    source: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    # Imagem
+    image_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    background_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    background_source: Mapped[str] = mapped_column(String(30), default="static", server_default="static")
+
+    # Post-production — TEXT/JSON sem server_default
+    caption: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    hashtags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    best_time_to_post: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    quality_score: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
+
+    # Metadata de geracao
+    image_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
+    # Publishing
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    # Relationships
+    pipeline_run: Mapped["PipelineRun"] = relationship(back_populates="content_packages")
+    work_order: Mapped["WorkOrder"] = relationship(back_populates="content_packages")
+    character: Mapped[Optional["Character"]] = relationship(back_populates="content_packages")
+    generated_image: Mapped[Optional["GeneratedImage"]] = relationship(back_populates="content_package")
+
+    __table_args__ = (
+        Index("idx_pkg_pipeline_run_id", "pipeline_run_id"),
+        Index("idx_pkg_character_id", "character_id"),
+        Index("idx_pkg_quality_score", "quality_score"),
+        Index("idx_pkg_created_at", "created_at"),
+        Index("idx_pkg_is_published", "is_published"),
+    )
+
+
+# ============================================================
+# 8. generated_images
+# ============================================================
+
+class GeneratedImage(Base):
+    __tablename__ = "generated_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
+    )
+    content_package_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("content_packages.id"), nullable=True
+    )
+    batch_job_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("batch_jobs.id"), nullable=True
+    )
+    filename: Mapped[str] = mapped_column(String(300), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    image_type: Mapped[str] = mapped_column(String(30), nullable=False)  # background | composed | refined
+    source: Mapped[str] = mapped_column(String(30), nullable=False)  # gemini | comfyui | static | pillow
+    width: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    height: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    theme_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    prompt_used: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_refined: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    refinement_passes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    image_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    # Relationships
+    character: Mapped[Optional["Character"]] = relationship(back_populates="generated_images")
+    content_package: Mapped[Optional["ContentPackage"]] = relationship(back_populates="generated_image")
+    batch_job: Mapped[Optional["BatchJob"]] = relationship(back_populates="generated_images")
+
+    __table_args__ = (
+        Index("idx_img_character_id", "character_id"),
+        Index("idx_img_content_package_id", "content_package_id"),
+        Index("idx_img_image_type", "image_type"),
+        Index("idx_img_source", "source"),
+        Index("idx_img_created_at", "created_at"),
+    )
+
+
+# ============================================================
+# 9. batch_jobs
+# ============================================================
+
+class BatchJob(Base):
+    __tablename__ = "batch_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default="queued")
+    total: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    failed: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    auto_refine: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    refinement_passes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    results: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    errors: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    character: Mapped[Optional["Character"]] = relationship(back_populates="batch_jobs")
+    generated_images: Mapped[list["GeneratedImage"]] = relationship(back_populates="batch_job")
+
+    __table_args__ = (
+        Index("idx_jobs_status", "status"),
+        Index("idx_jobs_created_at", "created_at"),
+    )
+
+
+# ============================================================
+# 10. agent_stats
+# ============================================================
+
+class AgentStat(Base):
+    __tablename__ = "agent_stats"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pipeline_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("pipeline_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    agent_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # done | error | timeout | idle
+    events_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    # Relationship
+    pipeline_run: Mapped["PipelineRun"] = relationship(back_populates="agent_stats")
+
+    __table_args__ = (
+        Index("idx_astats_pipeline_run_id", "pipeline_run_id"),
+        Index("idx_astats_agent_name", "agent_name"),
+    )

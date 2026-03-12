@@ -47,13 +47,15 @@ class GenerateThemesRequest(BaseModel):
     count: int = Field(default=5, ge=1, le=20, description="Quantos temas gerar")
     categories: list[str] = Field(default=[], description="Categorias desejadas (ex: humor, fantasia)")
     avoid_existing: bool = Field(default=True, description="Evitar temas similares aos existentes")
-    save_to_yaml: bool = Field(default=True, description="Salvar no themes.yaml")
+    save_to_db: bool = Field(default=True, description="Salvar no banco de dados")
+    character_id: int | None = Field(default=None, description="Associar a personagem (None=global)")
 
 
 class EnhanceRequest(BaseModel):
     """Input simples -> prompt forte via IA."""
     input_text: str = Field(..., min_length=2, max_length=500, description="Descricao simples do tema")
-    save_to_yaml: bool = Field(default=False, description="Salvar no themes.yaml")
+    save_to_db: bool = Field(default=False, description="Salvar no banco de dados")
+    character_id: int | None = Field(default=None, description="Associar a personagem (None=global)")
 
 
 # ===== Pipeline =====
@@ -65,6 +67,8 @@ class PipelineRunRequest(BaseModel):
     use_comfyui: bool = Field(default=False, description="Usar ComfyUI local")
     use_gemini_image: bool | None = Field(default=None, description="Usar Gemini para backgrounds")
     use_phrase_context: bool = Field(default=False, description="Background contextualizado pela frase (mais coerente, mas mais lento)")
+    theme_tags: list[str] = Field(default=[], description="Lista de situacao_keys para forcar temas visuais (ex: ['cafe', 'meditando', 'confronto']). Se vazio, auto-detecta com diversidade.")
+    character_slug: str | None = Field(default=None, description="Slug do personagem (None=mago-mestre padrao)")
 
 
 class GeneratePhrasesRequest(BaseModel):
@@ -83,3 +87,102 @@ class ComposeImageRequest(BaseModel):
     auto_refine: bool = Field(default=False, description="Refinar background")
     refinement_passes: int = Field(default=1, ge=1, le=3)
     use_phrase_context: bool = Field(default=False, description="Background contextualizado pela frase")
+
+
+# ===== Characters =====
+
+class CharacterPersona(BaseModel):
+    system_prompt: str = Field(default="", description="Prompt de sistema completo para o LLM")
+    humor_style: str = Field(default="", description="Estilo de humor (zoeiro, sarcastico, etc)")
+    tone: str = Field(default="", description="Tom geral (leve, engracado, viral)")
+    catchphrases: list[str] = Field(default=[], description="Frases de efeito do personagem")
+    rules: dict = Field(default_factory=lambda: {"max_chars": 120, "forbidden": []})
+
+
+class CharacterVisual(BaseModel):
+    character_dna: str = Field(default="", description="DNA visual para Gemini Image")
+    negative_traits: str = Field(default="", description="Traits negativos (o que NAO gerar)")
+    composition: str = Field(default="", description="Regras de composicao da imagem")
+    rendering: dict = Field(default_factory=dict, description="Config de rendering: art_style, lighting, camera, custom overrides")
+
+
+class CharacterComfyUI(BaseModel):
+    trigger_word: str = Field(default="", description="Trigger word da LoRA")
+    character_dna: str = Field(default="", description="DNA visual para ComfyUI (ilustracao)")
+    lora_path: str = Field(default="", description="Caminho da LoRA")
+
+
+class CharacterBranding(BaseModel):
+    branded_hashtags: list[str] = Field(default=[], description="Hashtags do personagem")
+    caption_prompt: str = Field(default="", description="Prompt para gerar legendas Instagram")
+
+
+class CharacterStyleConfig(BaseModel):
+    overlay_color: list[int] = Field(default=[10, 10, 30, 40])
+    glow_color: list[int] = Field(default=[255, 200, 80, 15])
+    text_color: list[int] = Field(default=[255, 255, 255])
+    text_stroke_width: int = Field(default=2)
+    text_vertical_position: float = Field(default=0.80)
+    font_size: int = Field(default=48)
+    watermark_color: list[int] = Field(default=[200, 180, 130, 120])
+    watermark_font_size: int = Field(default=22)
+
+
+class CharacterCreateRequest(BaseModel):
+    """Criar novo personagem."""
+    name: str = Field(description="Nome do personagem (ex: 'O Dragao Zoeiro')")
+    handle: str = Field(default="", description="Handle Instagram (ex: '@dragaozoeiro')")
+    watermark: str = Field(default="", description="Texto do watermark (default: handle)")
+    persona: CharacterPersona = Field(default_factory=CharacterPersona)
+    visual: CharacterVisual = Field(default_factory=CharacterVisual)
+    comfyui: CharacterComfyUI = Field(default_factory=CharacterComfyUI)
+    branding: CharacterBranding = Field(default_factory=CharacterBranding)
+    style: CharacterStyleConfig = Field(default_factory=CharacterStyleConfig)
+
+
+class CharacterUpdateRequest(BaseModel):
+    """Atualizar personagem existente (campos parciais)."""
+    name: str | None = None
+    handle: str | None = None
+    watermark: str | None = None
+    status: str | None = None
+    persona: dict | None = None
+    visual: dict | None = None
+    comfyui: dict | None = None
+    branding: dict | None = None
+    style: dict | None = None
+    refs_config: dict | None = None
+
+
+class CharacterRefsStats(BaseModel):
+    approved: int = 0
+    pending: int = 0
+    rejected: int = 0
+    min_required: int = 5
+    ideal: int = 15
+    is_ready: bool = False
+
+
+class CharacterSummary(BaseModel):
+    slug: str
+    name: str
+    handle: str
+    status: str
+    avatar: str | None = None
+    refs: CharacterRefsStats
+    themes_count: int = 0
+
+
+class CharacterDetail(BaseModel):
+    slug: str
+    name: str
+    handle: str
+    watermark: str
+    status: str
+    persona: CharacterPersona
+    visual: CharacterVisual
+    comfyui: CharacterComfyUI
+    branding: CharacterBranding
+    style: CharacterStyleConfig
+    refs: CharacterRefsStats
+    themes_count: int = 0

@@ -7,6 +7,13 @@ BACKGROUNDS_DIR = ASSETS_DIR / "backgrounds"
 FONTS_DIR = ASSETS_DIR / "fonts"
 OUTPUT_DIR = BASE_DIR / "output"
 
+# Banco de dados
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{BASE_DIR / 'data' / 'clipflow.db'}")
+
 # Tamanho da imagem (Instagram post 4:5)
 IMAGE_WIDTH = 1080
 IMAGE_HEIGHT = 1350
@@ -202,7 +209,25 @@ GEMINI_TRENDS_MODEL = "gemini-2.5-flash"
 # Quantos topicos virais pedir ao Gemini por fetch
 GEMINI_TRENDS_MAX_TOPICS = 15
 
+# ===== BlueSky Trends Agent =====
+
+# Max posts virais BR coletados do BlueSky por fetch
+BLUESKY_MAX_POSTS = 15
+# Credenciais BlueSky (app password — criar em bsky.app/settings/app-passwords)
+BLUESKY_HANDLE = os.getenv("BLUESKY_HANDLE", "")
+BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD", "")
+
 # ===== Brazil Viral RSS Agent =====
 
 # Max itens por feed curado de memes BR
 BRAZIL_VIRAL_RSS_MAX_PER_FEED = 10
+
+# ===== Lemmy Communities Agent =====
+
+# Max posts por comunidade Lemmy
+LEMMY_MAX_POSTS = 15
+
+# ===== HackerNews Agent =====
+
+# Max stories para buscar do HN top stories
+HACKERNEWS_MAX_STORIES = 20

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Palette, Plus, Trash2, Sparkles, Wand2, RefreshCw, Loader2, CheckCircle2 } from "lucide-react";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,7 +81,7 @@ export default function ThemesPage() {
     setGenerating(true);
     setGenSuccess(null);
     try {
-      const result = await generateThemes({ count: genCount, save_to_yaml: true });
+      const result = await generateThemes({ count: genCount, save_to_db: true });
       setGenSuccess(`${result.generated} temas gerados e salvos`);
       mutate();
     } catch {
@@ -105,12 +107,12 @@ export default function ThemesPage() {
   };
 
   return (
-    <div className="space-y-6 animate-page-in">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Temas Visuais</h2>
           <p className="text-sm text-muted-foreground">
-            {themes.length} temas ({themesData?.source ?? "..."})
+            {themesData?.total ?? themes.length} temas
           </p>
         </div>
         <div className="flex gap-2">
@@ -161,7 +163,7 @@ export default function ThemesPage() {
                 <p className="text-xs text-muted-foreground">{enhanceResult.enhanced_theme.acao}</p>
                 <p className="text-xs text-muted-foreground">{enhanceResult.enhanced_theme.cenario}</p>
                 <Badge variant="secondary" className="text-[10px] mt-1">
-                  {enhanceResult.saved_to_yaml ? "Salvo" : "Nao salvo"}
+                  {enhanceResult.saved_to_db ? "Salvo" : "Nao salvo"}
                 </Badge>
               </div>
             )}
@@ -195,7 +197,7 @@ export default function ThemesPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Usa Gemini para criar temas visuais diversos e salvar no themes.yaml
+              Usa Gemini para criar temas visuais diversos e salvar no banco de dados
             </p>
           </CardContent>
         </Card>
@@ -209,12 +211,11 @@ export default function ThemesPage() {
           ))}
         </div>
       ) : themes.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {themes.map((theme, idx) => (
+        <motion.div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" variants={staggerContainer} initial="initial" animate="animate">
+          {themes.map((theme) => (
+            <motion.div key={theme.key} variants={staggerItem} whileHover={{ y: -3 }}>
             <Card
-              key={theme.key}
-              className="stagger-item group cursor-pointer transition-all duration-200 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
-              style={{ animationDelay: `${idx * 30}ms` }}
+              className="group cursor-pointer transition-all duration-200 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
               onClick={() => setSelectedTheme(theme)}
             >
               <CardContent className="p-4 space-y-2">
@@ -243,8 +244,9 @@ export default function ThemesPage() {
                 )}
               </CardContent>
             </Card>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 gap-3">

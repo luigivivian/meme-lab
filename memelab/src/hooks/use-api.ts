@@ -51,6 +51,13 @@ export function useThemes() {
   });
 }
 
+export function useThemeKeys() {
+  return useSWR("theme-keys", () => api.getThemeKeys(), {
+    refreshInterval: 0,
+    revalidateOnFocus: false,
+  });
+}
+
 export function useTrendsFeed(limit = 50) {
   return useSWR(`trends-feed-${limit}`, () => api.getTrendsFeed(limit), {
     refreshInterval: 5 * 60 * 1000,
@@ -69,4 +76,55 @@ export function useJobs() {
   return useSWR("jobs", () => api.getJobs(), {
     refreshInterval: 5000,
   });
+}
+
+export function useContentPackages(limit = 6) {
+  return useSWR(`content-packages-${limit}`, () => api.getContentPackages({ limit }), {
+    refreshInterval: 15000,
+  });
+}
+
+export function useCharacters() {
+  return useSWR("characters", () => api.getCharacters(), {
+    refreshInterval: 30000,
+  });
+}
+
+export function useCharacter(slug: string | null) {
+  return useSWR(
+    slug ? `character-${slug}` : null,
+    () => (slug ? api.getCharacter(slug) : null),
+    { refreshInterval: 0, revalidateOnFocus: false }
+  );
+}
+
+export function useCharacterRefs(slug: string | null) {
+  return useSWR(
+    slug ? `character-refs-${slug}` : null,
+    () => (slug ? api.getCharacterRefs(slug) : null),
+    { refreshInterval: 5000 }
+  );
+}
+
+export function useRefsGenerateStatus(slug: string | null, enabled = false) {
+  return useSWR(
+    slug && enabled ? `refs-generate-${slug}` : null,
+    () => (slug ? api.getRefsGenerateStatus(slug) : null),
+    { refreshInterval: 2000 }
+  );
+}
+
+export function useRenderingPresets() {
+  return useSWR("rendering-presets", () => api.getRenderingPresets(), {
+    refreshInterval: 0,
+    revalidateOnFocus: false,
+  });
+}
+
+export function useCharacterValidation(slug: string | null) {
+  return useSWR(
+    slug ? `character-validation-${slug}` : null,
+    () => (slug ? api.validateCharacter(slug) : null),
+    { refreshInterval: 0, revalidateOnFocus: false }
+  );
 }

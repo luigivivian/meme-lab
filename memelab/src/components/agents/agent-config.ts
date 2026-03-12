@@ -1,5 +1,5 @@
 import {
-  Globe, MessageCircle, Rss, Youtube, Sparkles, Flame,
+  Globe, MessageCircle, Rss, Youtube, Sparkles, Flame, CloudSun, Newspaper, Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -88,6 +88,42 @@ export const AGENT_PERSONAS: Record<string, AgentPersona> = {
     badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
     description: "Subreddits meme BR + portais (Hypeness, Omelete)",
     animationType: "flame",
+  },
+  bluesky_trends: {
+    label: "BlueSky",
+    icon: CloudSun,
+    color: "text-sky-400",
+    bgGradient: "from-sky-600/20 via-sky-500/10 to-transparent",
+    accentHex: "#38bdf8",
+    glowColor: "rgba(56, 189, 248, 0.3)",
+    iconBg: "bg-sky-500/15 ring-1 ring-sky-500/30",
+    badgeClass: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+    description: "Posts virais brasileiros via AT Protocol",
+    animationType: "wave",
+  },
+  hackernews: {
+    label: "HackerNews",
+    icon: Newspaper,
+    color: "text-orange-300",
+    bgGradient: "from-orange-500/20 via-orange-400/10 to-transparent",
+    accentHex: "#fdba74",
+    glowColor: "rgba(253, 186, 116, 0.3)",
+    iconBg: "bg-orange-400/15 ring-1 ring-orange-400/30",
+    badgeClass: "bg-orange-400/15 text-orange-300 border-orange-400/30",
+    description: "Top stories do Hacker News (tech/humor)",
+    animationType: "pulse",
+  },
+  lemmy_communities: {
+    label: "Lemmy",
+    icon: Users,
+    color: "text-teal-400",
+    bgGradient: "from-teal-600/20 via-teal-500/10 to-transparent",
+    accentHex: "#2dd4bf",
+    glowColor: "rgba(45, 212, 191, 0.3)",
+    iconBg: "bg-teal-500/15 ring-1 ring-teal-500/30",
+    badgeClass: "bg-teal-500/15 text-teal-400 border-teal-500/30",
+    description: "Comunidades BR no Lemmy (Reddit federado)",
+    animationType: "bounce",
   },
 };
 

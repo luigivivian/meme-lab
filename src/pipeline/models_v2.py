@@ -24,6 +24,9 @@ class TrendSource(Enum):
     YOUTUBE = "youtube"
     GEMINI_TRENDS = "gemini_trends"
     BRAZIL_VIRAL = "brazil_viral"
+    BLUESKY = "bluesky"
+    HACKERNEWS = "hackernews"
+    LEMMY = "lemmy"
 
 
 @dataclass
@@ -71,6 +74,10 @@ class ContentPackage:
     quality_score: float = 0.0
     work_order: WorkOrder | None = None
     created_at: datetime = field(default_factory=datetime.now)
+    # Metadata de geracao de imagem
+    background_path: str | None = None
+    background_source: str = "static"  # gemini | comfyui | static
+    image_metadata: dict = field(default_factory=dict)
 
 
 @dataclass

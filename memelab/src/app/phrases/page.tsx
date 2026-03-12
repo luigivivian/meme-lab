@@ -2,7 +2,9 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import { MessageSquareQuote, Sparkles, Copy, Check, Image, Loader2 } from "lucide-react";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +55,7 @@ function PhrasesContent() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl animate-page-in">
+    <div className="space-y-6 max-w-3xl">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -108,12 +110,13 @@ function PhrasesContent() {
           <CardHeader>
             <CardTitle className="text-base">{phrases.length} frases geradas</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent>
+            <motion.div className="space-y-2" variants={staggerContainer} initial="initial" animate="animate">
             {phrases.map((phrase, idx) => (
-              <div
+              <motion.div
                 key={`${phrase.slice(0, 20)}-${idx}`}
-                className="stagger-item group flex items-start justify-between gap-3 rounded-xl bg-secondary/50 px-4 py-3 transition-colors duration-200 hover:bg-secondary/70"
-                style={{ animationDelay: `${idx * 40}ms` }}
+                className="group flex items-start justify-between gap-3 rounded-xl bg-secondary/50 px-4 py-3 transition-colors duration-200 hover:bg-secondary/70"
+                variants={staggerItem}
               >
                 <p className="flex-1 text-sm leading-relaxed">{phrase}</p>
                 <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -139,8 +142,9 @@ function PhrasesContent() {
                     <Image className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-              </div>
+              </motion.div>
             ))}
+            </motion.div>
           </CardContent>
         </Card>
       )}

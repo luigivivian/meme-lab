@@ -8,9 +8,13 @@ Canais monitorados (verificados e funcionais):
   - Manual do Mundo    — ciencia popular + humor, muito compartilhado
   - KondZilla          — maior canal de funk BR, indicador de trends musicais
   - BRKsEDU            — gaming/entretenimento, grande audiencia jovem BR
+  - UmDois Podcast     — podcast cannabis/cultura BR, alto engajamento
+  - Hempadao TV        — conteudo cannabis medicinal/educativo BR
+  - Torrando Tomazine  — cultura cannabis/entrevistas BR
 
 Score baseado no tipo de canal:
   - Comedia/Humor: 0.75 (alto potencial de meme)
+  - Cannabis/Cultura 420: 0.70 (relevancia direta pro Mago Mestre)
   - Viral/Entretenimento: 0.65
   - Posicao no feed ajusta +0.0 (primeiro) ate -0.15 (ultimo)
 """
@@ -29,10 +33,16 @@ logger = logging.getLogger("clip-flow.agent.youtube_rss")
 
 # (channel_id, nome, score_base, categoria)
 _CHANNELS = [
+    # Comedia/Humor
     ("UCEWHPFNilsT0IfQfutVzsag", "Porta dos Fundos", 0.75, "comedia"),
     ("UCKHhA5hN2UohhFDfNXB_cvQ", "Manual do Mundo",  0.68, "entretenimento"),
+    # Musica/Cultura
     ("UCffDXn7ycAzwL2LDlbyWOTw", "KondZilla",         0.65, "musica_viral"),
     ("UCWKtHaeXVzUscYGcm0hEunw", "BRKsEDU",           0.60, "gaming"),
+    # Cannabis/Cultura 420
+    ("UCoj1MMpCJg1PZzH5cr3pr7g", "UmDois Podcast",    0.70, "cannabis_cultura"),
+    ("UCcuBfWaT2n7WFfO-x140Xmg", "Hempadao TV",       0.70, "cannabis_medicinal"),
+    ("UCqWRJJWjyw8zn3D4Cz2o7Xg", "Torrando Tomazine",  0.68, "cannabis_cultura"),
 ]
 
 _RSS_URL = "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"

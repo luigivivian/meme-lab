@@ -106,6 +106,17 @@ export interface PipelineRunResult {
   current_layer?: string | null;
 }
 
+export interface ImageMetadata {
+  pose?: string;
+  scene?: string;
+  theme_key?: string;
+  prompt_used?: string;
+  reference_images?: string[];
+  rendering_config?: Record<string, string>;
+  phrase_context_used?: boolean;
+  character_dna_used?: boolean;
+}
+
 export interface ContentPackage {
   phrase: string;
   image_path: string;
@@ -113,11 +124,29 @@ export interface ContentPackage {
   caption: string;
   hashtags: string;
   quality_score: number;
+  background_path?: string;
+  background_source?: string;
+  image_metadata?: ImageMetadata;
+  character_id?: number;
 }
 
 export interface PipelineRunSummary {
+  run_id: string;
   status: string;
-  packages: number;
+  packages_produced: number;
+  images_generated: number;
+  trends_fetched: number;
+  duration_seconds: number | null;
+  started_at: string | null;
+  finished_at: string | null;
+  errors: string[];
+}
+
+export interface PipelineRunsResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  runs: PipelineRunSummary[];
 }
 
 export interface ThemeInfo {
@@ -129,7 +158,9 @@ export interface ThemeInfo {
 }
 
 export interface ThemesResponse {
-  source: string;
+  total: number;
+  offset: number;
+  limit: number;
   themes: ThemeInfo[];
 }
 
@@ -240,7 +271,7 @@ export interface JobsListResponse {
 export interface EnhanceResponse {
   original_input: string;
   enhanced_theme: ThemeInfo & { acao: string; cenario: string };
-  saved_to_yaml: boolean;
+  saved_to_db: boolean;
   prompt_preview: string;
 }
 
@@ -249,12 +280,13 @@ export interface GenerateThemesParams {
   count?: number;
   categories?: string[];
   avoid_existing?: boolean;
-  save_to_yaml?: boolean;
+  save_to_db?: boolean;
+  character_id?: number | null;
 }
 
 export interface GenerateThemesResponse {
   generated: number;
-  saved_to_yaml: boolean;
+  saved_to_db: boolean;
   themes: ThemeInfo[];
 }
 
@@ -301,6 +333,32 @@ export interface TrendCategoriesResponse {
   };
 }
 
+// --- Content Packages (DB) ---
+export interface ContentPackageDB {
+  id: number;
+  phrase: string;
+  topic: string;
+  source: string;
+  image_path: string;
+  background_path: string | null;
+  background_source: string;
+  caption: string;
+  hashtags: string[];
+  quality_score: number;
+  is_published: boolean;
+  published_at: string | null;
+  created_at: string | null;
+  pipeline_run_id: number | null;
+  character_id: number | null;
+}
+
+export interface ContentPackagesResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  packages: ContentPackageDB[];
+}
+
 // --- Status ---
 export const getStatus = () => request<StatusResponse>("/status");
 
@@ -329,6 +387,13 @@ export interface PipelineRunParams {
   use_gemini_image?: boolean;
   use_phrase_context?: boolean;
   use_comfyui?: boolean;
+  theme_tags?: string[];
+  character_slug?: string;
+}
+
+export interface ThemeKeysResponse {
+  total: number;
+  keys: string[];
 }
 export const runPipeline = (params: PipelineRunParams) =>
   request<PipelineRunResult>("/pipeline/run", {
@@ -343,7 +408,7 @@ export const runPipelineSync = (params: PipelineRunParams) =>
 export const getPipelineStatus = (runId: string) =>
   request<PipelineRunResult>(`/pipeline/status/${runId}`);
 export const getPipelineRuns = () =>
-  request<Record<string, PipelineRunSummary>>("/pipeline/runs");
+  request<PipelineRunsResponse>("/pipeline/runs");
 
 // --- Generation ---
 export interface ComposeParams {
@@ -399,10 +464,11 @@ export const generateThemes = (params?: GenerateThemesParams) =>
     method: "POST",
     body: params ? JSON.stringify(params) : undefined,
   });
+export const getThemeKeys = () => request<ThemeKeysResponse>("/themes/keys");
 export const enhanceTheme = (concept: string, save = false) =>
   request<EnhanceResponse>("/themes/enhance", {
     method: "POST",
-    body: JSON.stringify({ input_text: concept, save_to_yaml: save }),
+    body: JSON.stringify({ input_text: concept, save_to_db: save }),
   });
 
 // --- Jobs ---
@@ -419,6 +485,14 @@ export const createBatchFromConfig = (autoRefine = false, passes = 1) =>
 export const getJobStatus = (jobId: string) =>
   request<JobStatus>(`/jobs/${jobId}`);
 export const getJobs = () => request<JobsListResponse>("/jobs");
+
+export const getContentPackages = (params?: { limit?: number; offset?: number }) => {
+  const p = new URLSearchParams();
+  if (params?.limit) p.set("limit", String(params.limit));
+  if (params?.offset) p.set("offset", String(params.offset));
+  const qs = p.toString();
+  return request<ContentPackagesResponse>(`/content${qs ? `?${qs}` : ""}`);
+};
 
 // --- Drive ---
 export interface DriveQuery {
@@ -442,3 +516,317 @@ export const getDriveHealth = () =>
   request<DriveHealthResponse>("/drive/health");
 export const imageUrl = (filename: string) =>
   `${BASE}/drive/images/${encodeURIComponent(filename)}`;
+
+// --- Characters ---
+export interface CharacterRefsStats {
+  approved: number;
+  pending: number;
+  rejected: number;
+  min_required: number;
+  ideal: number;
+  is_ready: boolean;
+}
+
+export interface CharacterSummary {
+  slug: string;
+  name: string;
+  handle: string;
+  status: "draft" | "refining" | "ready";
+  avatar: string | null;
+  refs: CharacterRefsStats;
+  themes_count: number;
+}
+
+export interface CharacterPersona {
+  system_prompt: string;
+  humor_style: string;
+  tone: string;
+  catchphrases: string[];
+  rules: { max_chars: number; forbidden: string[] };
+}
+
+export interface RenderingConfig {
+  art_style?: string;
+  art_style_custom?: string;
+  lighting?: string;
+  lighting_custom?: string;
+  camera?: string;
+  camera_custom?: string;
+  extra_instructions?: string;
+}
+
+export interface RenderingPreset {
+  label: string;
+  prompt: string;
+}
+
+export interface RenderingPresetsResponse {
+  art_style: Record<string, RenderingPreset>;
+  lighting: Record<string, RenderingPreset>;
+  camera: Record<string, RenderingPreset>;
+}
+
+export interface CharacterVisual {
+  character_dna: string;
+  negative_traits: string;
+  composition: string;
+  rendering: RenderingConfig;
+}
+
+export interface CharacterComfyUI {
+  trigger_word: string;
+  character_dna: string;
+  lora_path: string;
+}
+
+export interface CharacterBranding {
+  branded_hashtags: string[];
+  caption_prompt: string;
+}
+
+export interface CharacterStyleConfig {
+  overlay_color: number[];
+  glow_color: number[];
+  text_color: number[];
+  text_stroke_width: number;
+  text_vertical_position: number;
+  font_size: number;
+  watermark_color: number[];
+  watermark_font_size: number;
+}
+
+export interface CharacterDetail {
+  slug: string;
+  name: string;
+  handle: string;
+  watermark: string;
+  status: "draft" | "refining" | "ready";
+  persona: CharacterPersona;
+  visual: CharacterVisual;
+  comfyui: CharacterComfyUI;
+  branding: CharacterBranding;
+  style: CharacterStyleConfig;
+  refs: CharacterRefsStats;
+  themes_count: number;
+}
+
+export interface CharacterCreateParams {
+  name: string;
+  handle?: string;
+  watermark?: string;
+  persona?: Partial<CharacterPersona>;
+  visual?: Partial<CharacterVisual>;
+  comfyui?: Partial<CharacterComfyUI>;
+  branding?: Partial<CharacterBranding>;
+  style?: Partial<CharacterStyleConfig>;
+}
+
+export interface CharacterUpdateParams {
+  name?: string;
+  handle?: string;
+  watermark?: string;
+  status?: string;
+  persona?: Partial<CharacterPersona>;
+  visual?: Partial<CharacterVisual>;
+  comfyui?: Partial<CharacterComfyUI>;
+  branding?: Partial<CharacterBranding>;
+  style?: Partial<CharacterStyleConfig>;
+  refs_config?: Record<string, unknown>;
+}
+
+export interface CharactersListResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  characters: CharacterSummary[];
+}
+
+export const getCharacters = () =>
+  request<CharactersListResponse>("/characters");
+
+export const getCharacter = (slug: string) =>
+  request<CharacterDetail>(`/characters/${slug}`);
+
+export const createCharacter = (params: CharacterCreateParams) =>
+  request<CharacterDetail>("/characters", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+
+export const updateCharacter = (slug: string, params: CharacterUpdateParams) =>
+  request<CharacterDetail>(`/characters/${slug}`, {
+    method: "PUT",
+    body: JSON.stringify(params),
+  });
+
+export const deleteCharacter = (slug: string) =>
+  request<{ deleted: string }>(`/characters/${slug}`, {
+    method: "DELETE",
+  });
+
+// --- Character Refs ---
+export interface RefInfo {
+  filename: string;
+  status: "approved" | "pending" | "rejected";
+  size_kb: number;
+  modified_at: string;
+}
+
+export interface RefsListResponse {
+  slug: string;
+  stats: CharacterRefsStats;
+  refs: RefInfo[];
+}
+
+export interface RefActionResponse {
+  status: string;
+  filename: string;
+  refs_stats?: CharacterRefsStats;
+}
+
+export interface RefGenerateJob {
+  job_id: string;
+  slug: string;
+  status: "queued" | "running" | "completed" | "none";
+  done: number;
+  failed: number;
+  total: number;
+  results: { filename: string; pose: string; index: number }[];
+  errors: string[];
+  created_at: string;
+  finished_at: string | null;
+  message?: string;
+}
+
+export const getCharacterRefs = (slug: string) =>
+  request<RefsListResponse>(`/characters/${slug}/refs`);
+
+export const generateCharacterRefs = (slug: string, batchSize = 15) =>
+  request<RefGenerateJob>(`/characters/${slug}/refs/generate`, {
+    method: "POST",
+    body: JSON.stringify({ batch_size: batchSize }),
+  });
+
+export const getRefsGenerateStatus = (slug: string) =>
+  request<RefGenerateJob>(`/characters/${slug}/refs/generate/status`);
+
+export const approveRef = (slug: string, filename: string) =>
+  request<RefActionResponse>(`/characters/${slug}/refs/${encodeURIComponent(filename)}/approve`, {
+    method: "POST",
+  });
+
+export const rejectRef = (slug: string, filename: string) =>
+  request<RefActionResponse>(`/characters/${slug}/refs/${encodeURIComponent(filename)}/reject`, {
+    method: "POST",
+  });
+
+export const deleteRef = (slug: string, filename: string) =>
+  request<{ deleted: string; refs_stats: CharacterRefsStats }>(`/characters/${slug}/refs/${encodeURIComponent(filename)}`, {
+    method: "DELETE",
+  });
+
+export const refImageUrl = (slug: string, filename: string) =>
+  `${BASE}/characters/${slug}/refs/image/${encodeURIComponent(filename)}`;
+
+// --- Character AI Profile Generation ---
+export interface GeneratedProfile {
+  system_prompt: string;
+  humor_style: string;
+  tone: string;
+  catchphrases: string[];
+  max_chars: number;
+  forbidden: string[];
+  character_dna: string;
+  negative_traits: string;
+  composition: string;
+  branded_hashtags: string[];
+  caption_prompt: string;
+  watermark: string;
+}
+
+export const generateProfile = (name: string, description: string, handle?: string) =>
+  request<{ profile: GeneratedProfile }>("/characters/generate-profile", {
+    method: "POST",
+    body: JSON.stringify({ name, description, handle }),
+  });
+
+// --- Character Validation & Testing ---
+export interface ValidationCheck {
+  area: string;
+  item: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface ValidationResult {
+  slug: string;
+  status: string;
+  checks: ValidationCheck[];
+  area_scores: Record<string, number>;
+  overall_score: number;
+  total_checks: number;
+  total_ok: number;
+  is_production_ready: boolean;
+}
+
+export interface PhraseValidation {
+  phrase: string;
+  chars: number;
+  over_limit: boolean;
+  forbidden_found: string[];
+  ok: boolean;
+}
+
+export interface TestPhrasesResult {
+  slug: string;
+  topic: string;
+  phrases: PhraseValidation[];
+  persona_used: {
+    humor_style: string;
+    tone: string;
+    max_chars: number;
+  };
+}
+
+export interface TestVisualResult {
+  success: boolean;
+  filename: string;
+  slug: string;
+  pose: string;
+  image_url: string;
+}
+
+export interface TestComposeResult {
+  success: boolean;
+  slug: string;
+  phrase: string;
+  topic: string;
+  situacao: string;
+  background_path: string;
+  image_path: string;
+  image_url: string;
+}
+
+export const getRenderingPresets = () =>
+  request<RenderingPresetsResponse>("/characters/rendering-presets");
+
+export const validateCharacter = (slug: string) =>
+  request<ValidationResult>(`/characters/${slug}/validate`);
+
+export const testCharacterPhrases = (slug: string, topic = "segunda-feira", count = 3) =>
+  request<TestPhrasesResult>(`/characters/${slug}/test-phrases`, {
+    method: "POST",
+    body: JSON.stringify({ topic, count }),
+  });
+
+export const testCharacterVisual = (slug: string, pose?: string) =>
+  request<TestVisualResult>(`/characters/${slug}/test-visual`, {
+    method: "POST",
+    body: JSON.stringify({ pose }),
+  });
+
+export const testCharacterCompose = (slug: string, topic = "segunda-feira", situacao = "sabedoria") =>
+  request<TestComposeResult>(`/characters/${slug}/test-compose`, {
+    method: "POST",
+    body: JSON.stringify({ topic, situacao }),
+  });

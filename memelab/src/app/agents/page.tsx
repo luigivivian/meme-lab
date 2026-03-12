@@ -237,7 +237,7 @@ export default function AgentsPage() {
   const sourceCount = agents?.filter((a) => a.type === "source").length ?? 0;
 
   return (
-    <div className="space-y-6 animate-page-in">
+    <div className="space-y-6">
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>

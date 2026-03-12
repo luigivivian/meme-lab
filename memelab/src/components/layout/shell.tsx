@@ -2,8 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { pageVariants, pageTransition } from "@/lib/animations";
+import { CharacterProvider } from "@/contexts/character-context";
 
 function TopLoader() {
   const pathname = usePathname();
@@ -51,49 +54,31 @@ function TopLoader() {
   );
 }
 
-function PageContent({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const [displayed, setDisplayed] = useState(children);
-  const [animating, setAnimating] = useState(false);
-  const prevPathname = useRef(pathname);
-
-  useEffect(() => {
-    if (pathname !== prevPathname.current) {
-      prevPathname.current = pathname;
-      setAnimating(true);
-      const t = setTimeout(() => {
-        setDisplayed(children);
-        setAnimating(false);
-      }, 150);
-      return () => clearTimeout(t);
-    } else {
-      setDisplayed(children);
-    }
-  }, [pathname, children]);
-
-  return (
-    <main
-      className="flex-1 overflow-auto p-6"
-      style={{
-        opacity: animating ? 0 : 1,
-        transform: animating ? "translateY(6px)" : "translateY(0)",
-        transition: "opacity 0.2s ease-out, transform 0.2s ease-out",
-      }}
-    >
-      {displayed}
-    </main>
-  );
-}
-
 export function Shell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      <TopLoader />
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <PageContent>{children}</PageContent>
+    <CharacterProvider>
+      <div className="flex h-screen overflow-hidden">
+        <TopLoader />
+        <Sidebar />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header />
+          <AnimatePresence mode="wait">
+            <motion.main
+              key={pathname}
+              className="flex-1 overflow-auto p-6"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={pageTransition}
+            >
+              {children}
+            </motion.main>
+          </AnimatePresence>
+        </div>
       </div>
-    </div>
+    </CharacterProvider>
   );
 }

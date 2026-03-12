@@ -58,6 +58,12 @@ def main():
         action="store_true",
         help="Background contextualizado pela frase (mais coerente, mais lento)",
     )
+    parser.add_argument(
+        "--theme-tags",
+        nargs="+",
+        default=None,
+        help="Lista de situacao_keys para forcar temas visuais (ex: cafe meditando confronto)",
+    )
 
     args = parser.parse_args()
     setup_logging(args.verbose)
@@ -107,6 +113,7 @@ def main():
             images_per_run=images_per_run,
             use_comfyui=use_comfyui,
             use_phrase_context=args.phrase_context,
+            theme_tags=args.theme_tags,
         )
         result = asyncio.run(orchestrator.run())
 

@@ -4,14 +4,17 @@ from src.pipeline.agents.base import BaseSourceAgent
 from src.pipeline.models import TrendItem, TrendSource
 
 DEFAULT_SUBREDDITS = [
-    "brasil",
-    "eu_nvr",
+    # Humor/cotidiano BR (titulos textuais, bons pra meme)
     "DiretoDoZapZap",
-    "memes",
-    "dankmemes",
-    "meirl",
-    "me_irl",
-    "funny",
+    "tiodopave",
+    "desabafos",
+    "antitrampo",
+    # Cannabis/cultura 420 BR
+    "maconha",
+    "cultivonha",
+    # Cannabis gringo (referencia visual/trends)
+    "trees",
+    "microgrowery",
 ]
 
 
@@ -44,13 +47,13 @@ class RedditMemesAgent(BaseSourceAgent):
     def _fetch_subreddit(self, subreddit: str) -> list[TrendItem]:
         import feedparser
 
-        url = f"https://www.reddit.com/r/{subreddit}/hot/.rss"
+        url = f"https://www.reddit.com/r/{subreddit}/top/.rss?t=day"
         feed = feedparser.parse(url)
 
         items = []
         for entry in feed.entries[: self.limit_per_sub]:
-            title = entry.get("title", "")
-            if not title:
+            title = entry.get("title", "").strip()
+            if not title or len(title) < 10:
                 continue
             item = TrendItem(
                 title=title,

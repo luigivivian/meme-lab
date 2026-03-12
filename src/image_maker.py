@@ -163,19 +163,26 @@ def _create_glow_layer(width: int, height: int, glow_color: tuple) -> Image.Imag
     return glow
 
 
-def create_image(text: str, background_path: str, output_path: str | None = None) -> str:
-    """Cria imagem com texto sobreposto no estilo Mago Mistico.
+def create_image(
+    text: str,
+    background_path: str,
+    output_path: str | None = None,
+    watermark_text: str | None = None,
+) -> str:
+    """Cria imagem com texto sobreposto.
 
-    Composicao: background -> overlay azul noturno -> vinheta -> glow dourado -> texto com contorno -> watermark
+    Composicao: background -> overlay -> vinheta -> glow -> texto com contorno -> watermark
 
     Args:
         text: Frase para sobrepor na imagem
         background_path: Caminho da imagem de fundo
         output_path: Caminho de saida (opcional, gera automaticamente)
+        watermark_text: Texto do watermark (None = usa WATERMARK_TEXT do config)
 
     Returns:
         Caminho do arquivo gerado
     """
+    wm = watermark_text if watermark_text is not None else WATERMARK_TEXT
     # Abrir e redimensionar background
     bg = Image.open(background_path).convert("RGBA")
     bg = _crop_center(bg, IMAGE_WIDTH, IMAGE_HEIGHT)
@@ -237,13 +244,13 @@ def create_image(text: str, background_path: str, output_path: str | None = None
 
         y += line_heights[i] + line_spacing
 
-    # Watermark dourado sutil no canto inferior
-    wm_bbox = watermark_font.getbbox(WATERMARK_TEXT)
+    # Watermark no canto inferior
+    wm_bbox = watermark_font.getbbox(wm)
     wm_width = wm_bbox[2] - wm_bbox[0]
     wm_x = IMAGE_WIDTH - wm_width - 20
     wm_y = IMAGE_HEIGHT - 50
     draw.text(
-        (wm_x, wm_y), WATERMARK_TEXT, font=watermark_font,
+        (wm_x, wm_y), wm, font=watermark_font,
         fill=WATERMARK_COLOR,
     )
 

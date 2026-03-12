@@ -20,6 +20,9 @@ from src.pipeline.agents.rss_feeds import RSSFeedAgent
 from src.pipeline.agents.youtube_rss import YouTubeRSSAgent
 from src.pipeline.agents.gemini_web_trends import GeminiWebTrendsAgent
 from src.pipeline.agents.brazil_viral_rss import BrazilViralRSSAgent
+from src.pipeline.agents.bluesky_trends import BlueSkyTrendsAgent
+from src.pipeline.agents.hackernews import HackerNewsAgent
+from src.pipeline.agents.lemmy_communities import LemmyCommunitiesAgent
 from src.pipeline.monitoring import MonitoringLayer
 from src.pipeline.broker import TrendBroker
 from src.pipeline.curator import CuratorAgent
@@ -43,10 +46,26 @@ class AsyncPipelineOrchestrator:
         use_gemini_image: bool | None = None,
         use_phrase_context: bool = False,
         on_layer_update=None,
+        theme_tags: list[str] | None = None,
+        character_system_prompt: str | None = None,
+        character_max_chars: int | None = None,
+        character_reference_dir: str | None = None,
+        character_dna: str | None = None,
+        character_negative_traits: str | None = None,
+        character_composition: str | None = None,
+        character_rendering: dict | None = None,
+        character_refs_priority: list[str] | None = None,
+        # Branding do personagem
+        character_watermark: str | None = None,
+        character_name: str | None = None,
+        character_handle: str | None = None,
+        character_branded_hashtags: list[str] | None = None,
+        character_caption_prompt: str | None = None,
     ):
         self.images_per_run = images_per_run
         self.phrases_per_topic = phrases_per_topic or PIPELINE_PHRASES_PER_TOPIC
         self._on_layer_update = on_layer_update
+        self._theme_tags = theme_tags
 
         # Layer 1: Monitoring — wrapa agentes sync existentes
         sync_agents = [
@@ -61,6 +80,9 @@ class AsyncPipelineOrchestrator:
             YouTubeRSSAgent(),
             GeminiWebTrendsAgent(),
             BrazilViralRSSAgent(),
+            BlueSkyTrendsAgent(),
+            HackerNewsAgent(),
+            LemmyCommunitiesAgent(),
         ]
 
         # Adicionar stub agents disponiveis (requerem API keys externas)
@@ -74,20 +96,41 @@ class AsyncPipelineOrchestrator:
         # Layer 3: Curator
         self.curator = CuratorAgent()
 
-        # Layer 4: Generation
+        # Layer 4: Generation — com suporte a personagem customizado
         use_comfyui_flag = use_comfyui if use_comfyui is not None else False
         self.generation = GenerationLayer(
-            phrase_worker=PhraseWorker(),
+            phrase_worker=PhraseWorker(
+                system_prompt=character_system_prompt,
+                max_chars=character_max_chars,
+            ),
             image_worker=ImageWorker(
                 use_comfyui=use_comfyui_flag,
                 use_gemini_image=use_gemini_image,
                 use_phrase_context=use_phrase_context,
+                reference_dir=character_reference_dir,
+                character_dna=character_dna,
+                negative_traits=character_negative_traits,
+                composition=character_composition,
+                rendering=character_rendering,
+                refs_priority=character_refs_priority,
+                watermark_text=character_watermark,
             ),
             phrases_per_topic=self.phrases_per_topic,
         )
 
-        # Layer 5: Post-production
-        self.post_production = PostProductionLayer()
+        # Layer 5: Post-production — com branding do personagem
+        from src.pipeline.workers.caption_worker import CaptionWorker
+        from src.pipeline.workers.hashtag_worker import HashtagWorker
+        self.post_production = PostProductionLayer(
+            caption_worker=CaptionWorker(
+                character_name=character_name,
+                character_handle=character_handle,
+                caption_prompt=character_caption_prompt,
+            ),
+            hashtag_worker=HashtagWorker(
+                branded_hashtags=character_branded_hashtags,
+            ),
+        )
 
     def _load_stub_agents(self):
         """Carrega stub agents que estejam disponiveis (API key configurada)."""
@@ -175,7 +218,8 @@ class AsyncPipelineOrchestrator:
 
         try:
             work_orders = await self.curator.curate(
-                trend_events, count=topics_count, on_step=self._step_cb("L3")
+                trend_events, count=topics_count, on_step=self._step_cb("L3"),
+                theme_tags=self._theme_tags,
             )
             result.work_orders_emitted = len(work_orders)
             self._notify("L3", "done", f"{len(work_orders)} work orders")
