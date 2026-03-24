@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 3 planning complete
-last_updated: "2026-03-24T02:41:31.152Z"
+status: Ready to execute
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-24T02:51:32.815Z"
 progress:
   total_phases: 11
   completed_phases: 2
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** O pipeline nunca para de gerar conteúdo — degrada graciosamente quando limites são atingidos
-**Current focus:** Phase 02 — users-table
+**Current focus:** Phase 03 — auth-backend
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
+Phase: 03 (auth-backend) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Plan: Not started
 | Phase 01 P01 | 3 | 2 tasks | 4 files |
 | Phase 01 P02 | 3min | 2 tasks | 3 files |
 | Phase 02 P01 | 202 | 2 tasks | 5 files |
+| Phase 03 P01 | 2 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 - [Phase 02]: Migration 006 chains from rev 003 (004/005 not committed to branch)
 - [Phase 02]: User model added as section 11 at end of models.py
 - [Phase 02]: bcrypt bytes decoded to UTF-8 string for MySQL VARCHAR storage
+- [Phase 03]: HS256 with SECRET_KEY env var for JWT signing
+- [Phase 03]: bcrypt rounds=12 for password hashing, SHA-256 hashed refresh tokens in DB
+- [Phase 03]: Refresh token rotation on use: old deleted, new issued
 
 ### Pending Todos
 
@@ -82,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T02:41:31.149Z
-Stopped at: Phase 3 planning complete
-Resume file: .planning/phases/03-auth-backend/03-01-PLAN.md
+Last session: 2026-03-24T02:51:32.812Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None

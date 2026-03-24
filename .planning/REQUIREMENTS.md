@@ -13,12 +13,12 @@
 
 ### Authentication Backend
 
-- [ ] **AUTH-01**: Usuário pode criar conta com email e senha (bcrypt hash)
-- [ ] **AUTH-02**: Usuário pode fazer login e receber JWT access token + refresh token
-- [ ] **AUTH-03**: Usuário pode renovar access token usando refresh token
-- [ ] **AUTH-04**: Usuário pode fazer logout (invalidar refresh token)
+- [x] **AUTH-01**: Usuário pode criar conta com email e senha (bcrypt hash)
+- [x] **AUTH-02**: Usuário pode fazer login e receber JWT access token + refresh token
+- [x] **AUTH-03**: Usuário pode renovar access token usando refresh token
+- [x] **AUTH-04**: Usuário pode fazer logout (invalidar refresh token)
 - [ ] **AUTH-05**: Todas as rotas da API protegidas por JWT (exceto login/registro/health)
-- [ ] **AUTH-06**: Sistema de roles (admin/user) com seed admin na migration
+- [x] **AUTH-06**: Sistema de roles (admin/user) com seed admin na migration
 - [x] **AUTH-07**: Tabela users no MySQL (email, hashed_password, role, api_keys criptografadas, created_at)
 
 ### Authentication Frontend
@@ -85,11 +85,11 @@
 | PRE-02 | Phase 1 | Complete |
 | PRE-03 | Phase 1 | Complete |
 | AUTH-07 | Phase 2 | Complete |
-| AUTH-01 | Phase 3 | Pending |
-| AUTH-02 | Phase 3 | Pending |
-| AUTH-03 | Phase 3 | Pending |
-| AUTH-04 | Phase 3 | Pending |
-| AUTH-06 | Phase 3 | Pending |
+| AUTH-01 | Phase 3 | Complete |
+| AUTH-02 | Phase 3 | Complete |
+| AUTH-03 | Phase 3 | Complete |
+| AUTH-04 | Phase 3 | Complete |
+| AUTH-06 | Phase 3 | Complete |
 | AUTH-05 | Phase 4 | Pending |
 | FAUTH-01 | Phase 5 | Pending |
 | FAUTH-02 | Phase 5 | Pending |
