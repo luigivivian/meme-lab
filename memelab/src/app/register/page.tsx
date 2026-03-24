@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
@@ -18,7 +19,32 @@ export default function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { register } = useAuth();
+  const { register, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: "#09090b" }}
+      >
+        <div
+          className="h-8 w-8 rounded-full border-4 border-t-transparent animate-spin"
+          style={{ borderColor: "#7C3AED", borderTopColor: "transparent" }}
+        />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return null;
+  }
 
   function validate(): boolean {
     const errors: Record<string, string> = {};
