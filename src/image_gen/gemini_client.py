@@ -722,6 +722,18 @@ class GeminiImageClient:
         self._rendering = rendering
         self._refs_priority = refs_priority
 
+    def _get_image_client(self, api_key: str):
+        """Get or create a genai Client for the given API key.
+
+        Caches clients by key (max 2: free + paid).
+        """
+        if not hasattr(self, "_client_cache"):
+            self._client_cache = {}
+        if api_key not in self._client_cache:
+            from google import genai
+            self._client_cache[api_key] = genai.Client(api_key=api_key)
+        return self._client_cache[api_key]
+
     def _load_referencias(self) -> None:
         """Carrega imagens de referencia do disco (lazy)."""
         if self._loaded:
@@ -753,11 +765,11 @@ class GeminiImageClient:
         except Exception:
             return False
 
-    def _tentar_gerar(self, modelo: str, partes: list, temperatura: float) -> PIL.Image.Image | None:
+    def _tentar_gerar(self, modelo: str, partes: list, temperatura: float, api_key: str | None = None) -> PIL.Image.Image | None:
         """Tenta gerar imagem com um modelo. Retorna PIL.Image ou None."""
         from google.genai import types
 
-        client = _get_client()
+        client = self._get_image_client(api_key) if api_key else _get_client()
         response = client.models.generate_content(
             model=modelo,
             contents=partes,
@@ -772,12 +784,12 @@ class GeminiImageClient:
                 return PIL.Image.open(BytesIO(part.inline_data.data))
         return None
 
-    def _tentar_modelos(self, partes: list, temperatura: float) -> PIL.Image.Image | None:
+    def _tentar_modelos(self, partes: list, temperatura: float, api_key: str | None = None) -> PIL.Image.Image | None:
         """Tenta todos os modelos em ordem com retry para 429."""
         for modelo in MODELOS_IMAGEM:
             for tentativa in range(self.max_retries_429):
                 try:
-                    imagem = self._tentar_gerar(modelo, partes, temperatura)
+                    imagem = self._tentar_gerar(modelo, partes, temperatura, api_key=api_key)
                     if imagem is None:
                         logger.warning(f"{modelo}: resposta sem imagem")
                         break
@@ -813,6 +825,7 @@ class GeminiImageClient:
         cenario_custom: str = "",
         nome_arquivo: str = "",
         phrase_context: str = "",
+        api_key: str | None = None,
     ) -> ImageGenerationResult | None:
         """Gera uma imagem do personagem para uma situacao.
 
@@ -880,7 +893,7 @@ class GeminiImageClient:
 
         logger.info(f"Gerando: situacao={situacao_key}, refs={len(refs)}, custom_dna={bool(self._character_dna)}")
 
-        imagem = self._tentar_modelos(partes, self.temperatura)
+        imagem = self._tentar_modelos(partes, self.temperatura, api_key=api_key)
 
         if imagem is None:
             logger.error("Todos os modelos falharam")
@@ -923,6 +936,7 @@ class GeminiImageClient:
         instrucao: str = "",
         referencias_adicionais: int = 3,
         nome_arquivo: str = "",
+        api_key: str | None = None,
     ) -> str | None:
         """Refina uma imagem existente (img2img com temperatura baixa).
 
@@ -970,7 +984,7 @@ class GeminiImageClient:
 
         logger.info(f"Refinando imagem (refs adicionais: {referencias_adicionais})")
 
-        imagem = self._tentar_modelos(partes, temperatura=0.4)
+        imagem = self._tentar_modelos(partes, temperatura=0.4, api_key=api_key)
 
         if imagem is None:
             logger.error("Refinamento falhou em todos os modelos")
@@ -987,6 +1001,7 @@ class GeminiImageClient:
         passes_refinamento: int = 1,
         instrucao_refinamento: str = "",
         nome_arquivo: str = "",
+        api_key: str | None = None,
     ) -> str | None:
         """Pipeline Nano Banana: geracao + N passes de refinamento.
 
@@ -1004,6 +1019,7 @@ class GeminiImageClient:
             descricao_custom=descricao_custom,
             cenario_custom=cenario_custom,
             nome_arquivo=f"{base_nome}_v0",
+            api_key=api_key,
         )
 
         if result_v0 is None:
@@ -1022,6 +1038,7 @@ class GeminiImageClient:
                 instrucao=instrucao_refinamento,
                 referencias_adicionais=min(4, self.n_referencias),
                 nome_arquivo=f"{base_nome}_v{i + 1}",
+                api_key=api_key,
             )
 
             if ref_path is not None:
