@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-03-24T19:06:30.307Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-03-24T19:11:54.421Z"
 progress:
   total_phases: 11
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -57,6 +57,7 @@ Plan: 2 of 2
 | Phase 07 P01 | 123 | 2 tasks | 3 files |
 | Phase 08 P01 | 3 | 2 tasks | 4 files |
 | Phase 09 P01 | 2 | 2 tasks | 2 files |
+| Phase 09 P02 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,8 @@ Recent decisions affecting current work:
 - [Phase 07]: user_id nullable FK with ondelete SET NULL - preserves usage records when user deleted
 - [Phase 08]: PT timezone daily bucketing with naive UTC in DB; rejected rows use full timestamp to avoid constraint collision; 0=unlimited with remaining=-1 sentinel
 - [Phase 09]: Frozen dataclass for KeyResolution; priority chain: force_tier param > env var > free-only > auto DB check
+- [Phase 09]: Thread api_key through _tentar_modelos intermediate layer for complete key propagation
+- [Phase 09]: Shared _resolve_key/_increment_usage helpers for DRY dual-key wiring across 3 routes
 
 ### Pending Todos
 
@@ -104,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T19:06:30.304Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-03-24T19:11:54.418Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
