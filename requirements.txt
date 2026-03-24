@@ -17,3 +17,4 @@ aiosqlite>=0.20
 aiomysql>=0.2.0
 cryptography>=42.0
 alembic>=1.13
+bcrypt>=5.0.0
