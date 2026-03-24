@@ -35,7 +35,7 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 - ✓ Tracking de uso da API por usuário por dia — Validated in Phase 7: Usage Tracking Table
 - [ ] Sistema de tiers: key free (padrão) + key paga (fallback)
 - ✓ Rate limiting baseado nos limites do plano free do Google — Validated in Phase 8: Atomic Counter
-- [ ] Fallback automático para backgrounds estáticos quando limite atingido
+- ✓ Fallback automático para backgrounds estáticos quando limite atingido — Validated in Phase 10: Static Fallback
 - [ ] Dashboard de uso mostrando consumo diário vs limite
 - [ ] Proteção de rotas da API backend (autenticação obrigatória)
 
@@ -105,4 +105,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 9 completion — dual key management (UsageAwareKeySelector) wired into image generation pipeline*
+*Last updated: 2026-03-24 after Phase 10 completion — static fallback when both Gemini API keys exhausted, compose() pre-check with fallback_reason metadata*
