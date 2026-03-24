@@ -38,13 +38,55 @@ class ImageGenerationResult:
     character_dna_used: bool = False
 
 
-# Modelos em ordem de preferencia (Nano Banana Pipeline)
-MODELOS_IMAGEM = [
+def discover_image_models() -> list[str]:
+    """Descobre modelos com capacidade de geracao de imagem via API.
+
+    Chama client.models.list() e filtra por nomes contendo 'image'.
+    Retorna lista de nomes sem prefixo 'models/' (per Pitfall 5).
+    Se falhar (sem API key, rede), retorna lista vazia e loga WARNING (per D-05).
+    """
+    try:
+        client = _get_client()
+        image_models = []
+        for model in client.models.list():
+            name = model.name
+            # Strip 'models/' prefix if present (Pitfall 5 from RESEARCH)
+            if name.startswith("models/"):
+                name = name[len("models/"):]
+            # Filter: only models with "image" in their name
+            if "image" in name.lower():
+                image_models.append(name)
+        if image_models:
+            logger.info(f"Modelos de imagem descobertos: {image_models}")
+        else:
+            logger.warning("Nenhum modelo de imagem encontrado via models.list()")
+        return image_models
+    except Exception as e:
+        logger.warning(f"Falha ao descobrir modelos de imagem: {e}")
+        return []
+
+
+# Fallback: modelos conhecidos (usados se discovery falhar)
+_FALLBACK_MODELOS_IMAGEM = [
     "gemini-2.5-flash-image",
-    "gemini-2.0-flash-exp-image-generation",
     "gemini-3.1-flash-image-preview",
     "gemini-3-pro-image-preview",
 ]
+
+# Lista dinamica — populada por discover_image_models() no startup
+# Se discovery nao rodar, usa fallback
+MODELOS_IMAGEM: list[str] = list(_FALLBACK_MODELOS_IMAGEM)
+
+
+def update_modelos_imagem(discovered: list[str]):
+    """Atualiza MODELOS_IMAGEM com modelos descobertos. Chamado no startup."""
+    global MODELOS_IMAGEM
+    if discovered:
+        MODELOS_IMAGEM = discovered
+        logger.info(f"MODELOS_IMAGEM atualizado: {MODELOS_IMAGEM}")
+    else:
+        MODELOS_IMAGEM = list(_FALLBACK_MODELOS_IMAGEM)
+        logger.warning(f"Usando fallback MODELOS_IMAGEM: {MODELOS_IMAGEM}")
 
 # DNA do personagem — fotorrealista cinematico (Gandalf o Cinzento)
 CHARACTER_DNA = """Photorealistic fantasy portrait of an ancient wise wizard with the following EXACT traits (NEVER change):
