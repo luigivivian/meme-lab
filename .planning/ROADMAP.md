@@ -165,10 +165,13 @@ Plans:
   1. When both free and paid daily limits are exhausted, `ImageWorker` produces a valid image using a static background instead of returning an error
   2. The `ContentPackage` metadata for a statically-generated image has `background_source: "static"`
   3. The pipeline completes a full run end-to-end even when `GEMINI_IMAGE_DAILY_LIMIT_FREE=0` and `GEMINI_IMAGE_DAILY_LIMIT_PAID=0`
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [ ] 10-01-PLAN.md — Exhaustion detection in UsageAwareKeySelector.resolve()
+- [ ] 10-02-PLAN.md — Wire static fallback into ImageWorker.compose() and GenerationLayer
+
+
 
 ### Phase 11: Usage Dashboard
 **Goal**: Users can see how much Gemini API quota they have used today and what source produced each image
@@ -202,5 +205,5 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 7. Usage Tracking Table | 1/1 | Complete   | 2026-03-24 |
 | 8. Atomic Counter | 0/1 | Planning complete | - |
 | 9. Dual Key Management | 0/TBD | Not started | - |
-| 10. Static Fallback | 0/TBD | Not started | - |
+| 10. Static Fallback | 0/2 | Not started | - |
 | 11. Usage Dashboard | 0/TBD | Not started | - |
