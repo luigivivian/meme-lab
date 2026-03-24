@@ -32,7 +32,7 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 - ✓ Página de login no frontend memeLab — Validated in Phase 5: frontend-auth-pages
 - ✓ Registro de novo usuário (frontend) — Validated in Phase 5: frontend-auth-pages
 - ✓ Proteção de rotas do frontend (redirect para /login) — Validated in Phase 6: frontend-route-protection
-- [ ] Tracking de uso da API por usuário por dia
+- ✓ Tracking de uso da API por usuário por dia — Validated in Phase 7: Usage Tracking Table
 - [ ] Sistema de tiers: key free (padrão) + key paga (fallback)
 - [ ] Rate limiting baseado nos limites do plano free do Google
 - [ ] Fallback automático para backgrounds estáticos quando limite atingido
@@ -61,7 +61,7 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 **Codebase existente:**
 - Backend: Python 3.14, FastAPI, SQLAlchemy 2.0 async, MySQL
 - Frontend: Next.js 15, TypeScript, Tailwind CSS
-- 13 tabelas ORM (incl. users + refresh_tokens), Alembic migrations (001-007)
+- 14 tabelas ORM (incl. users + refresh_tokens + api_usage), Alembic migrations (001-008)
 - `src/image_gen/gemini_client.py` — GeminiImageClient atual
 - `src/api/` — API REST modular com 9 route modules (incl. auth)
 - `src/auth/` — Auth module: JWT, bcrypt, AuthService
@@ -105,4 +105,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 3 completion*
+*Last updated: 2026-03-24 after Phase 7 completion*
