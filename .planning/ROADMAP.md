@@ -65,10 +65,11 @@ Plans:
   3. `POST /auth/refresh` with a valid refresh token returns a new access token without re-entering credentials
   4. `POST /auth/logout` invalidates the refresh token so a subsequent refresh returns 401
   5. Admin and user roles exist; a seed admin account is functional after migration
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [ ] 03-01-PLAN.md — RefreshToken model, migration 007, UserRepository, JWT utils, AuthService
+- [ ] 03-02-PLAN.md — Auth routes (/auth/*), get_current_user dependency, integration tests
 
 ### Phase 4: Route Protection
 **Goal**: Every API route (except /auth/* and /health) requires a valid JWT to respond
@@ -192,7 +193,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 |-------|----------------|--------|-----------|
 | 1. Pre-Conditions | 0/2 | Planning complete | - |
 | 2. Users Table | 0/1 | Planning complete | - |
-| 3. Auth Backend | 0/TBD | Not started | - |
+| 3. Auth Backend | 0/2 | Planning complete | - |
 | 4. Route Protection | 0/TBD | Not started | - |
 | 5. Frontend Auth Pages | 0/TBD | Not started | - |
 | 6. Frontend Route Protection | 0/TBD | Not started | - |
