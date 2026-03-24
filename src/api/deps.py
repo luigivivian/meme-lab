@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from fastapi import HTTPException
+from fastapi import Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("clip-flow.api")
@@ -16,6 +16,37 @@ async def db_session():
     from src.database.session import get_session
     async for session in get_session():
         yield session
+
+
+# ── Auth dependency ──────────────────────────────────────────────────────────
+
+async def get_current_user(
+    authorization: str = Header(..., alias="Authorization"),
+    session: AsyncSession = Depends(db_session),
+):
+    """FastAPI dependency: extract and verify JWT from Authorization header.
+
+    Returns User ORM object. Raises 401 if token invalid/expired/user not found.
+    Used by /auth/me now, and by all protected routes in Phase 4.
+    """
+    from src.auth.jwt import verify_access_token
+    from src.database.repositories.user_repo import UserRepository
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = authorization[7:]  # Strip "Bearer "
+    payload = verify_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+    repo = UserRepository(session)
+    user = await repo.get_by_id(user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found or deactivated")
+
+    return user
 
 
 # ── Path helpers ─────────────────────────────────────────────────────────────
