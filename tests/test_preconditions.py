@@ -144,8 +144,20 @@ def test_log_sanitizer_masks_bearer_token():
     assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in record.msg
 
 
-# PRE-01 + D-09: Health endpoint (stub — filled in Plan 02)
+# PRE-01 + D-09: Health endpoint
 @pytest.mark.asyncio
 async def test_health_endpoint(client):
-    """GET /health retorna status com info de DB e Gemini."""
-    pytest.skip("Implementado no Plan 02")
+    """GET /health retorna status com info de DB e Gemini (per D-09)."""
+    response = await client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert "status" in data
+    assert data["status"] in ("healthy", "degraded")
+    assert "database" in data
+    assert "connected" in data["database"]
+    assert isinstance(data["database"]["connected"], bool)
+    assert "gemini_image" in data
+    assert "models_available" in data["gemini_image"]
+    assert isinstance(data["gemini_image"]["models_available"], int)
+    assert "validation" in data["gemini_image"]
+    assert data["gemini_image"]["validation"] in ("ok", "no image models found")
