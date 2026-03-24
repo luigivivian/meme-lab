@@ -2,7 +2,7 @@
 phase: 11
 slug: usage-dashboard
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-03-24
 ---
@@ -38,21 +38,23 @@ created: 2026-03-24
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 11-01-01 | 01 | 1 | DASH-01 | unit | `cd memelab && npx vitest run` | ❌ W0 | ⬜ pending |
-| 11-01-02 | 01 | 1 | DASH-02 | unit | `cd memelab && npx vitest run` | ❌ W0 | ⬜ pending |
-| 11-01-03 | 01 | 1 | DASH-03 | unit | `cd memelab && npx vitest run` | ❌ W0 | ⬜ pending |
+| 11-01-00 | 01 | 1 | (infra) | setup | `cd memelab && npx vitest run` | Created by Task 0 | pending |
+| 11-01-01 | 01 | 1 | DASH-01 | unit | `cd memelab && npx vitest run` | Created by Task 0 | pending |
+| 11-01-02 | 01 | 1 | DASH-02 | unit | `cd memelab && npx vitest run` | Created by Task 0 | pending |
+| 11-01-03 | 01 | 1 | DASH-03 | unit | `cd memelab && npx vitest run` | Created by Task 0 | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending / green / red / flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `memelab/src/__tests__/usage-widget.test.tsx` — stubs for DASH-01 (usage widget renders)
-- [ ] `memelab/src/__tests__/source-badges.test.tsx` — stubs for DASH-02 (source badge rendering)
-- [ ] `memelab/src/__tests__/use-usage.test.ts` — stubs for DASH-03 (useUsage hook)
+- [ ] `memelab/vitest.config.ts` — vitest configuration (created by Plan 11-01, Task 0)
+- [ ] `memelab/src/__tests__/usage-widget.test.tsx` — stubs for DASH-01 (created by Plan 11-01, Task 0)
+- [ ] `memelab/src/__tests__/source-badges.test.tsx` — stubs for DASH-02 (created by Plan 11-01, Task 0)
+- [ ] `memelab/src/__tests__/use-usage.test.ts` — stubs for DASH-03 (created by Plan 11-01, Task 0)
 
-*Existing infrastructure covers framework installation — vitest already configured.*
+*Plan 11-01 Task 0 installs vitest, creates config, and writes all three stub files. Set `wave_0_complete: true` after Task 0 executes successfully.*
 
 ---
 
@@ -67,11 +69,11 @@ created: 2026-03-24
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** pending execution

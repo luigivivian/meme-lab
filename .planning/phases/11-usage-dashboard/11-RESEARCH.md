@@ -242,11 +242,14 @@ export function useUsage() {
 ### Badge Source Resolution Helper
 ```typescript
 // Helper to determine tier-aware source label from content package
+// NOTE: undefined/missing tier MUST fall back to "gemini", not "gemini_free"
+// — backward compatibility with legacy images that have no tier metadata.
 function getSourceLabel(pkg: ContentPackageDB): string {
   if (pkg.background_source === "gemini") {
     const tier = (pkg.image_metadata as Record<string, unknown>)?.tier;
     if (tier === "paid") return "gemini_paid";
-    return "gemini_free"; // default for gemini
+    if (tier === "free") return "gemini_free";
+    return "gemini"; // legacy entries without tier metadata — backward compatible
   }
   return pkg.background_source || "static";
 }
