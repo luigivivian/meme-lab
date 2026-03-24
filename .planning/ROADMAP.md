@@ -69,7 +69,7 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — RefreshToken model, migration 007, UserRepository, JWT utils, AuthService
-- [ ] 03-02-PLAN.md — Auth routes (/auth/*), get_current_user dependency, integration tests
+- [x] 03-02-PLAN.md — Auth routes (/auth/*), get_current_user dependency, integration tests
 
 ### Phase 4: Route Protection
 **Goal**: Every API route (except /auth/* and /health) requires a valid JWT to respond
