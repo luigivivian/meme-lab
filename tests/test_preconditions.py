@@ -41,11 +41,49 @@ async def test_cors_rejects_unknown_origin(client):
     assert response.headers.get("access-control-allow-origin") != "http://evil.com"
 
 
-# PRE-02: Gemini model discovery (stub — filled in Plan 02)
-@pytest.mark.asyncio
-async def test_model_discovery():
-    """Gemini model discovery retorna lista de modelos de imagem."""
-    pytest.skip("Implementado no Plan 02")
+# PRE-02: Gemini model discovery
+from unittest.mock import patch, MagicMock
+
+
+def test_model_discovery_returns_list():
+    """discover_image_models() retorna lista filtrada por 'image' no nome."""
+    from src.image_gen.gemini_client import discover_image_models
+
+    mock_model_img = MagicMock()
+    mock_model_img.name = "models/gemini-2.5-flash-image"
+    mock_model_text = MagicMock()
+    mock_model_text.name = "models/gemini-2.5-flash"
+
+    mock_client = MagicMock()
+    mock_client.models.list.return_value = [mock_model_img, mock_model_text]
+
+    with patch("src.image_gen.gemini_client._get_client", return_value=mock_client):
+        result = discover_image_models()
+    assert isinstance(result, list)
+    assert "gemini-2.5-flash-image" in result
+    assert "gemini-2.5-flash" not in result  # texto filtrado
+
+
+def test_model_discovery_handles_failure():
+    """discover_image_models() retorna lista vazia se API falhar (per D-05)."""
+    from src.image_gen.gemini_client import discover_image_models
+
+    with patch("src.image_gen.gemini_client._get_client", side_effect=ValueError("no key")):
+        result = discover_image_models()
+    assert result == []
+
+
+def test_update_modelos_imagem():
+    """update_modelos_imagem() atualiza a lista global quando discovery tem resultados."""
+    from src.image_gen import gemini_client
+    from src.image_gen.gemini_client import update_modelos_imagem
+
+    original = list(gemini_client.MODELOS_IMAGEM)
+    update_modelos_imagem(["new-model-image"])
+    assert gemini_client.MODELOS_IMAGEM == ["new-model-image"]
+    # Restaurar: sem resultados usa fallback
+    update_modelos_imagem([])
+    assert gemini_client.MODELOS_IMAGEM == list(gemini_client._FALLBACK_MODELOS_IMAGEM)
 
 
 # PRE-03: Log sanitizer
