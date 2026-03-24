@@ -21,12 +21,13 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 - ✓ Banco MySQL + SQLAlchemy 2.0 async + Alembic — existing
 - ✓ Multi-personagem backend (CRUD characters) — existing
 - ✓ 9 agents de trends ativos — existing
+- ✓ Tabela users no MySQL com roles e API keys — Validated in Phase 2: Users Table
 
 ### Active
 
 - [ ] Nova Google API key configurada e funcionando (fix 400)
 - [ ] Sistema de autenticação email + senha no memeLab
-- [ ] Tabela de usuários no MySQL com roles (admin/user)
+- [x] Tabela de usuários no MySQL com roles (admin/user) — Phase 2
 - [ ] Sessão de usuário com JWT tokens
 - [ ] Página de login no frontend memeLab
 - [ ] Registro de novo usuário
@@ -59,7 +60,7 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 **Codebase existente:**
 - Backend: Python 3.14, FastAPI, SQLAlchemy 2.0 async, MySQL
 - Frontend: Next.js 15, TypeScript, Tailwind CSS
-- 10 tabelas ORM existentes, Alembic migrations
+- 12 tabelas ORM (incl. users + scheduled_posts), Alembic migrations (001-006)
 - `src/image_gen/gemini_client.py` — GeminiImageClient atual
 - `src/api/` — API REST modular com 8 route modules
 - `memelab/` — Frontend dashboard
@@ -102,4 +103,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-23 after initialization*
+*Last updated: 2026-03-24 after Phase 2 completion*
