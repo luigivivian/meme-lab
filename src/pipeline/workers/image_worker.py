@@ -175,6 +175,7 @@ class ImageWorker:
         bg_source = "static"
         gen_metadata = {}
         fallback_reason = None
+        resolved_tier = None  # Track tier for metadata
 
         # Pre-check: quota exhaustion (D-04, D-05)
         if user_id is not None and session is not None and self._background_mode not in ("static", "comfyui"):
@@ -182,6 +183,7 @@ class ImageWorker:
                 from src.services.key_selector import UsageAwareKeySelector
                 selector = UsageAwareKeySelector()
                 resolution = await selector.resolve(user_id=user_id, session=session)
+                resolved_tier = resolution.tier
                 if resolution.tier == "exhausted":
                     logger.warning("Both tiers exhausted, using static fallback")
                     fallback_reason = "quota_exhausted"
@@ -226,6 +228,8 @@ class ImageWorker:
             create_image, phrase, bg, None, self._watermark_text, layout,
         )
         gen_metadata["layout"] = layout
+        if resolved_tier and resolved_tier != "exhausted":
+            gen_metadata["tier"] = resolved_tier
         # Ensure fallback_reason in metadata for all static backgrounds
         if bg_source == "static" and "fallback_reason" not in gen_metadata:
             gen_metadata["fallback_reason"] = fallback_reason or "generation_failed"
