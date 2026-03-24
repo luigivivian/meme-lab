@@ -50,7 +50,10 @@ Plans:
   2. The `users` table contains columns: id, email, hashed_password, role, is_active, gemini_free_key, gemini_paid_key, active_key_tier, created_at
   3. A seed admin user exists after running the migration (email from env var)
   4. Rolling back the migration (`alembic downgrade -1`) drops the table cleanly
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 
 ### Phase 3: Auth Backend
 **Goal**: Users can register, log in, receive JWT tokens, and refresh or invalidate their session
@@ -62,7 +65,10 @@ Plans:
   3. `POST /auth/refresh` with a valid refresh token returns a new access token without re-entering credentials
   4. `POST /auth/logout` invalidates the refresh token so a subsequent refresh returns 401
   5. Admin and user roles exist; a seed admin account is functional after migration
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 
 ### Phase 4: Route Protection
 **Goal**: Every API route (except /auth/* and /health) requires a valid JWT to respond
@@ -73,7 +79,10 @@ Plans:
   2. `GET /pipeline/run` with a valid Bearer token returns 200 (or its normal response)
   3. `GET /health` and `POST /auth/login` return 200 without any token
   4. A script enumerating all app routes confirms every non-exempt route has `get_current_user` in its dependency chain
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 
 ### Phase 5: Frontend Auth Pages
 **Goal**: Users can log in and register through the memeLab UI, and all API calls carry the JWT automatically
@@ -85,7 +94,10 @@ Plans:
   3. Visiting `/register` shows a form; submitting it creates an account and logs the user in
   4. An authenticated fetch to any API endpoint from the browser includes the `Authorization: Bearer <token>` header automatically
   5. Calling `AuthContext.logout()` clears the stored token
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 **UI hint**: yes
 
 ### Phase 6: Frontend Route Protection
@@ -96,7 +108,10 @@ Plans:
   1. Visiting `/dashboard` without a stored token redirects to `/login` before the page renders
   2. Visiting `/login` with a valid stored token redirects to `/dashboard`
   3. The redirect happens at Edge Runtime (visible in network tab as a 307 before any HTML loads)
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 **UI hint**: yes
 
 ### Phase 7: Usage Tracking Table
@@ -107,7 +122,10 @@ Plans:
   1. `alembic upgrade head` creates the `api_usage` table with columns: id, user_id (FK), service, tier, date, usage_count, status, created_at
   2. The daily reset logic uses Pacific Time (America/Los_Angeles) — a record created at 23:59 PT and another at 00:01 PT the next day are in different date buckets
   3. Rolling back the migration drops the table cleanly
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 
 ### Phase 8: Atomic Counter
 **Goal**: API usage increments atomically without race conditions, daily limits are configurable, and usage is readable via API
@@ -117,7 +135,10 @@ Plans:
   1. Ten concurrent image generation calls do not result in a usage count above 10 in `api_usage`
   2. Setting `GEMINI_IMAGE_DAILY_LIMIT_FREE=5` via env var causes the 6th call of the day to be rejected (not the 5th or 7th)
   3. `GET /auth/me/usage` returns `{used: N, limit: M, tier: "free", remaining: M-N}` for today
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 
 ### Phase 9: Dual Key Management
 **Goal**: Image generation automatically uses the free Gemini key until the daily limit, then switches to the paid key
@@ -128,7 +149,10 @@ Plans:
   2. When free-tier usage is at or above the daily limit, `UsageAwareKeySelector.resolve()` returns the paid key
   3. The key switch is logged to `api_usage` with the correct tier value (`gemini_free` or `gemini_paid`)
   4. A `GOOGLE_API_KEY_PAID` env var that differs from `GOOGLE_API_KEY` is used for paid-tier calls
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 
 ### Phase 10: Static Fallback
 **Goal**: When both Gemini keys are exhausted, image generation falls back to static backgrounds automatically
@@ -138,7 +162,10 @@ Plans:
   1. When both free and paid daily limits are exhausted, `ImageWorker` produces a valid image using a static background instead of returning an error
   2. The `ContentPackage` metadata for a statically-generated image has `background_source: "static"`
   3. The pipeline completes a full run end-to-end even when `GEMINI_IMAGE_DAILY_LIMIT_FREE=0` and `GEMINI_IMAGE_DAILY_LIMIT_PAID=0`
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 
 ### Phase 11: Usage Dashboard
 **Goal**: Users can see how much Gemini API quota they have used today and what source produced each image
@@ -148,7 +175,10 @@ Plans:
   1. The dashboard shows a widget with "N / M requests used today (free tier)" and a visual fill indicator
   2. Each generated image in the pipeline results list shows a badge: "gemini free", "gemini paid", or "static"
   3. `GET /auth/me/usage` returns data the widget consumes (used, limit, tier, remaining)
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
 **UI hint**: yes
 
 ## Progress
@@ -161,7 +191,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Pre-Conditions | 0/2 | Planning complete | - |
-| 2. Users Table | 0/TBD | Not started | - |
+| 2. Users Table | 0/1 | Planning complete | - |
 | 3. Auth Backend | 0/TBD | Not started | - |
 | 4. Route Protection | 0/TBD | Not started | - |
 | 5. Frontend Auth Pages | 0/TBD | Not started | - |
