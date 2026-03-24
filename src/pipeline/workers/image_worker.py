@@ -222,6 +222,24 @@ class ImageWorker:
             gen_metadata = {"theme_key": situacao_key, "fallback_reason": fallback_reason}
             logger.debug(f"[{work_order.order_id}] Usando background estatico: {bg}")
 
+        # Track usage for successful Gemini generations
+        if bg_source == "gemini" and user_id is not None and session is not None:
+            try:
+                from src.database.repositories.usage_repo import UsageRepository
+                tier_label = resolved_tier.replace("gemini_", "") if resolved_tier else "free"
+                if tier_label not in ("free", "paid"):
+                    tier_label = "free"
+                repo = UsageRepository(session)
+                await repo.increment(
+                    user_id=user_id,
+                    service="gemini_image",
+                    tier=tier_label,
+                )
+                await session.commit()
+                logger.debug(f"[{work_order.order_id}] Usage incremented: gemini_image/{tier_label}")
+            except Exception as e:
+                logger.warning(f"[{work_order.order_id}] Failed to increment usage: {e}")
+
         # Compor imagem final com Pillow (layout do WorkOrder)
         layout = getattr(work_order, "layout", "bottom")
         image_path = await asyncio.to_thread(
