@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 11 context gathered
-last_updated: "2026-03-24T20:18:21.666Z"
+status: Phase complete — ready for verification
+stopped_at: "Completed 11-02-PLAN.md (Task 1), awaiting checkpoint:human-verify (Task 2)"
+last_updated: "2026-03-24T20:58:46.651Z"
 progress:
   total_phases: 11
-  completed_phases: 9
-  total_plans: 14
-  completed_plans: 14
+  completed_phases: 10
+  total_plans: 16
+  completed_plans: 16
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** O pipeline nunca para de gerar conteúdo — degrada graciosamente quando limites são atingidos
-**Current focus:** Phase 10 — static-fallback
+**Current focus:** Phase 11 — usage-dashboard
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 11 (usage-dashboard) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -60,6 +60,8 @@ Plan: Not started
 | Phase 09 P02 | 3 | 2 tasks | 2 files |
 | Phase 10 P01 | 2 | 2 tasks | 2 files |
 | Phase 10 P02 | 3 | 2 tasks | 3 files |
+| Phase 11 P01 | 4 | 3 tasks | 8 files |
+| Phase 11 P02 | 3 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -99,6 +101,8 @@ Recent decisions affecting current work:
 - [Phase 10]: Free-only mode now checks DB limits before returning free key (D-02 exhaustion)
 - [Phase 10]: Pre-check wrapped in bg is None guard to skip backend selection when exhaustion already resolved
 - [Phase 10]: fallback_reason stored in gen_metadata dict, not as separate ComposeResult field
+- [Phase 11]: Vitest with jsdom for frontend unit tests; usage bar color thresholds emerald(<60%)/amber(60-84%)/rose(>=85%)
+- [Phase 11]: Tier values stored as-is from KeyResolution (gemini_free/gemini_paid); getSourceLabel returns generic gemini for legacy images without tier
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T20:18:21.663Z
-Stopped at: Phase 11 context gathered
-Resume file: .planning/phases/11-usage-dashboard/11-CONTEXT.md
+Last session: 2026-03-24T20:58:46.647Z
+Stopped at: Completed 11-02-PLAN.md (Task 1), awaiting checkpoint:human-verify (Task 2)
+Resume file: None

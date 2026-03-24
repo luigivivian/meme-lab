@@ -41,9 +41,9 @@
 
 ### Usage Dashboard
 
-- [ ] **DASH-01**: Widget no dashboard mostrando consumo diário vs limite
-- [ ] **DASH-02**: Indicador visual de source usado (gemini/comfyui/static) por imagem
-- [ ] **DASH-03**: Endpoint API retornando estatísticas de uso do usuário
+- [x] **DASH-01**: Widget no dashboard mostrando consumo diário vs limite
+- [x] **DASH-02**: Indicador visual de source usado (gemini/comfyui/static) por imagem
+- [x] **DASH-03**: Endpoint API retornando estatísticas de uso do usuário
 
 ## v2 Requirements
 
@@ -103,9 +103,9 @@
 | QUOT-04 | Phase 9 | Complete |
 | QUOT-05 | Phase 9 | Complete |
 | QUOT-06 | Phase 10 | Complete |
-| DASH-01 | Phase 11 | Pending |
-| DASH-02 | Phase 11 | Pending |
-| DASH-03 | Phase 11 | Pending |
+| DASH-01 | Phase 11 | Complete |
+| DASH-02 | Phase 11 | Complete |
+| DASH-03 | Phase 11 | Complete |
 
 **Coverage:**
 - v1 requirements: 25 total
