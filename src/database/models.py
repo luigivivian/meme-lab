@@ -1,4 +1,4 @@
-"""ORM models — 10 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+"""ORM models — 11 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
 
 from datetime import datetime
 from typing import Optional
@@ -72,7 +72,13 @@ class Character(TimestampMixin, Base):
     # Soft delete
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
+    # Owner (multi-tenant prep, per D-07)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+
     # Relationships
+    owner: Mapped[Optional["User"]] = relationship(back_populates="characters")
     refs: Mapped[list["CharacterRef"]] = relationship(
         back_populates="character", cascade="all, delete-orphan"
     )
@@ -441,4 +447,32 @@ class AgentStat(Base):
     __table_args__ = (
         Index("idx_astats_pipeline_run_id", "pipeline_run_id"),
         Index("idx_astats_agent_name", "agent_name"),
+    )
+
+
+# ============================================================
+# 11. users
+# ============================================================
+
+class User(TimestampMixin, Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(200), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="user", server_default="user")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    display_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
+    # API keys — plaintext Text, nullable (per D-01, D-02)
+    gemini_free_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gemini_paid_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    active_key_tier: Mapped[str] = mapped_column(String(20), default="free", server_default="free")
+
+    # Relationships
+    characters: Mapped[list["Character"]] = relationship(back_populates="owner")
+
+    __table_args__ = (
+        Index("idx_users_role", "role"),
+        Index("idx_users_is_active", "is_active"),
     )
