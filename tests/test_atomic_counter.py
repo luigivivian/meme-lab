@@ -269,3 +269,113 @@ async def test_get_daily_limit_default():
     finally:
         if old is not None:
             os.environ["GEMINI_IMAGE_DAILY_LIMIT_FREE"] = old
+
+
+# -- Endpoint integration tests -----------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_usage_endpoint_returns_services(client):
+    """GET /auth/me/usage returns 200 with services list and resets_at."""
+    token, _ = await _register_and_login(client)
+    resp = await client.get("/auth/me/usage", headers={"Authorization": token})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "services" in data
+    assert "resets_at" in data
+    assert isinstance(data["services"], list)
+    assert len(data["services"]) >= 1  # at least known services
+
+
+@pytest.mark.asyncio
+async def test_usage_endpoint_after_increments(client):
+    """After incrementing 3 times, endpoint shows used=3 for gemini_image."""
+    from src.database.repositories.usage_repo import UsageRepository
+
+    token, user_id = await _register_and_login(client)
+
+    # Increment via repository
+    factory = get_session_factory()
+    for _ in range(3):
+        async with factory() as session:
+            repo = UsageRepository(session)
+            await repo.increment(user_id=user_id, service="gemini_image", tier="free")
+            await session.commit()
+
+    resp = await client.get("/auth/me/usage", headers={"Authorization": token})
+    assert resp.status_code == 200
+    data = resp.json()
+    img_svc = next(s for s in data["services"] if s["service"] == "gemini_image")
+    assert img_svc["used"] == 3
+
+
+@pytest.mark.asyncio
+async def test_usage_endpoint_unauthenticated(client):
+    """GET /auth/me/usage without token returns 401 or 422."""
+    resp = await client.get("/auth/me/usage")
+    assert resp.status_code in (401, 422)
+
+
+@pytest.mark.asyncio
+async def test_rejection_response_format():
+    """When limit reached, check_limit returns dict with required keys (D-02)."""
+    from src.database.repositories.usage_repo import UsageRepository
+
+    old = os.environ.get("GEMINI_IMAGE_DAILY_LIMIT_FREE")
+    os.environ["GEMINI_IMAGE_DAILY_LIMIT_FREE"] = "1"
+    try:
+        factory = get_session_factory()
+        async with factory() as session:
+            repo = UsageRepository(session)
+            await repo.increment(user_id=1, service="gemini_image", tier="free")
+            await session.commit()
+
+        async with factory() as session:
+            repo = UsageRepository(session)
+            allowed, info = await repo.check_limit(user_id=1, service="gemini_image", tier="free")
+            await session.commit()
+
+        assert allowed is False
+        assert "used" in info
+        assert "limit" in info
+        assert "remaining" in info
+        assert "resets_at" in info
+        assert info["remaining"] == 0
+    finally:
+        if old is None:
+            os.environ.pop("GEMINI_IMAGE_DAILY_LIMIT_FREE", None)
+        else:
+            os.environ["GEMINI_IMAGE_DAILY_LIMIT_FREE"] = old
+
+
+@pytest.mark.asyncio
+async def test_limit_enforcement_exactly_at_boundary():
+    """With limit=5, calls 1-5 allowed, call 6 rejected (not 5th or 7th)."""
+    from src.database.repositories.usage_repo import UsageRepository
+
+    old = os.environ.get("GEMINI_IMAGE_DAILY_LIMIT_FREE")
+    os.environ["GEMINI_IMAGE_DAILY_LIMIT_FREE"] = "5"
+    try:
+        factory = get_session_factory()
+
+        # Calls 1-5: increment and check — all should be allowed
+        for i in range(5):
+            async with factory() as session:
+                repo = UsageRepository(session)
+                allowed, info = await repo.check_limit(user_id=1, service="gemini_image", tier="free")
+                assert allowed is True, f"Call {i+1} should be allowed"
+                await repo.increment(user_id=1, service="gemini_image", tier="free")
+                await session.commit()
+
+        # Call 6: should be rejected
+        async with factory() as session:
+            repo = UsageRepository(session)
+            allowed, info = await repo.check_limit(user_id=1, service="gemini_image", tier="free")
+            await session.commit()
+        assert allowed is False, "Call 6 should be rejected"
+        assert info["used"] == 5
+    finally:
+        if old is None:
+            os.environ.pop("GEMINI_IMAGE_DAILY_LIMIT_FREE", None)
+        else:
+            os.environ["GEMINI_IMAGE_DAILY_LIMIT_FREE"] = old

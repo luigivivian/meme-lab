@@ -36,3 +36,16 @@ class UserResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class ServiceUsage(BaseModel):
+    service: str
+    tier: str
+    used: int
+    limit: int
+    remaining: int
+
+
+class UsageResponse(BaseModel):
+    services: list[ServiceUsage]
+    resets_at: str
