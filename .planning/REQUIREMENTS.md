@@ -7,9 +7,9 @@
 
 ### Pre-Conditions
 
-- [ ] **PRE-01**: CORS configurado com origins específicos (não wildcard) para suportar credentials
+- [x] **PRE-01**: CORS configurado com origins específicos (não wildcard) para suportar credentials
 - [ ] **PRE-02**: Gemini Image model names validados via list_models() e corrigidos (fix 400)
-- [ ] **PRE-03**: API keys mascaradas em todos os logs (fix exposição existente)
+- [x] **PRE-03**: API keys mascaradas em todos os logs (fix exposição existente)
 
 ### Authentication Backend
 
@@ -81,9 +81,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRE-01 | Phase 1 | Pending |
+| PRE-01 | Phase 1 | Complete |
 | PRE-02 | Phase 1 | Pending |
-| PRE-03 | Phase 1 | Pending |
+| PRE-03 | Phase 1 | Complete |
 | AUTH-07 | Phase 2 | Pending |
 | AUTH-01 | Phase 3 | Pending |
 | AUTH-02 | Phase 3 | Pending |

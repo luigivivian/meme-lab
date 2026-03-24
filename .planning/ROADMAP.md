@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — CORS fix, log sanitizer, test scaffold
+- [x] 01-01-PLAN.md — CORS fix, log sanitizer, test scaffold
 - [ ] 01-02-PLAN.md — Gemini model discovery, health endpoint
 
 ### Phase 2: Users Table
