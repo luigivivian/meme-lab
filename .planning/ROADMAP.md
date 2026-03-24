@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3: Auth Backend** - Register, login, JWT tokens, roles, bcrypt hashing
 - [ ] **Phase 4: Route Protection** - Retrofit all 50+ API routes with JWT dependency injection
 - [ ] **Phase 5: Frontend Auth Pages** - Login page, register page, AuthContext, API header injection
-- [ ] **Phase 6: Frontend Route Protection** - Next.js middleware redirecting unauthenticated visitors
+- [ ] **Phase 6: Frontend Route Protection** - Client-side auth guard redirecting unauthenticated visitors
 - [ ] **Phase 7: Usage Tracking Table** - Add api_usage table to MySQL with timezone-correct daily reset logic
 - [ ] **Phase 8: Atomic Counter** - Atomic usage increment, daily limit config, usage read endpoint
 - [ ] **Phase 9: Dual Key Management** - UsageAwareKeySelector choosing free vs paid Gemini key
@@ -113,7 +113,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [ ] 06-01-PLAN.md — Auth guard in (app) layout, authenticated-user redirect on login/register
 **UI hint**: yes
 
 ### Phase 7: Usage Tracking Table
@@ -197,7 +197,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 3. Auth Backend | 1/2 | In Progress|  |
 | 4. Route Protection | 0/TBD | Not started | - |
 | 5. Frontend Auth Pages | 0/2 | Planning complete | - |
-| 6. Frontend Route Protection | 0/TBD | Not started | - |
+| 6. Frontend Route Protection | 0/1 | Planning complete | - |
 | 7. Usage Tracking Table | 0/TBD | Not started | - |
 | 8. Atomic Counter | 0/TBD | Not started | - |
 | 9. Dual Key Management | 0/TBD | Not started | - |
