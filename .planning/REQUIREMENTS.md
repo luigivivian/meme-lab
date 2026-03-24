@@ -34,8 +34,8 @@
 - [x] **QUOT-01**: Tabela api_usage no MySQL (user_id, service, tier, date, count, status)
 - [x] **QUOT-02**: Tracking atômico de uso por usuário por dia (SELECT FOR UPDATE)
 - [x] **QUOT-03**: Limites diários configuráveis via env vars (GEMINI_IMAGE_DAILY_LIMIT_FREE)
-- [ ] **QUOT-04**: Dual key management: key free como padrão, key paga como fallback
-- [ ] **QUOT-05**: UsageAwareKeySelector que resolve qual key usar baseado no consumo
+- [x] **QUOT-04**: Dual key management: key free como padrão, key paga como fallback
+- [x] **QUOT-05**: UsageAwareKeySelector que resolve qual key usar baseado no consumo
 - [ ] **QUOT-06**: Fallback automático para backgrounds estáticos quando limite free atingido
 - [x] **QUOT-07**: Reset diário do contador (timezone-aware)
 
@@ -100,8 +100,8 @@
 | QUOT-07 | Phase 7 | Complete |
 | QUOT-02 | Phase 8 | Complete |
 | QUOT-03 | Phase 8 | Complete |
-| QUOT-04 | Phase 9 | Pending |
-| QUOT-05 | Phase 9 | Pending |
+| QUOT-04 | Phase 9 | Complete |
+| QUOT-05 | Phase 9 | Complete |
 | QUOT-06 | Phase 10 | Pending |
 | DASH-01 | Phase 11 | Pending |
 | DASH-02 | Phase 11 | Pending |

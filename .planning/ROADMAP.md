@@ -154,7 +154,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — TDD: UsageAwareKeySelector with KeyResolution dataclass and full test coverage
+- [x] 09-01-PLAN.md — TDD: UsageAwareKeySelector with KeyResolution dataclass and full test coverage
 - [ ] 09-02-PLAN.md — Wire selector into GeminiImageClient and generation routes with force_tier admin param
 
 ### Phase 10: Static Fallback
