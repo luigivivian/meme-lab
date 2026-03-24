@@ -51,7 +51,7 @@ completed: 2026-03-24
 - **Duration:** 3 min
 - **Started:** 2026-03-24T20:54:48Z
 - **Completed:** 2026-03-24T20:57:36Z
-- **Tasks:** 1 of 2 (paused at checkpoint)
+- **Tasks:** 2 of 2 complete
 - **Files modified:** 3
 
 ## Accomplishments
@@ -101,12 +101,14 @@ None - no external service configuration required.
 
 ## Checkpoint Status
 
-Task 2 (checkpoint:human-verify) awaiting visual verification of Usage Card widget and tier badges on the dashboard.
+Task 2 (checkpoint:human-verify) — approved by user. Visual verification passed.
+
+**Post-checkpoint fix:** Pipeline `image_worker.py` was not tracking Gemini usage in the database. Added `UsageRepository.increment()` after successful Gemini generation so dashboard accurately reflects total API consumption (both API routes and pipeline). Commit: `5452b1f`.
 
 ## Next Phase Readiness
 - Tier metadata pipeline complete from backend to frontend
-- Awaiting visual verification before marking plan complete
+- Usage tracking covers both API routes and pipeline worker
 
 ---
 *Phase: 11-usage-dashboard*
-*Completed: 2026-03-24 (pending checkpoint)*
+*Completed: 2026-03-24*
