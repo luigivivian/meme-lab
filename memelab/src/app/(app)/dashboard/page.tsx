@@ -18,8 +18,33 @@ import {
   useDriveHealth, useJobs, useContentPackages, useQueueSummary, useUsage,
 } from "@/hooks/use-api";
 import { usePipeline } from "@/hooks/use-pipeline";
-import { imageUrl } from "@/lib/api";
+import { imageUrl, type ContentPackageDB } from "@/lib/api";
 import { SOURCE_COLORS, AGENT_TYPE_COLORS, PUBLISH_STATUS_COLORS } from "@/lib/constants";
+
+const DISTRIBUTION_BAR_COLORS: Record<string, string> = {
+  gemini: "bg-blue-500",
+  gemini_free: "bg-sky-500",
+  gemini_paid: "bg-indigo-500",
+  comfyui: "bg-violet-500",
+  static: "bg-zinc-600",
+};
+const DISTRIBUTION_DOT_COLORS: Record<string, string> = {
+  gemini: "bg-blue-400",
+  gemini_free: "bg-sky-400",
+  gemini_paid: "bg-indigo-400",
+  comfyui: "bg-violet-400",
+  static: "bg-zinc-500",
+};
+
+function getSourceLabel(pkg: ContentPackageDB): string {
+  if (pkg.background_source === "gemini") {
+    const tier = pkg.image_metadata?.tier;
+    if (tier === "gemini_paid") return "gemini_paid";
+    if (tier === "gemini_free") return "gemini_free";
+    return "gemini"; // legacy entries without tier metadata — backward compatible
+  }
+  return pkg.background_source || "static";
+}
 
 export default function DashboardPage() {
   const { data: status, isLoading: statusLoading } = useStatus();
@@ -43,7 +68,7 @@ export default function DashboardPage() {
     if (!contentData?.packages.length) return null;
     const counts: Record<string, number> = {};
     for (const pkg of contentData.packages) {
-      const src = pkg.background_source || "static";
+      const src = getSourceLabel(pkg);
       counts[src] = (counts[src] || 0) + 1;
     }
     const total = contentData.packages.length;
@@ -175,11 +200,9 @@ export default function DashboardPage() {
                     {Object.entries(sourceDistribution.counts).map(([src, count]) => (
                       <span key={src} className="flex items-center gap-1 text-[10px] text-muted-foreground">
                         <span
-                          className={`inline-block h-2 w-2 rounded-full ${
-                            src === "gemini" ? "bg-sky-400" : src === "comfyui" ? "bg-violet-400" : "bg-zinc-500"
-                          }`}
+                          className={`inline-block h-2 w-2 rounded-full ${DISTRIBUTION_DOT_COLORS[src] ?? "bg-zinc-500"}`}
                         />
-                        {src} ({count})
+                        {src.replace("_", " ")} ({count})
                       </span>
                     ))}
                   </div>
@@ -193,9 +216,7 @@ export default function DashboardPage() {
                   {Object.entries(sourceDistribution.counts).map(([src, count]) => (
                     <div
                       key={src}
-                      className={`h-full transition-all duration-500 ${
-                        src === "gemini" ? "bg-sky-500" : src === "comfyui" ? "bg-violet-500" : "bg-zinc-600"
-                      }`}
+                      className={`h-full transition-all duration-500 ${DISTRIBUTION_BAR_COLORS[src] ?? "bg-zinc-600"}`}
                       style={{ width: `${(count / sourceDistribution.total) * 100}%` }}
                     />
                   ))}
@@ -214,6 +235,7 @@ export default function DashboardPage() {
                     const score = pkg.quality_score;
                     const barColor = score < 0.4 ? "bg-rose-500" : score < 0.7 ? "bg-amber-500" : "bg-emerald-500";
                     const themeKey = pkg.image_metadata?.theme_key;
+                    const sourceLabel = getSourceLabel(pkg);
                     return (
                       <motion.div
                         key={pkg.id}
@@ -244,9 +266,9 @@ export default function DashboardPage() {
                           <p className="line-clamp-2 text-sm leading-snug">{pkg.phrase}</p>
                           <div className="flex items-center gap-1.5">
                             <span
-                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SOURCE_COLORS[pkg.background_source] ?? "bg-zinc-500/15 text-zinc-400 border-zinc-500/20"}`}
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SOURCE_COLORS[sourceLabel] ?? "bg-zinc-500/15 text-zinc-400 border-zinc-500/20"}`}
                             >
-                              {pkg.background_source}
+                              {sourceLabel.replace("_", " ")}
                             </span>
                             <span className="text-[10px] text-muted-foreground">{pkg.topic}</span>
                           </div>

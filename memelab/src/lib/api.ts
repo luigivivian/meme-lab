@@ -141,6 +141,7 @@ export interface ImageMetadata {
   rendering_config?: Record<string, string>;
   phrase_context_used?: boolean;
   character_dna_used?: boolean;
+  tier?: string;  // "gemini_free" or "gemini_paid" — added Phase 11
 }
 
 export interface ContentPackage {
