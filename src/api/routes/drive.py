@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import db_session, output_dir, validate_filename
+from src.api.deps import db_session, get_current_user, output_dir, validate_filename
 
 logger = logging.getLogger("clip-flow.api")
 
@@ -54,24 +54,25 @@ def list_images(
     theme: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    current_user=Depends(get_current_user),
 ):
     imgs = _list_drive_images(theme)
     return {"total": len(imgs), "offset": offset, "limit": limit, "images": imgs[offset:offset + limit]}
 
 
 @router.get("/drive/images/latest", summary="N imagens mais recentes")
-def latest_images(count: int = Query(default=5, ge=1, le=50)):
+def latest_images(count: int = Query(default=5, ge=1, le=50), current_user=Depends(get_current_user)):
     return {"count": count, "images": _list_drive_images()[:count]}
 
 
 @router.get("/drive/images/by-theme/{theme_key}", summary="Imagens por tema")
-def images_by_theme(theme_key: str):
+def images_by_theme(theme_key: str, current_user=Depends(get_current_user)):
     imgs = _list_drive_images(theme_key)
     return {"theme": theme_key, "total": len(imgs), "images": imgs}
 
 
 @router.get("/drive/images/{filename}", summary="Serve imagem PNG")
-def get_image(filename: str):
+def get_image(filename: str, current_user=Depends(get_current_user)):
     validate_filename(filename)
     path = output_dir() / filename
     if not path.exists():
@@ -83,7 +84,7 @@ def get_image(filename: str):
 
 
 @router.get("/drive/themes", summary="Temas nas imagens geradas")
-def list_image_themes():
+def list_image_themes(current_user=Depends(get_current_user)):
     imgs = _list_drive_images()
     themes = sorted(set(i["theme"] for i in imgs))
     counts = {t: sum(1 for i in imgs if i["theme"] == t) for t in themes}
@@ -108,7 +109,7 @@ def drive_health():
 # ── Status ───────────────────────────────────────────────────────────────────
 
 @router.get("/status", summary="Estado do servico", tags=["Sistema"])
-async def api_status(session: AsyncSession = Depends(db_session)):
+async def api_status(current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from config import BACKGROUNDS_DIR
     from src.image_gen.gemini_client import MODELOS_IMAGEM
     from src.database.repositories.pipeline_repo import PipelineRunRepository

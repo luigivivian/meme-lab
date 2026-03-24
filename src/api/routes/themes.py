@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import db_session
+from src.api.deps import db_session, get_current_user
 from src.api.models import ThemeItem, GenerateThemesRequest, EnhanceRequest
 
 logger = logging.getLogger("clip-flow.api")
@@ -55,6 +55,7 @@ async def list_themes(
     include_builtin: bool = Query(default=True),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.theme_repo import ThemeRepository
@@ -78,7 +79,7 @@ async def list_themes(
 
 
 @router.get("/keys", summary="Lista todas as situacao_keys disponiveis")
-def list_theme_keys():
+def list_theme_keys(current_user=Depends(get_current_user)):
     from src.pipeline.curator import _load_all_situacao_keys
     keys = _load_all_situacao_keys()
     return {"total": len(keys), "keys": keys}
@@ -88,6 +89,7 @@ def list_theme_keys():
 async def add_theme(
     theme: ThemeItem,
     character_id: int | None = Query(default=None),
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.theme_repo import ThemeRepository
@@ -113,6 +115,7 @@ async def add_theme(
 async def delete_theme(
     key: str,
     character_id: int | None = Query(default=None),
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.theme_repo import ThemeRepository
@@ -125,7 +128,7 @@ async def delete_theme(
 
 
 @router.post("/generate", summary="Auto-gera temas variados via IA", tags=["Temas IA"])
-async def generate_themes_ai(req: GenerateThemesRequest, session: AsyncSession = Depends(db_session)):
+async def generate_themes_ai(req: GenerateThemesRequest, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.image_gen.gemini_client import SITUACOES
     from src.llm_client import generate_json
     from src.database.repositories.theme_repo import ThemeRepository
@@ -182,7 +185,7 @@ async def generate_themes_ai(req: GenerateThemesRequest, session: AsyncSession =
 
 
 @router.post("/enhance", summary="Input simples -> prompt forte via IA", tags=["Temas IA"])
-async def enhance_theme_ai(req: EnhanceRequest, session: AsyncSession = Depends(db_session)):
+async def enhance_theme_ai(req: EnhanceRequest, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.image_gen.gemini_client import construir_prompt_completo
     from src.llm_client import generate_json
 

@@ -7,8 +7,9 @@ import re
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from src.api.deps import get_current_user
 from src.api.registry import (
     AGENT_REGISTRY, STUB_AGENTS, WORKER_NAMES,
     check_agent_availability, get_agent_map,
@@ -22,7 +23,7 @@ router = APIRouter(tags=["Agentes"])
 # ── Agents ───────────────────────────────────────────────────────────────────
 
 @router.get("/agents", summary="Lista agentes e disponibilidade")
-async def list_agents():
+async def list_agents(current_user=Depends(get_current_user)):
     agents = []
     for name, module_path, class_name, _ in AGENT_REGISTRY:
         available = await check_agent_availability(name, module_path, class_name)
@@ -39,7 +40,7 @@ async def list_agents():
 
 
 @router.post("/agents/{agent_name}/fetch", summary="Fetch de um agente especifico")
-async def fetch_from_agent(agent_name: str, limit: int = 10):
+async def fetch_from_agent(agent_name: str, limit: int = 10, current_user=Depends(get_current_user)):
     if agent_name in WORKER_NAMES:
         return {"agent": agent_name, "count": 0, "items": []}
 
@@ -118,7 +119,7 @@ def _categorize_trend(title: str) -> str:
 
 
 @router.get("/trends/feed", summary="Feed completo de trends", tags=["Trends"])
-async def trends_feed(limit: int = Query(default=50, ge=1, le=200)):
+async def trends_feed(limit: int = Query(default=50, ge=1, le=200), current_user=Depends(get_current_user)):
     from src.pipeline.models_v2 import TrendEvent
 
     # Usar apenas agents ativos do feed (sem stubs)
@@ -187,7 +188,7 @@ async def trends_feed(limit: int = Query(default=50, ge=1, le=200)):
 
 
 @router.get("/trends/search", summary="Buscar trends via Gemini", tags=["Trends"])
-async def trends_search(q: str = Query(..., min_length=2, max_length=200)):
+async def trends_search(q: str = Query(..., min_length=2, max_length=200), current_user=Depends(get_current_user)):
     import os
     from google import genai
     from google.genai import types
@@ -288,12 +289,12 @@ async def trends_search(q: str = Query(..., min_length=2, max_length=200)):
 
 
 @router.get("/trends/categories", summary="Categorias disponiveis e preferencias", tags=["Trends"])
-async def trends_categories():
+async def trends_categories(current_user=Depends(get_current_user)):
     return {"categories": DEFAULT_CATEGORIES, "preferences": _user_category_prefs}
 
 
 @router.post("/trends/categories/preferences", summary="Salvar preferencias", tags=["Trends"])
-async def save_category_preferences(favorites: list[str] = [], hidden: list[str] = []):
+async def save_category_preferences(favorites: list[str] = [], hidden: list[str] = [], current_user=Depends(get_current_user)):
     _user_category_prefs["favorites"] = favorites
     _user_category_prefs["hidden"] = hidden
     return _user_category_prefs

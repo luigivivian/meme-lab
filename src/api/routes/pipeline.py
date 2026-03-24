@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import db_session
+from src.api.deps import db_session, get_current_user
 from src.api.models import PipelineRunRequest
 from src.api.serializers import pipeline_run_to_dict, pipeline_run_list_item, content_package_summary
 
@@ -234,6 +234,7 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
 async def run_pipeline(
     request: PipelineRunRequest,
     background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.pipeline_repo import PipelineRunRepository
@@ -258,6 +259,7 @@ async def run_pipeline(
 @router.post("/run-sync", summary="Pipeline multi-agente (sincrono)")
 async def run_pipeline_sync(
     request: PipelineRunRequest,
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.pipeline_repo import PipelineRunRepository
@@ -286,7 +288,7 @@ async def run_pipeline_sync(
 
 
 @router.get("/status/{run_id}", summary="Status do pipeline")
-async def pipeline_status(run_id: str, session: AsyncSession = Depends(db_session)):
+async def pipeline_status(run_id: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.pipeline_repo import PipelineRunRepository
     from src.database.repositories.content_repo import ContentPackageRepository
 
@@ -312,6 +314,7 @@ async def list_pipeline_runs(
     character_id: int | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.pipeline_repo import PipelineRunRepository

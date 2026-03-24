@@ -17,7 +17,7 @@
 - [x] **AUTH-02**: Usuário pode fazer login e receber JWT access token + refresh token
 - [x] **AUTH-03**: Usuário pode renovar access token usando refresh token
 - [x] **AUTH-04**: Usuário pode fazer logout (invalidar refresh token)
-- [ ] **AUTH-05**: Todas as rotas da API protegidas por JWT (exceto login/registro/health)
+- [x] **AUTH-05**: Todas as rotas da API protegidas por JWT (exceto login/registro/health)
 - [x] **AUTH-06**: Sistema de roles (admin/user) com seed admin na migration
 - [x] **AUTH-07**: Tabela users no MySQL (email, hashed_password, role, api_keys criptografadas, created_at)
 
@@ -90,7 +90,7 @@
 | AUTH-03 | Phase 3 | Complete |
 | AUTH-04 | Phase 3 | Complete |
 | AUTH-06 | Phase 3 | Complete |
-| AUTH-05 | Phase 4 | Pending |
+| AUTH-05 | Phase 4 | Complete |
 | FAUTH-01 | Phase 5 | Complete |
 | FAUTH-02 | Phase 5 | Complete |
 | FAUTH-04 | Phase 5 | Complete |
