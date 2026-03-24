@@ -81,37 +81,37 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRE-01 | — | Pending |
-| PRE-02 | — | Pending |
-| PRE-03 | — | Pending |
-| AUTH-01 | — | Pending |
-| AUTH-02 | — | Pending |
-| AUTH-03 | — | Pending |
-| AUTH-04 | — | Pending |
-| AUTH-05 | — | Pending |
-| AUTH-06 | — | Pending |
-| AUTH-07 | — | Pending |
-| FAUTH-01 | — | Pending |
-| FAUTH-02 | — | Pending |
-| FAUTH-03 | — | Pending |
-| FAUTH-04 | — | Pending |
-| FAUTH-05 | — | Pending |
-| QUOT-01 | — | Pending |
-| QUOT-02 | — | Pending |
-| QUOT-03 | — | Pending |
-| QUOT-04 | — | Pending |
-| QUOT-05 | — | Pending |
-| QUOT-06 | — | Pending |
-| QUOT-07 | — | Pending |
-| DASH-01 | — | Pending |
-| DASH-02 | — | Pending |
-| DASH-03 | — | Pending |
+| PRE-01 | Phase 1 | Pending |
+| PRE-02 | Phase 1 | Pending |
+| PRE-03 | Phase 1 | Pending |
+| AUTH-07 | Phase 2 | Pending |
+| AUTH-01 | Phase 3 | Pending |
+| AUTH-02 | Phase 3 | Pending |
+| AUTH-03 | Phase 3 | Pending |
+| AUTH-04 | Phase 3 | Pending |
+| AUTH-06 | Phase 3 | Pending |
+| AUTH-05 | Phase 4 | Pending |
+| FAUTH-01 | Phase 5 | Pending |
+| FAUTH-02 | Phase 5 | Pending |
+| FAUTH-04 | Phase 5 | Pending |
+| FAUTH-05 | Phase 5 | Pending |
+| FAUTH-03 | Phase 6 | Pending |
+| QUOT-01 | Phase 7 | Pending |
+| QUOT-07 | Phase 7 | Pending |
+| QUOT-02 | Phase 8 | Pending |
+| QUOT-03 | Phase 8 | Pending |
+| QUOT-04 | Phase 9 | Pending |
+| QUOT-05 | Phase 9 | Pending |
+| QUOT-06 | Phase 10 | Pending |
+| DASH-01 | Phase 11 | Pending |
+| DASH-02 | Phase 11 | Pending |
+| DASH-03 | Phase 11 | Pending |
 
 **Coverage:**
 - v1 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-23 after initial definition*
+*Last updated: 2026-03-23 — traceability mapped after roadmap creation*
