@@ -151,10 +151,11 @@ Plans:
   2. When free-tier usage is at or above the daily limit, `UsageAwareKeySelector.resolve()` returns the paid key
   3. The key switch is logged to `api_usage` with the correct tier value (`gemini_free` or `gemini_paid`)
   4. A `GOOGLE_API_KEY_PAID` env var that differs from `GOOGLE_API_KEY` is used for paid-tier calls
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [ ] 09-01-PLAN.md — TDD: UsageAwareKeySelector with KeyResolution dataclass and full test coverage
+- [ ] 09-02-PLAN.md — Wire selector into GeminiImageClient and generation routes with force_tier admin param
 
 ### Phase 10: Static Fallback
 **Goal**: When both Gemini keys are exhausted, image generation falls back to static backgrounds automatically
