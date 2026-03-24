@@ -95,10 +95,11 @@ Plans:
   3. Visiting `/register` shows a form; submitting it creates an account and logs the user in
   4. An authenticated fetch to any API endpoint from the browser includes the `Authorization: Bearer <token>` header automatically
   5. Calling `AuthContext.logout()` clears the stored token
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [ ] 05-01-PLAN.md — AuthContext, API header injection, AuthProvider wrapping
+- [ ] 05-02-PLAN.md — Login page, Register page, visual verification
 **UI hint**: yes
 
 ### Phase 6: Frontend Route Protection
@@ -195,7 +196,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 2. Users Table | 0/1 | Planning complete | - |
 | 3. Auth Backend | 1/2 | In Progress|  |
 | 4. Route Protection | 0/TBD | Not started | - |
-| 5. Frontend Auth Pages | 0/TBD | Not started | - |
+| 5. Frontend Auth Pages | 0/2 | Planning complete | - |
 | 6. Frontend Route Protection | 0/TBD | Not started | - |
 | 7. Usage Tracking Table | 0/TBD | Not started | - |
 | 8. Atomic Counter | 0/TBD | Not started | - |
