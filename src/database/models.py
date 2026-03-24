@@ -1,4 +1,4 @@
-"""ORM models — 11 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+"""ORM models — 12 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
 
 from datetime import datetime
 from typing import Optional
@@ -89,6 +89,7 @@ class Character(TimestampMixin, Base):
     content_packages: Mapped[list["ContentPackage"]] = relationship(back_populates="character")
     batch_jobs: Mapped[list["BatchJob"]] = relationship(back_populates="character")
     generated_images: Mapped[list["GeneratedImage"]] = relationship(back_populates="character")
+    scheduled_posts: Mapped[list["ScheduledPost"]] = relationship(back_populates="character")
 
     __table_args__ = (
         Index("idx_characters_status", "status"),
@@ -323,6 +324,10 @@ class ContentPackage(Base):
     # Metadata de geracao
     image_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
+    # Quick Wins: A/B testing + carousel (nullable — MySQL nao suporta default em JSON)
+    phrase_alternatives: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
+    carousel_slides: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
+
     # Publishing
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
@@ -334,6 +339,7 @@ class ContentPackage(Base):
     work_order: Mapped["WorkOrder"] = relationship(back_populates="content_packages")
     character: Mapped[Optional["Character"]] = relationship(back_populates="content_packages")
     generated_image: Mapped[Optional["GeneratedImage"]] = relationship(back_populates="content_package")
+    scheduled_posts: Mapped[list["ScheduledPost"]] = relationship(back_populates="content_package")
 
     __table_args__ = (
         Index("idx_pkg_pipeline_run_id", "pipeline_run_id"),
@@ -451,7 +457,50 @@ class AgentStat(Base):
 
 
 # ============================================================
-# 11. users
+# 11. scheduled_posts
+# ============================================================
+
+class ScheduledPost(TimestampMixin, Base):
+    __tablename__ = "scheduled_posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    content_package_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("content_packages.id", ondelete="CASCADE"), nullable=False
+    )
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
+    )
+    platform: Mapped[str] = mapped_column(String(30), default="instagram", server_default="instagram")
+    status: Mapped[str] = mapped_column(
+        String(20), default="queued", server_default="queued"
+    )  # queued | publishing | published | failed | cancelled
+
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Resultado da publicacao (URL do post, response da API, etc)
+    publish_result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    # Retentativas
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    max_retries: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    content_package: Mapped["ContentPackage"] = relationship(back_populates="scheduled_posts")
+    character: Mapped[Optional["Character"]] = relationship(back_populates="scheduled_posts")
+
+    __table_args__ = (
+        Index("idx_sched_status", "status"),
+        Index("idx_sched_platform", "platform"),
+        Index("idx_sched_scheduled_at", "scheduled_at"),
+        Index("idx_sched_character_id", "character_id"),
+        Index("idx_sched_status_scheduled", "status", "scheduled_at"),
+    )
+
+
+# ============================================================
+# 12. users
 # ============================================================
 
 class User(TimestampMixin, Base):

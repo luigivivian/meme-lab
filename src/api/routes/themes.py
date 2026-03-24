@@ -143,7 +143,7 @@ async def generate_themes_ai(req: GenerateThemesRequest, session: AsyncSession =
     user_prompt += " Return a JSON array of theme objects."
 
     try:
-        raw = await asyncio.to_thread(generate_json, system_prompt=THEME_SYSTEM_PROMPT, user_message=user_prompt)
+        raw = await asyncio.to_thread(generate_json, system_prompt=THEME_SYSTEM_PROMPT, user_message=user_prompt, tier="lite")
         themes = json.loads(raw)
         if isinstance(themes, dict):
             themes = themes.get("themes", [themes])
@@ -189,7 +189,7 @@ async def enhance_theme_ai(req: EnhanceRequest, session: AsyncSession = Depends(
     user_prompt = f'Transform this simple concept into a detailed Mago Mestre theme: "{req.input_text}"'
 
     try:
-        raw = await asyncio.to_thread(generate_json, system_prompt=ENHANCE_SYSTEM_PROMPT, user_message=user_prompt)
+        raw = await asyncio.to_thread(generate_json, system_prompt=ENHANCE_SYSTEM_PROMPT, user_message=user_prompt, tier="lite")
         theme = json.loads(raw)
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"Gemini retornou JSON invalido: {e}")

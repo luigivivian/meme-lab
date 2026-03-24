@@ -295,7 +295,7 @@ async def generate_character_dna(body: dict):
     )
 
     try:
-        dna = await asyncio.to_thread(generate, system_prompt=DNA_SYSTEM_PROMPT, user_message=user_prompt)
+        dna = await asyncio.to_thread(generate, system_prompt=DNA_SYSTEM_PROMPT, user_message=user_prompt, tier="lite")
         return {"dna": dna.strip()}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Erro ao gerar DNA via Gemini: {e}")
@@ -322,7 +322,7 @@ async def generate_character_profile(body: dict):
     )
 
     try:
-        raw = await asyncio.to_thread(generate_json, system_prompt=PROFILE_SYSTEM_PROMPT, user_message=user_prompt, max_tokens=4096)
+        raw = await asyncio.to_thread(generate_json, system_prompt=PROFILE_SYSTEM_PROMPT, user_message=user_prompt, max_tokens=4096, tier="lite")
         profile = json.loads(raw)
         return {"profile": profile}
     except json.JSONDecodeError:
@@ -442,7 +442,7 @@ async def test_character_phrases(slug: str, body: dict | None = None, session: A
         user_msg += f"\nMaximo {char.rules_max_chars} caracteres por frase."
 
     try:
-        raw = await asyncio.to_thread(generate, system_prompt=char.system_prompt, user_message=user_msg, max_tokens=2048)
+        raw = await asyncio.to_thread(generate, system_prompt=char.system_prompt, user_message=user_msg, max_tokens=2048, tier="lite")
         phrases = [line.strip() for line in raw.strip().splitlines() if line.strip()]
         validation = []
         for p in phrases:
@@ -537,7 +537,7 @@ async def test_character_compose(slug: str, body: dict | None = None, session: A
         user_msg = f"Gere 1 frase sobre o tema: {topic}"
         if char.rules_max_chars:
             user_msg += f"\nMaximo {char.rules_max_chars} caracteres."
-        raw = await asyncio.to_thread(generate, system_prompt=char.system_prompt, user_message=user_msg, max_tokens=256)
+        raw = await asyncio.to_thread(generate, system_prompt=char.system_prompt, user_message=user_msg, max_tokens=256, tier="lite")
         phrase = raw.strip().splitlines()[0].strip().lstrip("0123456789.-) ").strip('"').strip()
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Erro ao gerar frase: {e}")

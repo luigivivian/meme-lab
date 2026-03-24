@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
@@ -27,8 +27,8 @@ function TopLoader() {
         setTimeout(() => {
           setLoading(false);
           setProgress(0);
-        }, 250);
-      }, 350);
+        }, 300);
+      }, 400);
 
       return () => {
         clearTimeout(t1);
@@ -41,13 +41,14 @@ function TopLoader() {
   if (!loading && progress === 0) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-[3px]">
+    <div className="fixed top-0 left-0 right-0 z-50 h-[2px]">
       <div
-        className="h-full bg-primary transition-all ease-out"
+        className="h-full bg-gradient-to-r from-primary via-primary to-violet-400 transition-all"
         style={{
           width: `${progress}%`,
-          transitionDuration: progress === 100 ? "200ms" : "300ms",
-          boxShadow: "0 0 10px rgba(124, 58, 237, 0.5), 0 0 5px rgba(124, 58, 237, 0.3)",
+          transitionDuration: progress === 100 ? "250ms" : "350ms",
+          transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+          boxShadow: "0 0 16px rgba(139, 92, 246, 0.6), 0 0 4px rgba(139, 92, 246, 0.4)",
         }}
       />
     </div>
@@ -56,18 +57,41 @@ function TopLoader() {
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => !prev);
+  }, []);
+
+  const handleMobileClose = useCallback(() => {
+    setMobileOpen(false);
+  }, []);
+
+  const handleMenuClick = useCallback(() => {
+    setMobileOpen(true);
+  }, []);
 
   return (
     <CharacterProvider>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-[var(--color-surface-0)]">
         <TopLoader />
-        <Sidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Header />
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={handleToggleSidebar}
+          mobileOpen={mobileOpen}
+          onMobileClose={handleMobileClose}
+        />
+        <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+          <Header onMenuClick={handleMenuClick} />
           <AnimatePresence mode="wait">
             <motion.main
               key={pathname}
-              className="flex-1 overflow-auto p-6"
+              className="flex-1 overflow-auto p-4 md:p-6"
               variants={pageVariants}
               initial="initial"
               animate="animate"

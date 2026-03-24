@@ -122,7 +122,7 @@ PIPELINE_RSS_FEEDS = [
 # ===== ComfyUI Settings =====
 
 # Habilitar geracao local de backgrounds via ComfyUI
-COMFYUI_ENABLED = False
+COMFYUI_ENABLED = True
 
 # Endereco do servidor ComfyUI
 COMFYUI_HOST = "127.0.0.1"
@@ -158,6 +158,13 @@ COMFYUI_IMG2IMG_DENOISE = 0.55
 # Diretorio com imagens de referencia do Mago Mestre (geradas no Leonardo AI)
 COMFYUI_REFERENCE_DIR = ASSETS_DIR / "backgrounds" / "mago"
 
+# ===== Image Backend Priority =====
+
+# Ordem de prioridade para geracao de backgrounds: "comfyui" | "gemini"
+# "comfyui" = ComfyUI local primeiro (custo zero), Gemini como fallback
+# "gemini" = Gemini Image API primeiro, ComfyUI como fallback
+IMAGE_BACKEND_PRIORITY = os.getenv("IMAGE_BACKEND_PRIORITY", "comfyui")
+
 # ===== Gemini Image Generation Settings =====
 
 # Habilitar geracao de backgrounds via Gemini API (com referencias visuais)
@@ -172,6 +179,35 @@ GEMINI_IMAGE_N_REFS = 5
 # Retry para rate limit 429
 GEMINI_IMAGE_MAX_RETRIES = 2
 GEMINI_IMAGE_WAIT_BASE = 60
+
+# ===== LLM Cost Tiers =====
+
+# Modelo "lite" para chamadas baratas (frases, captions, scoring)
+# gemini-2.5-flash-lite: $0.10/$0.40 por 1M tokens (6x mais barato que flash)
+GEMINI_MODEL_LITE = os.getenv("GEMINI_MODEL_LITE", "gemini-2.5-flash-lite")
+
+# Modelo "normal" para chamadas criticas (analyzer, grounding)
+GEMINI_MODEL_NORMAL = os.getenv("GEMINI_MODEL_NORMAL", "gemini-2.5-flash")
+
+# Modo de custo: "normal" | "eco" | "ultra-eco"
+COST_MODE = os.getenv("COST_MODE", "normal")
+
+# ===== Ollama (modelos locais) =====
+
+# Backend de texto: "gemini" | "ollama"
+LLM_BACKEND = os.getenv("LLM_BACKEND", "gemini")
+
+# Modelo Ollama (recomendado: gemma3:4b para 8GB VRAM, llama3.1:8b para 16GB)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:4b")
+
+# Host do servidor Ollama
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+# Timeout para chamadas Ollama (segundos)
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
+
+# Fallback para Gemini se Ollama falhar
+OLLAMA_FALLBACK_TO_GEMINI = os.getenv("OLLAMA_FALLBACK_TO_GEMINI", "true").lower() == "true"
 
 # ===== Multi-Agent Pipeline Settings =====
 
@@ -231,3 +267,70 @@ LEMMY_MAX_POSTS = 15
 
 # Max stories para buscar do HN top stories
 HACKERNEWS_MAX_STORIES = 20
+
+# ===== Dedup Cross-Run =====
+
+# Habilitar dedup entre runs (nao repetir temas recentes)
+DEDUP_CROSS_RUN_ENABLED = True
+
+# Quantos dias olhar para tras para encontrar temas ja usados
+DEDUP_CROSS_RUN_DAYS = 7
+
+# ===== Layout Variations =====
+
+# Templates de posicionamento de texto na imagem
+LAYOUT_TEMPLATES = {
+    "bottom": {"text_vertical_position": 0.80, "text_align": "center"},
+    "top": {"text_vertical_position": 0.20, "text_align": "center"},
+    "center": {"text_vertical_position": 0.50, "text_align": "center"},
+    "split_top": {"text_vertical_position": 0.15, "text_align": "left", "margin_left": 60},
+}
+
+# Layout padrao quando nao especificado
+LAYOUT_DEFAULT = "bottom"
+
+# Sortear layout automaticamente por imagem
+LAYOUT_RANDOM = True
+
+# ===== A/B Testing de Frases =====
+
+# Habilitar geracao de alternativas com scoring
+PHRASE_AB_ENABLED = True
+
+# Quantas alternativas gerar por frase
+PHRASE_AB_ALTERNATIVES = 3
+
+# ===== Carousel Mode =====
+
+# Quantidade padrao de slides por carousel (1 = imagem unica)
+CAROUSEL_DEFAULT_COUNT = 1
+
+# Maximo de slides permitido
+CAROUSEL_MAX_COUNT = 5
+
+# ===== Instagram Graph API =====
+
+# Token de acesso (long-lived, gerado via Facebook Developer Portal)
+INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN", "")
+
+# ID da conta Instagram Business (encontrado em Graph API Explorer)
+INSTAGRAM_BUSINESS_ID = os.getenv("INSTAGRAM_BUSINESS_ID", "")
+
+# Versao da Graph API
+INSTAGRAM_API_VERSION = "v21.0"
+INSTAGRAM_API_BASE = f"https://graph.facebook.com/{INSTAGRAM_API_VERSION}"
+
+# Limites do Instagram
+INSTAGRAM_MAX_HASHTAGS = 30
+INSTAGRAM_MAX_CAPTION_LENGTH = 2200
+
+# Melhores horarios para postar no Brasil (fuso BRT/Brasilia)
+INSTAGRAM_BEST_TIMES_BR = {
+    "monday": ["09:00", "12:00", "19:00"],
+    "tuesday": ["09:00", "12:00", "19:00"],
+    "wednesday": ["09:00", "12:00", "19:00", "21:00"],
+    "thursday": ["09:00", "12:00", "19:00"],
+    "friday": ["09:00", "12:00", "19:00", "21:00"],
+    "saturday": ["10:00", "14:00", "20:00"],
+    "sunday": ["10:00", "14:00", "20:00"],
+}

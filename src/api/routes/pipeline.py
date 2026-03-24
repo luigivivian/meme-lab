@@ -56,6 +56,14 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
         await session.commit()
 
     try:
+        # Aplicar cost_mode por request (override temporario do config global)
+        import config as _cfg
+        original_cost_mode = _cfg.COST_MODE
+        effective_cost_mode = request.cost_mode or _cfg.COST_MODE
+        if request.cost_mode:
+            _cfg.COST_MODE = request.cost_mode
+            logger.info(f"Pipeline cost_mode override: {request.cost_mode}")
+
         # Carregar contexto do personagem
         char_kwargs = {}
         char_id = None
@@ -91,6 +99,26 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
             except Exception as e:
                 logger.warning(f"Erro ao carregar personagem: {e}, usando padrao")
 
+        # Dedup cross-run: buscar temas recentes para excluir
+        exclude_topics = None
+        from config import DEDUP_CROSS_RUN_ENABLED, DEDUP_CROSS_RUN_DAYS
+        if DEDUP_CROSS_RUN_ENABLED:
+            try:
+                async with factory() as session:
+                    content_repo_dedup = ContentPackageRepository(session)
+                    exclude_topics = await content_repo_dedup.get_recent_topics(
+                        days=DEDUP_CROSS_RUN_DAYS
+                    )
+                    if exclude_topics:
+                        logger.info(f"Dedup cross-run: {len(exclude_topics)} temas recentes excluidos")
+            except Exception as e:
+                logger.warning(f"Dedup cross-run falhou (continuando sem): {e}")
+
+        # Converter TopicInput para dicts para o orchestrator
+        manual_topics = None
+        if request.topics:
+            manual_topics = [{"topic": t.topic, "humor_angle": t.humor_angle} for t in request.topics]
+
         orchestrator = AsyncPipelineOrchestrator(
             images_per_run=request.count,
             phrases_per_topic=request.phrases_per_topic,
@@ -99,6 +127,11 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
             use_phrase_context=request.use_phrase_context,
             on_layer_update=on_layer_update,
             theme_tags=request.theme_tags or None,
+            exclude_topics=exclude_topics,
+            carousel_count=request.carousel_count,
+            cost_mode=effective_cost_mode,
+            background_mode=request.background_mode,
+            manual_topics=manual_topics,
             **char_kwargs,
         )
         result = await orchestrator.run()
@@ -143,6 +176,8 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
                     "quality_score": pkg.quality_score,
                     "source": source_val,
                     "image_metadata": getattr(pkg, "image_metadata", {}),
+                    "phrase_alternatives": getattr(pkg, "phrase_alternatives", []),
+                    "carousel_slides": getattr(pkg, "carousel_slides", []),
                 }
                 if char_id:
                     pkg_data["character_id"] = char_id
@@ -171,15 +206,24 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
         logger.info(f"Pipeline {run_id} concluido: {result.packages_produced} packages")
 
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
         try:
             async with factory() as session:
                 repo = PipelineRunRepository(session)
-                await repo.finish_run(run_id, status="failed", results={"errors": [str(e)]})
+                await repo.finish_run(run_id, status="failed", results={
+                    "errors": [str(e)],
+                    "exception_type": type(e).__name__,
+                    "traceback": tb,
+                })
                 await session.commit()
         except Exception:
             pass
-        logger.error(f"Pipeline {run_id} falhou: {e}")
+        logger.error(f"Pipeline {run_id} falhou: {type(e).__name__}: {e}")
+        logger.error(f"Pipeline {run_id} traceback:\n{tb}")
     finally:
+        # Restaurar cost_mode original
+        _cfg.COST_MODE = original_cost_mode
         async def _cleanup_layers():
             await asyncio.sleep(300)
             _pipeline_layers.pop(run_id, None)

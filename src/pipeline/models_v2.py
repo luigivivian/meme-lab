@@ -59,6 +59,10 @@ class WorkOrder:
     priority: int = 0
     phrases_count: int = 1
     created_at: datetime = field(default_factory=datetime.now)
+    # Layout de composicao visual (bottom, top, center, split_top)
+    layout: str = "bottom"
+    # Carousel: quantos slides gerar (1 = imagem unica)
+    carousel_count: int = 1
 
 
 @dataclass
@@ -78,6 +82,10 @@ class ContentPackage:
     background_path: str | None = None
     background_source: str = "static"  # gemini | comfyui | static
     image_metadata: dict = field(default_factory=dict)
+    # A/B testing: alternativas de frase com scores
+    phrase_alternatives: list[dict] = field(default_factory=list)
+    # Carousel: paths dos slides (vazio = imagem unica)
+    carousel_slides: list[str] = field(default_factory=list)
 
 
 @dataclass

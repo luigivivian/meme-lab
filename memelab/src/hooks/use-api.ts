@@ -128,3 +128,31 @@ export function useCharacterValidation(slug: string | null) {
     { refreshInterval: 0, revalidateOnFocus: false }
   );
 }
+
+export function usePublishingQueue(params?: { status?: string; platform?: string; limit?: number }) {
+  const key = `publishing-queue-${params?.status ?? ""}-${params?.platform ?? ""}-${params?.limit ?? 20}`;
+  return useSWR(key, () => api.getPublishingQueue(params), {
+    refreshInterval: 5000,
+  });
+}
+
+export function useQueueSummary() {
+  return useSWR("queue-summary", () => api.getQueueSummary(), {
+    refreshInterval: 10000,
+  });
+}
+
+export function usePublishingCalendar(startDate: string, endDate: string) {
+  return useSWR(
+    `publishing-calendar-${startDate}-${endDate}`,
+    () => api.getPublishingCalendar(startDate, endDate),
+    { refreshInterval: 30000 }
+  );
+}
+
+export function useBestTimes() {
+  return useSWR("best-times", () => api.getBestTimes(), {
+    refreshInterval: 0,
+    revalidateOnFocus: false,
+  });
+}

@@ -64,6 +64,12 @@ def main():
         default=None,
         help="Lista de situacao_keys para forcar temas visuais (ex: cafe meditando confronto)",
     )
+    parser.add_argument(
+        "--cost-mode",
+        choices=["normal", "eco", "ultra-eco"],
+        default=None,
+        help="Modo de custo: 'normal' (padrao), 'eco' (Flash Lite + sem A/B), 'ultra-eco' (sem Gemini trends)",
+    )
 
     args = parser.parse_args()
     setup_logging(args.verbose)
@@ -79,6 +85,12 @@ def main():
         use_comfyui = True
     elif args.no_comfyui:
         use_comfyui = False
+
+    # Aplicar cost_mode global
+    if args.cost_mode:
+        import config as _cfg
+        _cfg.COST_MODE = args.cost_mode
+        logging.getLogger("clip-flow").info(f"Cost mode: {args.cost_mode}")
 
     if args.mode == "once":
         from src.pipeline.orchestrator import PipelineOrchestrator
@@ -109,11 +121,13 @@ def main():
         import asyncio
         from src.pipeline.async_orchestrator import AsyncPipelineOrchestrator
 
+        from config import COST_MODE
         orchestrator = AsyncPipelineOrchestrator(
             images_per_run=images_per_run,
             use_comfyui=use_comfyui,
             use_phrase_context=args.phrase_context,
             theme_tags=args.theme_tags,
+            cost_mode=COST_MODE,
         )
         result = asyncio.run(orchestrator.run())
 

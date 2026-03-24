@@ -5,6 +5,7 @@ from src.database.repositories.theme_repo import ThemeRepository
 from src.database.repositories.pipeline_repo import PipelineRunRepository
 from src.database.repositories.content_repo import ContentPackageRepository, GeneratedImageRepository
 from src.database.repositories.job_repo import BatchJobRepository
+from src.database.repositories.schedule_repo import ScheduledPostRepository
 
 __all__ = [
     "CharacterRepository",
@@ -13,4 +14,5 @@ __all__ = [
     "ContentPackageRepository",
     "GeneratedImageRepository",
     "BatchJobRepository",
+    "ScheduledPostRepository",
 ]

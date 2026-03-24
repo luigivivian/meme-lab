@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Shell } from "@/components/layout/shell";
 
 export const metadata: Metadata = {
   title: "memeLab — clip-flow dashboard",
@@ -17,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="antialiased">
-        <Shell>{children}</Shell>
+        {children}
       </body>
     </html>
   );
