@@ -98,7 +98,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — AuthContext, API header injection, AuthProvider wrapping
+- [x] 05-01-PLAN.md — AuthContext, API header injection, AuthProvider wrapping
 - [ ] 05-02-PLAN.md — Login page, Register page, visual verification
 **UI hint**: yes
 
