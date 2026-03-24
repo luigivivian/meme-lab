@@ -179,8 +179,8 @@ async def test_force_paid_without_paid_key(mock_session, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_resolution_tier_values(selector, mock_session):
-    """All resolution tiers are exactly 'gemini_free' or 'gemini_paid'."""
-    valid_tiers = {"gemini_free", "gemini_paid"}
+    """All resolution tiers are exactly 'gemini_free', 'gemini_paid', or 'exhausted'."""
+    valid_tiers = {"gemini_free", "gemini_paid", "exhausted"}
 
     mock_check = AsyncMock(return_value=(True, {
         "used": 0, "limit": 15, "remaining": 15,
@@ -202,3 +202,70 @@ def test_empty_free_key_raises(monkeypatch):
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     with pytest.raises(ValueError, match="GOOGLE_API_KEY"):
         UsageAwareKeySelector()
+
+
+# --------------------------------------------------------------------------
+# 11. Both tiers exhausted returns tier='exhausted'
+# --------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resolve_returns_exhausted_both_tiers(selector, mock_session):
+    """When both free and paid tiers are over limit, resolve returns exhausted."""
+    mock_check = AsyncMock(side_effect=[
+        (False, {"used": 15, "limit": 15, "remaining": 0,
+                 "resets_at": "2026-03-25T00:00:00-07:00"}),
+        (False, {"used": 100, "limit": 100, "remaining": 0,
+                 "resets_at": "2026-03-25T00:00:00-07:00"}),
+    ])
+    with patch("src.services.key_selector.UsageRepository") as MockRepo:
+        MockRepo.return_value.check_limit = mock_check
+        result = await selector.resolve(user_id=1, session=mock_session)
+
+    assert result.api_key == ""
+    assert result.tier == "exhausted"
+    assert result.mode == "auto"
+    assert mock_check.await_count == 2
+
+
+# --------------------------------------------------------------------------
+# 12. Free-only mode exhausted returns tier='exhausted'
+# --------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resolve_exhausted_free_only(mock_session, monkeypatch):
+    """In free-only mode, when free tier is over limit, resolve returns exhausted."""
+    monkeypatch.delenv("GOOGLE_API_KEY_PAID", raising=False)
+    sel = UsageAwareKeySelector()
+
+    mock_check = AsyncMock(return_value=(False, {
+        "used": 15, "limit": 15, "remaining": 0,
+        "resets_at": "2026-03-25T00:00:00-07:00",
+    }))
+    with patch("src.services.key_selector.UsageRepository") as MockRepo:
+        MockRepo.return_value.check_limit = mock_check
+        result = await sel.resolve(user_id=1, session=mock_session)
+
+    assert result.tier == "exhausted"
+    assert result.api_key == ""
+    assert mock_check.await_count == 1
+
+
+# --------------------------------------------------------------------------
+# 13. Free exhausted but paid allowed returns paid key
+# --------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resolve_paid_when_free_exhausted_paid_allowed(selector, mock_session):
+    """When free is over limit but paid is allowed, resolve returns paid key."""
+    mock_check = AsyncMock(side_effect=[
+        (False, {"used": 15, "limit": 15, "remaining": 0,
+                 "resets_at": "2026-03-25T00:00:00-07:00"}),
+        (True, {"used": 50, "limit": 0, "remaining": -1,
+                "resets_at": "2026-03-25T00:00:00-07:00"}),
+    ])
+    with patch("src.services.key_selector.UsageRepository") as MockRepo:
+        MockRepo.return_value.check_limit = mock_check
+        result = await selector.resolve(user_id=1, session=mock_session)
+
+    assert result.api_key == "test-paid-key"
+    assert result.tier == "gemini_paid"
