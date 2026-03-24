@@ -4,11 +4,37 @@ async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("access_token")
+      : null;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((options?.headers as Record<string, string>) || {}),
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
+    headers,
   });
+
   if (!res.ok) {
+    // On 401, redirect to login (per D-02) — skip for auth endpoints to avoid redirect loop
+    if (
+      res.status === 401 &&
+      typeof window !== "undefined" &&
+      !path.startsWith("/auth/")
+    ) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/login";
+      throw new Error("Sessao expirada");
+    }
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`API ${res.status}: ${text}`);
   }
