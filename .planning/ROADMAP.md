@@ -127,7 +127,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [ ] 07-01-PLAN.md — ApiUsage model, migration 008, schema tests
 
 ### Phase 8: Atomic Counter
 **Goal**: API usage increments atomically without race conditions, daily limits are configurable, and usage is readable via API
@@ -186,7 +186,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11
 
 Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Phase 2 is complete, as it only depends on Phase 2. Phases 4, 5/6, and 7/8/9/10 form two independent tracks after Phase 3.
 
@@ -198,7 +198,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 4. Route Protection | 0/TBD | Not started | - |
 | 5. Frontend Auth Pages | 0/2 | Planning complete | - |
 | 6. Frontend Route Protection | 0/1 | Planning complete | - |
-| 7. Usage Tracking Table | 0/TBD | Not started | - |
+| 7. Usage Tracking Table | 0/1 | Planning complete | - |
 | 8. Atomic Counter | 0/TBD | Not started | - |
 | 9. Dual Key Management | 0/TBD | Not started | - |
 | 10. Static Fallback | 0/TBD | Not started | - |
