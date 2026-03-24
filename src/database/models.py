@@ -1,4 +1,4 @@
-"""ORM models — 12 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+"""ORM models — 13 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
 
 from datetime import datetime
 from typing import Optional
@@ -524,4 +524,24 @@ class User(TimestampMixin, Base):
     __table_args__ = (
         Index("idx_users_role", "role"),
         Index("idx_users_is_active", "is_active"),
+    )
+
+
+# ============================================================
+# 13. refresh_tokens
+# ============================================================
+
+class RefreshToken(TimestampMixin, Base):
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    user: Mapped["User"] = relationship("User")
+
+    __table_args__ = (
+        Index("idx_refresh_tokens_user_id", "user_id"),
+        Index("idx_refresh_tokens_token_hash", "token_hash"),
     )
