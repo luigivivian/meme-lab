@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: Usage Tracking Table** - Add api_usage table to MySQL with timezone-correct daily reset logic (completed 2026-03-24)
 - [ ] **Phase 8: Atomic Counter** - Atomic usage increment, daily limit config, usage read endpoint
 - [ ] **Phase 9: Dual Key Management** - UsageAwareKeySelector choosing free vs paid Gemini key
-- [ ] **Phase 10: Static Fallback** - Automatic fallback to static backgrounds when both keys exhausted
+- [x] **Phase 10: Static Fallback** - Automatic fallback to static backgrounds when both keys exhausted (completed 2026-03-24)
 - [ ] **Phase 11: Usage Dashboard** - Widget showing daily consumption, source indicator per image
 
 ## Phase Details
@@ -165,11 +165,11 @@ Plans:
   1. When both free and paid daily limits are exhausted, `ImageWorker` produces a valid image using a static background instead of returning an error
   2. The `ContentPackage` metadata for a statically-generated image has `background_source: "static"`
   3. The pipeline completes a full run end-to-end even when `GEMINI_IMAGE_DAILY_LIMIT_FREE=0` and `GEMINI_IMAGE_DAILY_LIMIT_PAID=0`
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 10-01-PLAN.md — Exhaustion detection in UsageAwareKeySelector.resolve()
-- [ ] 10-02-PLAN.md — Wire static fallback into ImageWorker.compose() and GenerationLayer
+- [x] 10-02-PLAN.md — Wire static fallback into ImageWorker.compose() and GenerationLayer
 
 
 
@@ -205,5 +205,5 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 7. Usage Tracking Table | 1/1 | Complete   | 2026-03-24 |
 | 8. Atomic Counter | 0/1 | Planning complete | - |
 | 9. Dual Key Management | 0/TBD | Not started | - |
-| 10. Static Fallback | 1/2 | In Progress|  |
+| 10. Static Fallback | 2/2 | Complete   | 2026-03-24 |
 | 11. Usage Dashboard | 0/TBD | Not started | - |
