@@ -113,7 +113,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 06-01-PLAN.md — Auth guard in (app) layout, authenticated-user redirect on login/register
+- [x] 06-01-PLAN.md — Auth guard in (app) layout, authenticated-user redirect on login/register
 **UI hint**: yes
 
 ### Phase 7: Usage Tracking Table

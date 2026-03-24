@@ -23,9 +23,9 @@
 
 ### Authentication Frontend
 
-- [ ] **FAUTH-01**: Página de login com formulário email/senha no memeLab
-- [ ] **FAUTH-02**: Página de registro para criar conta nova
-- [ ] **FAUTH-03**: Middleware Next.js redirecionando rotas protegidas para login
+- [x] **FAUTH-01**: Página de login com formulário email/senha no memeLab
+- [x] **FAUTH-02**: Página de registro para criar conta nova
+- [x] **FAUTH-03**: Middleware Next.js redirecionando rotas protegidas para login
 - [x] **FAUTH-04**: AuthContext gerenciando tokens e estado de autenticação
 - [x] **FAUTH-05**: api.ts injetando Authorization header em todas as requisições
 
@@ -91,11 +91,11 @@
 | AUTH-04 | Phase 3 | Complete |
 | AUTH-06 | Phase 3 | Complete |
 | AUTH-05 | Phase 4 | Pending |
-| FAUTH-01 | Phase 5 | Pending |
-| FAUTH-02 | Phase 5 | Pending |
+| FAUTH-01 | Phase 5 | Complete |
+| FAUTH-02 | Phase 5 | Complete |
 | FAUTH-04 | Phase 5 | Complete |
 | FAUTH-05 | Phase 5 | Complete |
-| FAUTH-03 | Phase 6 | Pending |
+| FAUTH-03 | Phase 6 | Complete |
 | QUOT-01 | Phase 7 | Pending |
 | QUOT-07 | Phase 7 | Pending |
 | QUOT-02 | Phase 8 | Pending |
