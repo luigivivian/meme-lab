@@ -26,8 +26,8 @@
 - [ ] **FAUTH-01**: Página de login com formulário email/senha no memeLab
 - [ ] **FAUTH-02**: Página de registro para criar conta nova
 - [ ] **FAUTH-03**: Middleware Next.js redirecionando rotas protegidas para login
-- [ ] **FAUTH-04**: AuthContext gerenciando tokens e estado de autenticação
-- [ ] **FAUTH-05**: api.ts injetando Authorization header em todas as requisições
+- [x] **FAUTH-04**: AuthContext gerenciando tokens e estado de autenticação
+- [x] **FAUTH-05**: api.ts injetando Authorization header em todas as requisições
 
 ### Quota Control
 
@@ -93,8 +93,8 @@
 | AUTH-05 | Phase 4 | Pending |
 | FAUTH-01 | Phase 5 | Pending |
 | FAUTH-02 | Phase 5 | Pending |
-| FAUTH-04 | Phase 5 | Pending |
-| FAUTH-05 | Phase 5 | Pending |
+| FAUTH-04 | Phase 5 | Complete |
+| FAUTH-05 | Phase 5 | Complete |
 | FAUTH-03 | Phase 6 | Pending |
 | QUOT-01 | Phase 7 | Pending |
 | QUOT-07 | Phase 7 | Pending |

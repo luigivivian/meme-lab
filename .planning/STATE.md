@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-24T03:15:52.867Z"
+status: Ready to execute
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-24T03:52:58.522Z"
 progress:
   total_phases: 11
   completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** O pipeline nunca para de gerar conteúdo — degrada graciosamente quando limites são atingidos
-**Current focus:** Phase 03 — auth-backend
+**Current focus:** Phase 05 — frontend-auth-pages
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
+Phase: 05 (frontend-auth-pages) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Plan: Not started
 | Phase 02 P01 | 202 | 2 tasks | 5 files |
 | Phase 03 P01 | 2 | 2 tasks | 7 files |
 | Phase 03 P02 | 2 | 2 tasks | 6 files |
+| Phase 05 P01 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,9 @@ Recent decisions affecting current work:
 - [Phase 03]: Refresh token rotation on use: old deleted, new issued
 - [Phase 03]: get_current_user uses Header dependency for Authorization Bearer extraction
 - [Phase 03]: Tests use SQLite in-memory with session singleton reset for isolation
+- [Phase 05]: Direct fetch() in hydration to avoid circular dependency with api.ts 401 redirect
+- [Phase 05]: Auth endpoints excluded from 401 redirect to prevent redirect loops
+- [Phase 05]: SSR guard (typeof window !== undefined) on localStorage access
 
 ### Pending Todos
 
@@ -89,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T03:15:52.864Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-frontend-auth-pages/05-CONTEXT.md
+Last session: 2026-03-24T03:52:58.520Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None
