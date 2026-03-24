@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 9 context gathered
-last_updated: "2026-03-24T18:38:27.669Z"
+status: Ready to execute
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-03-24T19:06:30.307Z"
 progress:
   total_phases: 11
   completed_phases: 7
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 12
+  completed_plans: 11
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** O pipeline nunca para de gerar conteúdo — degrada graciosamente quando limites são atingidos
-**Current focus:** Phase 08 — atomic-counter
+**Current focus:** Phase 09 — dual-key-management
 
 ## Current Position
 
-Phase: 9
-Plan: Not started
+Phase: 09 (dual-key-management) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Plan: Not started
 | Phase 06 P01 | 8 | 3 tasks | 3 files |
 | Phase 07 P01 | 123 | 2 tasks | 3 files |
 | Phase 08 P01 | 3 | 2 tasks | 4 files |
+| Phase 09 P01 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,7 @@ Recent decisions affecting current work:
 - [Phase 07]: DateTime (not Date) for date column - UTC storage, PT conversion in repository layer
 - [Phase 07]: user_id nullable FK with ondelete SET NULL - preserves usage records when user deleted
 - [Phase 08]: PT timezone daily bucketing with naive UTC in DB; rejected rows use full timestamp to avoid constraint collision; 0=unlimited with remaining=-1 sentinel
+- [Phase 09]: Frozen dataclass for KeyResolution; priority chain: force_tier param > env var > free-only > auto DB check
 
 ### Pending Todos
 
@@ -102,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T18:38:27.666Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-dual-key-management/09-CONTEXT.md
+Last session: 2026-03-24T19:06:30.304Z
+Stopped at: Completed 09-01-PLAN.md
+Resume file: None
