@@ -39,7 +39,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — CORS fix, log sanitizer, test scaffold
-- [ ] 01-02-PLAN.md — Gemini model discovery, health endpoint
+- [x] 01-02-PLAN.md — Gemini model discovery, health endpoint
 
 ### Phase 2: Users Table
 **Goal**: MySQL has a users table that can store accounts, roles, and encrypted API keys
