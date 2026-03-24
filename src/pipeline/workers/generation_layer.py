@@ -31,7 +31,10 @@ class GenerationLayer:
         self.phrases_per_topic = phrases_per_topic
         self._cost_mode = cost_mode
 
-    async def process(self, work_orders: list[WorkOrder], on_step=None) -> list[ContentPackage]:
+    async def process(
+        self, work_orders: list[WorkOrder], on_step=None,
+        user_id: int | None = None, session: "AsyncSession | None" = None,
+    ) -> list[ContentPackage]:
         """Processa todos os WorkOrders em paralelo."""
         if not work_orders:
             return []
@@ -102,11 +105,11 @@ class GenerationLayer:
 
                         slides = []
                         for si, slide_phrase in enumerate(carousel_phrases[:carousel_count]):
-                            slide_result = await self.image_worker.compose(slide_phrase, wo)
+                            slide_result = await self.image_worker.compose(slide_phrase, wo, user_id=user_id, session=session)
                             slides.append(slide_result.image_path)
 
                         first_result = slides[0] if slides else ""
-                        compose_result = await self.image_worker.compose(phrase, wo)
+                        compose_result = await self.image_worker.compose(phrase, wo, user_id=user_id, session=session)
                         img_elapsed = time.perf_counter() - img_t0
                         logger.info(
                             f"[{wo.order_id}] Carousel: {len(slides)} slides em {img_elapsed:.1f}s "
@@ -127,7 +130,7 @@ class GenerationLayer:
                         ))
                     else:
                         # Modo imagem unica (padrao)
-                        compose_result = await self.image_worker.compose(phrase, wo)
+                        compose_result = await self.image_worker.compose(phrase, wo, user_id=user_id, session=session)
                         img_elapsed = time.perf_counter() - img_t0
                         logger.info(
                             f"[{wo.order_id}] Imagem composta em {img_elapsed:.1f}s "
