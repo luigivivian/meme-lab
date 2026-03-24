@@ -140,7 +140,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [ ] 08-01-PLAN.md — UsageRepository (atomic upsert), limit config, GET /auth/me/usage endpoint, tests
 
 ### Phase 9: Dual Key Management
 **Goal**: Image generation automatically uses the free Gemini key until the daily limit, then switches to the paid key
@@ -199,7 +199,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 5. Frontend Auth Pages | 0/2 | Planning complete | - |
 | 6. Frontend Route Protection | 0/1 | Planning complete | - |
 | 7. Usage Tracking Table | 1/1 | Complete   | 2026-03-24 |
-| 8. Atomic Counter | 0/TBD | Not started | - |
+| 8. Atomic Counter | 0/1 | Planning complete | - |
 | 9. Dual Key Management | 0/TBD | Not started | - |
 | 10. Static Fallback | 0/TBD | Not started | - |
 | 11. Usage Dashboard | 0/TBD | Not started | - |
