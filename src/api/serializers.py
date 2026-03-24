@@ -16,11 +16,16 @@ def content_package_to_dict(pkg) -> dict:
         "caption": pkg.caption,
         "hashtags": pkg.hashtags or [],
         "quality_score": pkg.quality_score,
+        "image_metadata": getattr(pkg, "image_metadata", None) or {},
         "is_published": pkg.is_published,
         "published_at": pkg.published_at.isoformat() if pkg.published_at else None,
         "created_at": pkg.created_at.isoformat() if pkg.created_at else None,
         "pipeline_run_id": pkg.pipeline_run_id,
         "character_id": pkg.character_id,
+        # Quick Wins: A/B testing + carousel
+        "phrase_alternatives": getattr(pkg, "phrase_alternatives", None) or [],
+        "carousel_slides": getattr(pkg, "carousel_slides", None) or [],
+        "is_carousel": bool(getattr(pkg, "carousel_slides", None)),
     }
 
 
@@ -171,6 +176,37 @@ def character_to_detail(char, refs_counts: dict, themes_count: int) -> dict:
         "style": style,
         "refs": character_refs_stats(char, refs_counts),
         "themes_count": themes_count,
+    }
+
+
+def scheduled_post_to_dict(post) -> dict:
+    """Converte ScheduledPost ORM para dict de resposta."""
+    return {
+        "id": post.id,
+        "content_package_id": post.content_package_id,
+        "character_id": post.character_id,
+        "platform": post.platform,
+        "status": post.status,
+        "scheduled_at": post.scheduled_at.isoformat() if post.scheduled_at else None,
+        "published_at": post.published_at.isoformat() if post.published_at else None,
+        "publish_result": post.publish_result,
+        "retry_count": post.retry_count,
+        "max_retries": post.max_retries,
+        "error_message": post.error_message,
+        "created_at": post.created_at.isoformat() if post.created_at else None,
+        "updated_at": post.updated_at.isoformat() if post.updated_at else None,
+    }
+
+
+def scheduled_post_calendar_item(post) -> dict:
+    """Versao resumida de ScheduledPost para a view de calendario."""
+    return {
+        "post_id": post.id,
+        "time": post.scheduled_at.strftime("%H:%M") if post.scheduled_at else None,
+        "platform": post.platform,
+        "status": post.status,
+        "content_package_id": post.content_package_id,
+        "character_id": post.character_id,
     }
 
 

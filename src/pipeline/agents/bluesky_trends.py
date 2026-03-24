@@ -1,9 +1,9 @@
-"""BlueSky Trends Agent — busca posts virais brasileiros via AT Protocol.
+"""BlueSky Trends Agent — busca posts virais brasileiros via AT Protocol publico.
 
-Usa autenticacao via app password para acessar a API de busca do BlueSky.
-Requer BLUESKY_HANDLE e BLUESKY_APP_PASSWORD no .env.
+Usa a API publica do BlueSky (sem autenticacao) para buscar posts em portugues.
+Endpoint publico: https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts
 
-Criar app password em: https://bsky.app/settings/app-passwords
+Nao requer credenciais — a busca publica e suficiente para monitorar trends BR.
 """
 
 import asyncio
@@ -11,19 +11,16 @@ import json
 import logging
 import urllib.request
 import urllib.parse
-from datetime import datetime
 
-from config import BLUESKY_MAX_POSTS, BLUESKY_HANDLE, BLUESKY_APP_PASSWORD
+from config import BLUESKY_MAX_POSTS
 from src.pipeline.agents.async_base import AsyncSourceAgent
 from src.pipeline.models_v2 import TrendEvent, TrendSource
 
 logger = logging.getLogger("clip-flow.agent.bluesky")
 
-# Endpoints do AT Protocol
-_API_BASE = "https://bsky.social/xrpc"
-_PUBLIC_BASE = "https://public.api.bsky.app/xrpc"
-_CREATE_SESSION = f"{_API_BASE}/com.atproto.server.createSession"
-_SEARCH_POSTS = f"{_API_BASE}/app.bsky.feed.searchPosts"
+# Endpoint publico do BlueSky (sem autenticacao)
+_PUBLIC_API = "https://public.api.bsky.app/xrpc"
+_SEARCH_POSTS = f"{_PUBLIC_API}/app.bsky.feed.searchPosts"
 
 # Keywords para buscar conteudo viral BR
 _KEYWORDS_BR = [
@@ -39,18 +36,19 @@ _KEYWORDS_BR = [
 
 _HEADERS = {
     "Accept": "application/json",
-    "Content-Type": "application/json",
     "User-Agent": "clip-flow/1.0 (memelab pipeline)",
 }
 
+# Timeout para requests HTTP (segundos)
+_HTTP_TIMEOUT = 15
+
 
 class BlueSkyTrendsAgent(AsyncSourceAgent):
-    """Busca posts virais brasileiros no BlueSky via AT Protocol com autenticacao."""
+    """Busca posts virais brasileiros no BlueSky via API publica (sem auth)."""
 
     def __init__(self, max_posts: int = BLUESKY_MAX_POSTS):
         super().__init__("bluesky_trends")
         self.max_posts = max_posts
-        self._access_jwt: str | None = None
 
     async def fetch(self) -> list[TrendEvent]:
         """Busca posts virais do BlueSky em paralelo por keyword."""
@@ -62,33 +60,8 @@ class BlueSkyTrendsAgent(AsyncSourceAgent):
             self.logger.error(f"BlueSky Trends falhou: {e}")
             return []
 
-    def _authenticate(self) -> bool:
-        """Autentica via createSession e obtem JWT token."""
-        if not BLUESKY_HANDLE or not BLUESKY_APP_PASSWORD:
-            self.logger.warning("BlueSky: BLUESKY_HANDLE ou BLUESKY_APP_PASSWORD nao configurados no .env")
-            return False
-
-        try:
-            body = json.dumps({
-                "identifier": BLUESKY_HANDLE,
-                "password": BLUESKY_APP_PASSWORD,
-            }).encode("utf-8")
-
-            req = urllib.request.Request(_CREATE_SESSION, data=body, headers=_HEADERS, method="POST")
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                self._access_jwt = data.get("accessJwt")
-                self.logger.info(f"BlueSky: autenticado como {data.get('handle', BLUESKY_HANDLE)}")
-                return bool(self._access_jwt)
-        except Exception as e:
-            self.logger.error(f"BlueSky auth falhou: {e}")
-            return False
-
     def _fetch_all(self) -> list[TrendEvent]:
         """Busca sincronamente posts de todas as keywords e retorna eventos unicos."""
-        if not self._authenticate():
-            return []
-
         seen: set[str] = set()
         all_events: list[TrendEvent] = []
 
@@ -153,7 +126,7 @@ class BlueSkyTrendsAgent(AsyncSourceAgent):
         return all_events
 
     def _search_posts(self, keyword: str) -> list[dict]:
-        """Busca posts no BlueSky para uma keyword especifica (autenticado)."""
+        """Busca posts no BlueSky para uma keyword via API publica (sem auth)."""
         params = urllib.parse.urlencode({
             "q": keyword,
             "lang": "pt",
@@ -162,12 +135,8 @@ class BlueSkyTrendsAgent(AsyncSourceAgent):
         })
         url = f"{_SEARCH_POSTS}?{params}"
 
-        headers = {**_HEADERS}
-        if self._access_jwt:
-            headers["Authorization"] = f"Bearer {self._access_jwt}"
-
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        req = urllib.request.Request(url, headers=_HEADERS)
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT) as resp:
             data = json.loads(resp.read().decode("utf-8"))
 
         posts = []
@@ -215,5 +184,5 @@ class BlueSkyTrendsAgent(AsyncSourceAgent):
             e.score = 0.3 + 0.6 * (engagement / max_engagement)
 
     async def is_available(self) -> bool:
-        """Disponivel se credenciais configuradas."""
-        return bool(BLUESKY_HANDLE and BLUESKY_APP_PASSWORD)
+        """Sempre disponivel — usa API publica sem autenticacao."""
+        return True

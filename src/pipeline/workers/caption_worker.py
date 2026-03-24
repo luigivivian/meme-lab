@@ -126,5 +126,6 @@ class CaptionWorker:
                 f"{humor_angle}"
             ),
             max_tokens=512,
+            tier="lite",
         )
         return text.strip()

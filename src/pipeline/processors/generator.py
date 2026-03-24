@@ -83,7 +83,7 @@ class ContentGenerator:
         except Exception as e:
             logger.warning(f"Erro ao inicializar ComfyUI: {e}")
 
-    def _generate_background(self, topic: AnalyzedTopic) -> str | None:
+    def _generate_background(self, topic: AnalyzedTopic, situacao_key: str = "") -> str | None:
         """Gera background via ComfyUI (img2img ou txt2img) ou retorna None."""
         if not self._comfyui_client:
             return None
@@ -91,10 +91,12 @@ class ContentGenerator:
         try:
             if COMFYUI_PROMPT_STRATEGY in ("claude", "gemini"):
                 from src.image_gen.prompt_builder import build_prompt_with_llm
-                prompt = build_prompt_with_llm(topic)
+                prompt = build_prompt_with_llm(topic, situacao_key=situacao_key)
             else:
                 from src.image_gen.prompt_builder import build_prompt
-                prompt = build_prompt(topic)
+                prompt = build_prompt(topic, situacao_key=situacao_key)
+
+            logger.info(f"ComfyUI prompt (situacao={situacao_key}): {prompt[:120]}...")
 
             GENERATED_BACKGROUNDS_DIR.mkdir(parents=True, exist_ok=True)
             output_path = str(
@@ -104,7 +106,7 @@ class ContentGenerator:
 
             # Tentar img2img com imagem de referencia (melhor qualidade)
             from src.image_gen.prompt_builder import select_reference_image
-            ref_image = select_reference_image(topic, str(COMFYUI_REFERENCE_DIR))
+            ref_image = select_reference_image(topic, str(COMFYUI_REFERENCE_DIR), situacao_key=situacao_key)
             if ref_image:
                 logger.info(f"Usando img2img com referencia: {Path(ref_image).name}")
                 result = self._comfyui_client.generate_img2img(

@@ -223,6 +223,10 @@ class ComfyUIClient:
         # Prefixo de saida
         workflow["15"]["inputs"]["filename_prefix"] = f"mago_i2i_{int(time.time())}"
 
+        # LoRA do personagem (mesmos params do txt2img)
+        workflow["2"]["inputs"]["strength_model"] = self.lora_strength
+        workflow["2"]["inputs"]["strength_clip"] = self.lora_strength
+
         # Parametros configuraveis
         workflow["6"]["inputs"]["guidance"] = self.guidance
         workflow["10"]["inputs"]["steps"] = self.sampling_steps

@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Palette,
   Layers,
+  Send,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -20,6 +21,7 @@ export const NAV_ITEMS = [
   { label: "Trends", href: "/trends", icon: TrendingUp },
   { label: "Temas", href: "/themes", icon: Palette },
   { label: "Jobs", href: "/jobs", icon: Layers },
+  { label: "Publicar", href: "/publishing", icon: Send },
 ] as const;
 
 export const AGENT_TYPE_COLORS: Record<string, string> = {
@@ -52,4 +54,17 @@ export const TREND_SOURCE_COLORS: Record<string, string> = {
   bluesky: "bg-sky-500/20 text-sky-400",
   hackernews: "bg-orange-500/20 text-orange-300",
   lemmy: "bg-teal-500/20 text-teal-400",
+};
+
+export const PUBLISH_STATUS_COLORS: Record<string, string> = {
+  queued: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  publishing: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  published: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  failed: "bg-red-500/20 text-red-400 border-red-500/30",
+  cancelled: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+};
+
+export const PLATFORM_COLORS: Record<string, string> = {
+  instagram: "bg-pink-500/20 text-pink-400",
+  tiktok: "bg-cyan-500/20 text-cyan-400",
 };

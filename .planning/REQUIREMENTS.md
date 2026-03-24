@@ -19,7 +19,7 @@
 - [ ] **AUTH-04**: Usuário pode fazer logout (invalidar refresh token)
 - [ ] **AUTH-05**: Todas as rotas da API protegidas por JWT (exceto login/registro/health)
 - [ ] **AUTH-06**: Sistema de roles (admin/user) com seed admin na migration
-- [ ] **AUTH-07**: Tabela users no MySQL (email, hashed_password, role, api_keys criptografadas, created_at)
+- [x] **AUTH-07**: Tabela users no MySQL (email, hashed_password, role, api_keys criptografadas, created_at)
 
 ### Authentication Frontend
 
@@ -84,7 +84,7 @@
 | PRE-01 | Phase 1 | Complete |
 | PRE-02 | Phase 1 | Complete |
 | PRE-03 | Phase 1 | Complete |
-| AUTH-07 | Phase 2 | Pending |
+| AUTH-07 | Phase 2 | Complete |
 | AUTH-01 | Phase 3 | Pending |
 | AUTH-02 | Phase 3 | Pending |
 | AUTH-03 | Phase 3 | Pending |

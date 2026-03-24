@@ -1,5 +1,6 @@
 """Modelos Pydantic para a API REST — espelha rotas do Colab."""
 
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 
@@ -60,6 +61,12 @@ class EnhanceRequest(BaseModel):
 
 # ===== Pipeline =====
 
+class TopicInput(BaseModel):
+    """Tema fornecido manualmente (pula L1-L2-L3)."""
+    topic: str = Field(description="Tema/assunto para gerar conteudo")
+    humor_angle: str = Field(default="", description="Angulo de humor (opcional)")
+
+
 class PipelineRunRequest(BaseModel):
     """Executar pipeline completo de geracao de conteudo."""
     count: int = Field(default=5, ge=1, le=20, description="Quantidade de imagens a gerar")
@@ -69,6 +76,10 @@ class PipelineRunRequest(BaseModel):
     use_phrase_context: bool = Field(default=False, description="Background contextualizado pela frase (mais coerente, mas mais lento)")
     theme_tags: list[str] = Field(default=[], description="Lista de situacao_keys para forcar temas visuais (ex: ['cafe', 'meditando', 'confronto']). Se vazio, auto-detecta com diversidade.")
     character_slug: str | None = Field(default=None, description="Slug do personagem (None=mago-mestre padrao)")
+    carousel_count: int = Field(default=1, ge=1, le=5, description="Slides por tema (1=imagem unica, 2-5=carousel Instagram)")
+    cost_mode: str | None = Field(default=None, description="Modo de custo: 'normal' | 'eco' | 'ultra-eco'. Se nulo, usa config.COST_MODE")
+    background_mode: str = Field(default="auto", description="Modo de background: 'auto' (prioridade config), 'comfyui' (local GPU), 'gemini' (API), 'static' (custo zero)")
+    topics: list[TopicInput] = Field(default=[], description="Temas manuais — pula L1/L2/L3 e vai direto para geracao. Se vazio, usa pipeline completo com fetch de trends.")
 
 
 class GeneratePhrasesRequest(BaseModel):
@@ -154,6 +165,13 @@ class CharacterUpdateRequest(BaseModel):
     refs_config: dict | None = None
 
 
+# ===== Content Export =====
+
+class BatchExportRequest(BaseModel):
+    """Exportar multiplos content packages como ZIP."""
+    package_ids: list[int] = Field(..., min_length=1, max_length=50, description="IDs dos packages a exportar (max 50)")
+
+
 class CharacterRefsStats(BaseModel):
     approved: int = 0
     pending: int = 0
@@ -186,3 +204,13 @@ class CharacterDetail(BaseModel):
     style: CharacterStyleConfig
     refs: CharacterRefsStats
     themes_count: int = 0
+
+
+# ===== Publishing / Scheduling =====
+
+class SchedulePostRequest(BaseModel):
+    """Agendar um content package para publicacao."""
+    content_package_id: int = Field(description="ID do content package a publicar")
+    platform: str = Field(default="instagram", description="Plataforma (instagram, tiktok)")
+    scheduled_at: datetime = Field(description="Data/hora para publicar (ISO 8601)")
+    character_id: int | None = Field(default=None, description="ID do personagem (herda do package se nulo)")

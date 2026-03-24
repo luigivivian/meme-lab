@@ -1,10 +1,11 @@
 """Repository para ContentPackage e GeneratedImage."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.database.models import ContentPackage, GeneratedImage
 
@@ -78,6 +79,30 @@ class ContentPackageRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
+    async def get_by_ids(self, package_ids: list[int], load_character: bool = False) -> list[ContentPackage]:
+        """Busca multiplos packages por lista de IDs."""
+        if not package_ids:
+            return []
+        stmt = (
+            select(ContentPackage)
+            .where(ContentPackage.id.in_(package_ids))
+            .order_by(ContentPackage.created_at.desc())
+        )
+        if load_character:
+            stmt = stmt.options(selectinload(ContentPackage.character))
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_by_id_with_character(self, package_id: int) -> ContentPackage | None:
+        """Busca package por ID com eager load do personagem."""
+        stmt = (
+            select(ContentPackage)
+            .where(ContentPackage.id == package_id)
+            .options(selectinload(ContentPackage.character))
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_for_run(self, pipeline_run_id: int) -> list[ContentPackage]:
         stmt = (
             select(ContentPackage)
@@ -86,6 +111,28 @@ class ContentPackageRepository:
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_recent_topics(self, days: int = 7, limit: int = 100) -> list[str]:
+        """Retorna topics unicos dos ultimos N dias para dedup cross-run.
+
+        Args:
+            days: quantos dias olhar para tras.
+            limit: maximo de topics a retornar.
+
+        Returns:
+            Lista de topics (lowercase, sem duplicatas).
+        """
+        cutoff = datetime.now() - timedelta(days=days)
+        stmt = (
+            select(ContentPackage.topic)
+            .where(ContentPackage.created_at >= cutoff)
+            .where(ContentPackage.topic != "")
+            .where(ContentPackage.topic.is_not(None))
+            .distinct()
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return [row[0].lower().strip() for row in result.all() if row[0]]
 
 
 class GeneratedImageRepository:

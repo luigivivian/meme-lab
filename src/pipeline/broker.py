@@ -79,20 +79,35 @@ class TrendBroker:
             on_step("ingest", "done", f"{queued} enfileirados")
             on_step("queue", "done", f"{queued} na fila")
 
-        logger.info(f"Broker: {len(events)} recebidos -> {queued} enfileirados (dedup: {len(events) - queued} removidos)")
+        # Contagem por fonte
+        source_counts = {}
+        for item in deduplicated_items:
+            src = getattr(item, 'source', None)
+            src_val = src.value if hasattr(src, 'value') else str(src)
+            source_counts[src_val] = source_counts.get(src_val, 0) + 1
+        sources_str = ", ".join(f"{k}:{v}" for k, v in sorted(source_counts.items()))
+
+        logger.info(f"Broker: {len(events)} recebidos -> {queued} enfileirados (dedup: {removed} removidos)")
+        logger.info(f"Broker fontes: [{sources_str}]")
+
+        # Top 10 trends por score
+        top_items = sorted(deduplicated_items, key=lambda x: getattr(x, 'score', 0), reverse=True)[:10]
+        logger.info("Broker top 10 trends:")
+        for i, item in enumerate(top_items, 1):
+            src = getattr(item, 'source', None)
+            src_val = src.value if hasattr(src, 'value') else '?'
+            logger.info(f"  {i}. [{src_val}] {item.title[:60]} (score={getattr(item, 'score', 0):.2f})")
+
         return queued
 
     async def drain(self, max_items: int | None = None) -> list[TrendEvent]:
-        """Retira eventos da fila para processamento.
-
-        Args:
-            max_items: limite de eventos a retirar. None = todos.
-        """
+        """Retira eventos da fila para processamento."""
         events = []
         while not self.queue.empty():
             if max_items and len(events) >= max_items:
                 break
             events.append(self.queue.get_nowait())
+        logger.info(f"Broker drain: {len(events)} eventos retirados (restam {self.queue.qsize()} na fila)")
         return events
 
     @property

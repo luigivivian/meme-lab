@@ -345,6 +345,7 @@ export interface ContentPackageDB {
   caption: string;
   hashtags: string[];
   quality_score: number;
+  image_metadata: ImageMetadata;
   is_published: boolean;
   published_at: string | null;
   created_at: string | null;
@@ -381,6 +382,11 @@ export const searchTrends = (q: string) =>
   request<TrendsSearchResponse>(`/trends/search?q=${encodeURIComponent(q)}`);
 
 // --- Pipeline ---
+export interface TopicInput {
+  topic: string;
+  humor_angle?: string;
+}
+
 export interface PipelineRunParams {
   count?: number;
   phrases_per_topic?: number;
@@ -389,6 +395,8 @@ export interface PipelineRunParams {
   use_comfyui?: boolean;
   theme_tags?: string[];
   character_slug?: string;
+  background_mode?: "auto" | "comfyui" | "gemini" | "static";
+  topics?: TopicInput[];
 }
 
 export interface ThemeKeysResponse {
@@ -830,3 +838,119 @@ export const testCharacterCompose = (slug: string, topic = "segunda-feira", situ
     method: "POST",
     body: JSON.stringify({ topic, situacao }),
   });
+
+// --- Publishing / Scheduling ---
+export interface ScheduledPost {
+  id: number;
+  content_package_id: number;
+  character_id: number | null;
+  platform: string;
+  status: "queued" | "publishing" | "published" | "failed" | "cancelled";
+  scheduled_at: string;
+  published_at: string | null;
+  publish_result: Record<string, unknown> | null;
+  retry_count: number;
+  max_retries: number;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  content_summary?: {
+    phrase: string;
+    topic: string;
+    image_path: string;
+    quality_score: number;
+  };
+  character_name?: string;
+}
+
+export interface ScheduledPostsResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  items: ScheduledPost[];
+}
+
+export interface QueueSummary {
+  total: number;
+  by_status: Record<string, number>;
+  by_platform: Record<string, number>;
+}
+
+export interface CalendarDay {
+  post_id: number;
+  time: string;
+  platform: string;
+  status: string;
+  content_summary: {
+    phrase: string;
+    topic: string;
+    quality_score: number;
+  };
+}
+
+export interface CalendarResponse {
+  dates: Record<string, CalendarDay[]>;
+  start_date: string;
+  end_date: string;
+}
+
+export interface BestTimesResponse {
+  monday: string[];
+  tuesday: string[];
+  wednesday: string[];
+  thursday: string[];
+  friday: string[];
+  saturday: string[];
+  sunday: string[];
+}
+
+// --- Publishing API functions ---
+export const schedulePost = (params: {
+  content_package_id: number;
+  platform?: string;
+  scheduled_at: string;
+  character_id?: number;
+}) =>
+  request<ScheduledPost>("/publishing/schedule", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+
+export const getPublishingQueue = (params?: {
+  status?: string;
+  platform?: string;
+  limit?: number;
+  offset?: number;
+}) => {
+  const p = new URLSearchParams();
+  if (params?.status) p.set("status", params.status);
+  if (params?.platform) p.set("platform", params.platform);
+  if (params?.limit) p.set("limit", String(params.limit));
+  if (params?.offset) p.set("offset", String(params.offset));
+  const qs = p.toString();
+  return request<ScheduledPostsResponse>(`/publishing/queue${qs ? `?${qs}` : ""}`);
+};
+
+export const getQueueSummary = () =>
+  request<QueueSummary>("/publishing/queue/summary");
+
+export const getScheduledPost = (postId: number) =>
+  request<ScheduledPost>(`/publishing/queue/${postId}`);
+
+export const cancelScheduledPost = (postId: number) =>
+  request<ScheduledPost>(`/publishing/queue/${postId}/cancel`, { method: "POST" });
+
+export const retryScheduledPost = (postId: number) =>
+  request<ScheduledPost>(`/publishing/queue/${postId}/retry`, { method: "POST" });
+
+export const getPublishingCalendar = (startDate: string, endDate: string) =>
+  request<CalendarResponse>(
+    `/publishing/calendar?start_date=${startDate}&end_date=${endDate}`
+  );
+
+export const getBestTimes = () =>
+  request<BestTimesResponse>("/publishing/best-times");
+
+// --- Content Export ---
+export const exportContentPack = (packageId: number) =>
+  `${BASE}/content/${packageId}/export`;

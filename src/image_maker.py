@@ -23,6 +23,8 @@ from config import (
     TEXT_VERTICAL_POSITION,
     FONTS_DIR,
     OUTPUT_DIR,
+    LAYOUT_TEMPLATES,
+    LAYOUT_DEFAULT,
 )
 
 
@@ -144,13 +146,24 @@ def _create_vignette_fast(width: int, height: int, strength: int) -> Image.Image
     return dark
 
 
-def _create_glow_layer(width: int, height: int, glow_color: tuple) -> Image.Image:
-    """Cria camada de brilho dourado sutil no centro — efeito mistico."""
+def _create_glow_layer(
+    width: int,
+    height: int,
+    glow_color: tuple,
+    text_vertical_position: float = TEXT_VERTICAL_POSITION,
+) -> Image.Image:
+    """Cria camada de brilho dourado sutil centralizada na posicao do texto.
+
+    Args:
+        width: largura da imagem.
+        height: altura da imagem.
+        glow_color: cor RGBA do glow (ex: 255,200,80,15).
+        text_vertical_position: posicao vertical do texto (0.0=topo, 1.0=base).
+    """
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(glow)
 
-    # Circulo de luz suave na area do texto
-    cx, cy = width // 2, int(height * TEXT_VERTICAL_POSITION)
+    cx, cy = width // 2, int(height * text_vertical_position)
     radius = int(width * 0.5)
     r, g, b, a = glow_color
 
@@ -168,21 +181,32 @@ def create_image(
     background_path: str,
     output_path: str | None = None,
     watermark_text: str | None = None,
+    layout: str | None = None,
 ) -> str:
-    """Cria imagem com texto sobreposto.
+    """Cria imagem com texto sobreposto usando layout configuravel.
 
     Composicao: background -> overlay -> vinheta -> glow -> texto com contorno -> watermark
 
     Args:
-        text: Frase para sobrepor na imagem
-        background_path: Caminho da imagem de fundo
-        output_path: Caminho de saida (opcional, gera automaticamente)
-        watermark_text: Texto do watermark (None = usa WATERMARK_TEXT do config)
+        text: Frase para sobrepor na imagem.
+        background_path: Caminho da imagem de fundo.
+        output_path: Caminho de saida (opcional, gera automaticamente).
+        watermark_text: Texto do watermark (None = usa WATERMARK_TEXT do config).
+        layout: Template de layout ("bottom", "top", "center", "split_top").
+            None = usa LAYOUT_DEFAULT do config.
 
     Returns:
-        Caminho do arquivo gerado
+        Caminho do arquivo gerado.
     """
     wm = watermark_text if watermark_text is not None else WATERMARK_TEXT
+
+    # Resolver layout template
+    layout_name = layout or LAYOUT_DEFAULT
+    layout_config = LAYOUT_TEMPLATES.get(layout_name, LAYOUT_TEMPLATES[LAYOUT_DEFAULT])
+    text_vpos = layout_config.get("text_vertical_position", TEXT_VERTICAL_POSITION)
+    text_align = layout_config.get("text_align", "center")
+    margin_left = layout_config.get("margin_left", 80)
+
     # Abrir e redimensionar background
     bg = Image.open(background_path).convert("RGBA")
     bg = _crop_center(bg, IMAGE_WIDTH, IMAGE_HEIGHT)
@@ -195,16 +219,16 @@ def create_image(
     vignette = _create_vignette_fast(IMAGE_WIDTH, IMAGE_HEIGHT, VIGNETTE_STRENGTH)
     bg = Image.alpha_composite(bg, vignette)
 
-    # 3. Glow dourado sutil no centro
-    glow = _create_glow_layer(IMAGE_WIDTH, IMAGE_HEIGHT, GLOW_COLOR)
+    # 3. Glow dourado posicionado na area do texto
+    glow = _create_glow_layer(IMAGE_WIDTH, IMAGE_HEIGHT, GLOW_COLOR, text_vpos)
     bg = Image.alpha_composite(bg, glow)
 
     draw = ImageDraw.Draw(bg)
     font = _load_font(FONT_SIZE)
     watermark_font = _load_font(WATERMARK_FONT_SIZE)
 
-    # Quebrar texto em linhas
-    margin = 80
+    # Margem depende do alinhamento
+    margin = margin_left if text_align == "left" else 80
     max_text_width = IMAGE_WIDTH - (margin * 2)
     lines = _wrap_text(text.upper(), font, max_text_width)
 
@@ -216,18 +240,25 @@ def create_image(
         line_heights.append(bbox[3] - bbox[1])
     total_height = sum(line_heights) + line_spacing * (len(lines) - 1)
 
-    # Posicao vertical configuravel
-    y = int(IMAGE_HEIGHT * TEXT_VERTICAL_POSITION) - (total_height // 2)
-    y = max(margin, y)  # Nao deixar sair do topo
-    y = min(y, IMAGE_HEIGHT - total_height - 70)  # Nao sobrepor watermark
+    # Posicao vertical baseada no layout
+    y = int(IMAGE_HEIGHT * text_vpos) - (total_height // 2)
+    y = max(margin, y)
+    y = min(y, IMAGE_HEIGHT - total_height - 70)
 
     # Desenhar cada linha com contorno + sombra
     for i, line in enumerate(lines):
         bbox = font.getbbox(line)
         text_width = bbox[2] - bbox[0]
-        x = (IMAGE_WIDTH - text_width) // 2
 
-        # Sombra suave (offset maior, com blur simulado por multiplas camadas)
+        # Alinhamento horizontal
+        if text_align == "left":
+            x = margin
+        elif text_align == "right":
+            x = IMAGE_WIDTH - text_width - margin
+        else:
+            x = (IMAGE_WIDTH - text_width) // 2
+
+        # Sombra suave
         for s in range(3):
             offset = SHADOW_OFFSET + s
             shadow_alpha = SHADOW_COLOR[3] if len(SHADOW_COLOR) > 3 else 200
@@ -244,10 +275,13 @@ def create_image(
 
         y += line_heights[i] + line_spacing
 
-    # Watermark no canto inferior
+    # Watermark — muda de lado no layout split_top
     wm_bbox = watermark_font.getbbox(wm)
     wm_width = wm_bbox[2] - wm_bbox[0]
-    wm_x = IMAGE_WIDTH - wm_width - 20
+    if layout_name == "split_top":
+        wm_x = 20  # Canto inferior esquerdo
+    else:
+        wm_x = IMAGE_WIDTH - wm_width - 20  # Canto inferior direito
     wm_y = IMAGE_HEIGHT - 50
     draw.text(
         (wm_x, wm_y), wm, font=watermark_font,

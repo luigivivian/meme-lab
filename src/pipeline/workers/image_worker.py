@@ -1,9 +1,8 @@
 """ImageWorker — gera background e compoe imagem final.
 
-Prioridade de geracao de background:
-1. Gemini API (imagens com referencias visuais)
-2. ComfyUI local (Flux + LoRA)
-3. Background estatico (assets/backgrounds/)
+Prioridade de geracao de background (config.IMAGE_BACKEND_PRIORITY):
+- "comfyui": ComfyUI local (custo zero) → Gemini API → estatico
+- "gemini":  Gemini API → ComfyUI local → estatico
 
 Usa Semaphore para serializar acessos a recursos limitados.
 """
@@ -13,7 +12,7 @@ import logging
 import random
 from dataclasses import dataclass, field
 
-from config import COMFYUI_MAX_CONCURRENT, GEMINI_MAX_CONCURRENT, GEMINI_IMAGE_ENABLED
+from config import COMFYUI_MAX_CONCURRENT, GEMINI_MAX_CONCURRENT, GEMINI_IMAGE_ENABLED, IMAGE_BACKEND_PRIORITY
 from src.image_maker import create_image
 from src.pipeline.models_v2 import WorkOrder, event_to_trend_item
 from src.pipeline.models import AnalyzedTopic
@@ -51,11 +50,13 @@ class ImageWorker:
         rendering: dict | None = None,
         refs_priority: list[str] | None = None,
         watermark_text: str | None = None,
+        background_mode: str = "auto",
     ):
         self._generator = ContentGenerator(use_comfyui=use_comfyui)
         self._watermark_text = watermark_text
         self._use_gemini_image = use_gemini_image if use_gemini_image is not None else GEMINI_IMAGE_ENABLED
         self._use_phrase_context = use_phrase_context
+        self._background_mode = background_mode
         self._gemini_client = None
         self._reference_dir = reference_dir
         self._character_dna = character_dna
@@ -64,7 +65,12 @@ class ImageWorker:
         self._rendering = rendering
         self._refs_priority = refs_priority
 
-        if self._use_gemini_image:
+        # Inicializar Gemini Image apenas quando necessario
+        if background_mode == "static":
+            logger.info("Background mode: static — usando apenas backgrounds estaticos")
+        elif background_mode == "comfyui":
+            logger.info("Background mode: comfyui — apenas GPU local")
+        elif self._use_gemini_image:
             self._init_gemini_image()
 
     def _init_gemini_image(self):
@@ -95,6 +101,49 @@ class ImageWorker:
         except Exception as e:
             logger.warning(f"Erro ao inicializar Gemini Image: {e}")
 
+    async def _try_gemini(self, work_order: WorkOrder, phrase: str, situacao_key: str) -> tuple:
+        """Tenta gerar background via Gemini Image API."""
+        if not self._gemini_client:
+            return None, "static", {}
+        try:
+            phrase_ctx = phrase if self._use_phrase_context else ""
+            gen_result = await self._gemini_client.agenerate_image(
+                situacao_key=situacao_key,
+                semaphore=_gemini_image_semaphore,
+                phrase_context=phrase_ctx,
+            )
+            if gen_result:
+                metadata = {
+                    "pose": gen_result.pose,
+                    "scene": gen_result.scene,
+                    "theme_key": gen_result.theme_key,
+                    "prompt_used": gen_result.prompt_used,
+                    "reference_images": gen_result.reference_images,
+                    "rendering_config": gen_result.rendering_config,
+                    "phrase_context_used": gen_result.phrase_context_used,
+                    "character_dna_used": gen_result.character_dna_used,
+                }
+                ctx_label = " (com contexto da frase)" if phrase_ctx else ""
+                logger.info(f"[{work_order.order_id}] Background via Gemini [{situacao_key}]{ctx_label}: {gen_result.path}")
+                return gen_result.path, "gemini", metadata
+        except Exception as e:
+            logger.warning(f"[{work_order.order_id}] Gemini Image falhou: {e}")
+        return None, "static", {}
+
+    async def _try_comfyui(self, work_order: WorkOrder, topic: AnalyzedTopic, situacao_key: str) -> tuple:
+        """Tenta gerar background via ComfyUI local."""
+        try:
+            async with _gpu_semaphore:
+                bg = await asyncio.to_thread(
+                    self._generator._generate_background, topic, situacao_key
+                )
+            if bg:
+                logger.info(f"[{work_order.order_id}] Background via ComfyUI [{situacao_key}]: {bg}")
+                return bg, "comfyui", {"theme_key": situacao_key}
+        except Exception as e:
+            logger.warning(f"[{work_order.order_id}] ComfyUI falhou: {e}")
+        return None, "static", {}
+
     async def compose(self, phrase: str, work_order: WorkOrder) -> ComposeResult:
         """Gera imagem composta para uma frase.
 
@@ -119,55 +168,40 @@ class ImageWorker:
         bg_source = "static"
         gen_metadata = {}
 
-        # 1. Tentar Gemini Image API (prioridade) — usa situacao_key do WorkOrder diretamente
-        if self._gemini_client:
-            try:
-                phrase_ctx = phrase if self._use_phrase_context else ""
-                gen_result = await self._gemini_client.agenerate_image(
-                    situacao_key=situacao_key,
-                    semaphore=_gemini_image_semaphore,
-                    phrase_context=phrase_ctx,
-                )
-                if gen_result:
-                    bg = gen_result.path
-                    bg_source = "gemini"
-                    gen_metadata = {
-                        "pose": gen_result.pose,
-                        "scene": gen_result.scene,
-                        "theme_key": gen_result.theme_key,
-                        "prompt_used": gen_result.prompt_used,
-                        "reference_images": gen_result.reference_images,
-                        "rendering_config": gen_result.rendering_config,
-                        "phrase_context_used": gen_result.phrase_context_used,
-                        "character_dna_used": gen_result.character_dna_used,
-                    }
-                    ctx_label = " (com contexto da frase)" if phrase_ctx else ""
-                    logger.info(f"[{work_order.order_id}] Background via Gemini [{situacao_key}]{ctx_label}: {bg}")
-            except Exception as e:
-                logger.warning(f"[{work_order.order_id}] Gemini Image falhou: {e}")
+        # Determinar backend baseado no background_mode
+        mode = self._background_mode
+        if mode == "static":
+            # Pula todos os backends — vai direto pro fallback estatico
+            pass
+        elif mode == "comfyui":
+            bg, bg_source, gen_metadata = await self._try_comfyui(work_order, topic, situacao_key)
+        elif mode == "gemini":
+            bg, bg_source, gen_metadata = await self._try_gemini(work_order, phrase, situacao_key)
+        else:
+            # auto: usa prioridade configurada com fallback
+            if IMAGE_BACKEND_PRIORITY == "comfyui":
+                bg, bg_source, gen_metadata = await self._try_comfyui(work_order, topic, situacao_key)
+                if bg is None:
+                    bg, bg_source, gen_metadata = await self._try_gemini(work_order, phrase, situacao_key)
+            else:
+                bg, bg_source, gen_metadata = await self._try_gemini(work_order, phrase, situacao_key)
+                if bg is None:
+                    bg, bg_source, gen_metadata = await self._try_comfyui(work_order, topic, situacao_key)
 
-        # 2. Fallback: ComfyUI local
-        if bg is None:
-            async with _gpu_semaphore:
-                bg = await asyncio.to_thread(
-                    self._generator._generate_background, topic
-                )
-            if bg:
-                bg_source = "comfyui"
-                gen_metadata = {"theme_key": situacao_key}
-
-        # 3. Fallback: background estatico
+        # Fallback final: background estatico
         if bg is None:
             bg = random.choice(self._generator.backgrounds)
             bg_source = "static"
             gen_metadata = {"theme_key": situacao_key}
             logger.debug(f"[{work_order.order_id}] Usando background estatico: {bg}")
 
-        # Compor imagem final com Pillow
+        # Compor imagem final com Pillow (layout do WorkOrder)
+        layout = getattr(work_order, "layout", "bottom")
         image_path = await asyncio.to_thread(
-            create_image, phrase, bg, None, self._watermark_text,
+            create_image, phrase, bg, None, self._watermark_text, layout,
         )
-        logger.info(f"[{work_order.order_id}] Imagem gerada: {image_path}")
+        gen_metadata["layout"] = layout
+        logger.info(f"[{work_order.order_id}] Imagem gerada (layout={layout}): {image_path}")
 
         return ComposeResult(
             image_path=image_path,
