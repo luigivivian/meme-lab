@@ -105,4 +105,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 8 completion*
+*Last updated: 2026-03-24 after Phase 9 completion — dual key management (UsageAwareKeySelector) wired into image generation pipeline*
