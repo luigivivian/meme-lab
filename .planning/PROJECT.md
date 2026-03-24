@@ -22,15 +22,15 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 - ✓ Multi-personagem backend (CRUD characters) — existing
 - ✓ 9 agents de trends ativos — existing
 - ✓ Tabela users no MySQL com roles e API keys — Validated in Phase 2: Users Table
+- ✓ Auth backend: register, login, refresh, logout com JWT + bcrypt — Validated in Phase 3: auth-backend
+- ✓ Sessão de usuário com JWT tokens (access 2h + refresh 30d, rotação) — Validated in Phase 3: auth-backend
+- ✓ get_current_user dependency para proteção de rotas — Validated in Phase 3: auth-backend
 
 ### Active
 
 - [ ] Nova Google API key configurada e funcionando (fix 400)
-- [ ] Sistema de autenticação email + senha no memeLab
-- [x] Tabela de usuários no MySQL com roles (admin/user) — Phase 2
-- [ ] Sessão de usuário com JWT tokens
 - [ ] Página de login no frontend memeLab
-- [ ] Registro de novo usuário
+- [ ] Registro de novo usuário (frontend)
 - [ ] Tracking de uso da API por usuário por dia
 - [ ] Sistema de tiers: key free (padrão) + key paga (fallback)
 - [ ] Rate limiting baseado nos limites do plano free do Google
@@ -60,9 +60,10 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 **Codebase existente:**
 - Backend: Python 3.14, FastAPI, SQLAlchemy 2.0 async, MySQL
 - Frontend: Next.js 15, TypeScript, Tailwind CSS
-- 12 tabelas ORM (incl. users + scheduled_posts), Alembic migrations (001-006)
+- 13 tabelas ORM (incl. users + refresh_tokens), Alembic migrations (001-007)
 - `src/image_gen/gemini_client.py` — GeminiImageClient atual
-- `src/api/` — API REST modular com 8 route modules
+- `src/api/` — API REST modular com 9 route modules (incl. auth)
+- `src/auth/` — Auth module: JWT, bcrypt, AuthService
 - `memelab/` — Frontend dashboard
 
 **Multi-tenant futuro:** Cada usuário terá personagem/marca próprios. A estrutura de auth e usage tracking de agora deve ser desenhada pensando nisso.
@@ -79,10 +80,10 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Email + senha (não OAuth) | Simplicidade para v1, multi-tenant futuro não precisa de social login | — Pending |
+| Email + senha (não OAuth) | Simplicidade para v1, multi-tenant futuro não precisa de social login | ✓ Phase 3 |
 | Key free + key paga (dual tier) | Maximiza uso gratuito, paga só quando necessário | — Pending |
 | Fallback para BG estático (não fila) | Pipeline não pode parar, conteúdo sai sempre | — Pending |
-| JWT para sessão (não session cookie) | API REST stateless, facilita multi-tenant futuro | — Pending |
+| JWT para sessão (não session cookie) | API REST stateless, facilita multi-tenant futuro | ✓ Phase 3 — HS256, access 2h, refresh 30d |
 | Preparar estrutura multi-tenant | Tabelas com user_id desde o início, isolamento depois | — Pending |
 
 ## Evolution
@@ -103,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 2 completion*
+*Last updated: 2026-03-24 after Phase 3 completion*
