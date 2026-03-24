@@ -10,11 +10,12 @@ import asyncio
 import os
 from pathlib import Path
 
+import bcrypt
 import yaml
 
 from config import BASE_DIR
 from src.database.session import get_session_factory, init_db
-from src.database.models import Character, CharacterRef, Theme
+from src.database.models import Character, CharacterRef, Theme, User
 
 
 CHARACTERS_DIR = BASE_DIR / "characters"
@@ -258,6 +259,36 @@ async def seed_themes(session):
             print(f"  [OK] {count} temas migrados para '{slug}'.")
 
 
+async def seed_admin_user(session):
+    """Cria admin user se ADMIN_EMAIL e ADMIN_PASSWORD estiverem no env."""
+    from sqlalchemy import select
+
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    admin_password = os.environ.get("ADMIN_PASSWORD", "").strip()
+
+    if not admin_email or not admin_password:
+        print("  [SKIP] ADMIN_EMAIL ou ADMIN_PASSWORD nao definidos no env.")
+        return
+
+    existing = await session.execute(
+        select(User).where(User.email == admin_email)
+    )
+    if existing.scalar_one_or_none():
+        print(f"  [SKIP] Admin '{admin_email}' ja existe no banco.")
+        return
+
+    hashed = bcrypt.hashpw(admin_password.encode("utf-8"), bcrypt.gensalt())
+    user = User(
+        email=admin_email,
+        hashed_password=hashed.decode("utf-8"),
+        role="admin",
+        is_active=True,
+    )
+    session.add(user)
+    await session.flush()
+    print(f"  [OK] Admin '{admin_email}' criado (id={user.id}).")
+
+
 async def run_seed():
     """Executa o seed completo."""
     print("=== Clip-Flow Database Seed ===\n")
@@ -267,20 +298,25 @@ async def run_seed():
     db_dir.mkdir(exist_ok=True)
 
     # Cria tabelas
-    print("[1/3] Criando tabelas...")
+    print("[1/4] Criando tabelas...")
     await init_db()
     print("  [OK] Tabelas criadas.\n")
 
     factory = get_session_factory()
     async with factory() as session:
         # Migra characters + refs
-        print("[2/3] Migrando characters e refs...")
+        print("[2/4] Migrando characters e refs...")
         await seed_characters(session)
         print()
 
         # Migra themes
-        print("[3/3] Migrando themes...")
+        print("[3/4] Migrando themes...")
         await seed_themes(session)
+        print()
+
+        # Seed admin user
+        print("[4/4] Verificando admin user...")
+        await seed_admin_user(session)
         print()
 
         await session.commit()
