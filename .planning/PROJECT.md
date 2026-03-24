@@ -2,7 +2,19 @@
 
 ## What This Is
 
-Pipeline multi-agente para geração automatizada de memes do personagem "O Mago Mestre" para Instagram (@magomestre420). Trends → frases Gemini → backgrounds Gemini Image → composição Pillow → publicação.
+Plataforma de geração e publicação automatizada de memes para Instagram. Pipeline simplificado compõe backgrounds existentes + frases, sem depender de APIs externas de imagem. Suporta múltiplos personagens e publicação automática.
+
+## Current Milestone: v2.0 Pipeline Simplification, Auto-Publicação & Multi-Tenant
+
+**Goal:** Pipeline simplificado que compõe memes (backgrounds existentes + frases) sem chamar Gemini Image API, com publicação automática e multi-tenant.
+
+**Target features:**
+- Pipeline refactor: desacoplar agentes/buscas, pipeline manual com backgrounds lisos + temas pré-configurados + composição de frases, zero chamadas Gemini Image
+- Multi-personagem pipeline: workers geram conteúdo por personagem
+- Auto-publicação Instagram: scheduler + publisher + calendar
+- Auth v2: reset de senha por email, 2FA, OAuth Google
+- Dashboard v2: histórico 30 dias, alertas de limite, relatório de custos
+- Multi-tenant: isolamento por usuário, API keys por usuário, billing
 
 ## Current State (v1.0 shipped 2026-03-24)
 
@@ -22,35 +34,37 @@ Pipeline multi-agente para geração automatizada de memes do personagem "O Mago
 
 ## Core Value
 
-O pipeline nunca para de gerar conteúdo — quando limites são atingidos, degrada graciosamente.
+Pipeline compõe e publica memes automaticamente — simples, rápido, sem depender de APIs caras de geração de imagem.
 
 ## Stack
 
 - **Backend:** Python 3.14, FastAPI, SQLAlchemy 2.0 async, MySQL, Alembic (8 migrations)
 - **Frontend:** Next.js 15, TypeScript, Tailwind CSS
-- **AI:** Google Gemini API (text + image), Ollama/Gemma3 (local fallback)
-- **Image:** Gemini Image → ComfyUI → static backgrounds (3-tier fallback)
+- **AI:** Google Gemini API (text only for phrases), Ollama/Gemma3 (local fallback)
+- **Image:** Composição Pillow com backgrounds existentes (lisos/estáticos)
 - **DB:** 14 tables ORM (incl. users, refresh_tokens, api_usage)
 
 ## Constraints
 
-- Respeitar limites do plano free do Google como padrão
-- Pipeline existente deve continuar funcionando (backward compatible)
+- Pipeline não chama Gemini Image API — apenas compõe backgrounds existentes + frases
+- Agentes de trends desacoplados do pipeline (consulta avulsa)
 - Manter stack atual (Python + FastAPI + MySQL + Next.js)
 - Senhas com bcrypt, JWT com expiração, nunca logar API keys
-- Pipeline nunca para — fallback para estáticos
+- Multi-tenant: isolamento por usuário desde o início
 
-## Out of Scope (v1)
+## Out of Scope (v2)
 
-- OAuth / login social — complexidade desnecessária para v1
-- 2FA — futuro, quando multi-tenant estiver ativo
-- Reset de senha por email — requer SMTP
-- Billing/pagamento — monetização é milestone separado
-- Multi-tenant completo — v1 preparou a estrutura, não implementa isolamento total
+- Geração de imagens via Gemini Image API no pipeline (disponível como ferramenta separada)
+- Redis para rate limiting (MySQL-based counter suficiente)
+- Mobile app nativo
 
-## Next Milestone Goals
+## Key Decisions
 
-_Not yet defined. Run `/gsd:new-milestone` to start planning._
+| Decision | Rationale | Outcome |
+|----------|-----------|---------|
+| Pipeline sem Gemini Image | Simplificar, reduzir custos, backgrounds lisos suficientes | v2.0 |
+| Desacoplar trends do pipeline | Pipeline manual, trends como consulta independente | v2.0 |
+| Billing via Stripe | Standard para SaaS | Pending |
 
 <details>
 <summary>v1.0 Key Decisions</summary>
@@ -65,5 +79,22 @@ _Not yet defined. Run `/gsd:new-milestone` to start planning._
 
 </details>
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-24 — v1.0 milestone archived*
+*Last updated: 2026-03-24 — v2.0 milestone started*
