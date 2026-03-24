@@ -20,7 +20,7 @@ class KeyResolution:
     """Immutable result of key selection."""
 
     api_key: str
-    tier: str   # "gemini_free" or "gemini_paid"
+    tier: str   # "gemini_free", "gemini_paid", or "exhausted"
     mode: str   # "auto", "forced_env", "forced_request", "free_only"
 
 
@@ -70,13 +70,18 @@ class UsageAwareKeySelector:
         if self._force_tier_env in ("free", "paid"):
             return self._forced_resolution(self._force_tier_env, mode="forced_env")
 
-        # Priority 3: free-only mode
+        # Priority 3: free-only mode — check limit before returning (D-02)
         if self._free_only:
-            return KeyResolution(
-                api_key=self._free_key,
-                tier="gemini_free",
-                mode="free_only",
-            )
+            repo = UsageRepository(session)
+            allowed, info = await repo.check_limit(user_id, "gemini_image", "free")
+            if allowed:
+                return KeyResolution(
+                    api_key=self._free_key,
+                    tier="gemini_free",
+                    mode="free_only",
+                )
+            logger.warning("Free tier exhausted and no paid key -- tier=exhausted")
+            return KeyResolution(api_key="", tier="exhausted", mode="auto")
 
         # Priority 4: automatic — check DB usage
         repo = UsageRepository(session)
@@ -89,16 +94,25 @@ class UsageAwareKeySelector:
                 mode="auto",
             )
 
-        logger.info(
-            "Free tier limit reached (used=%d/%d), switching to paid key",
-            info.get("used", 0),
-            info.get("limit", 0),
+        # Free exhausted — check paid tier (D-01)
+        allowed_paid, info_paid = await repo.check_limit(user_id, "gemini_image", "paid")
+        if allowed_paid:
+            logger.info(
+                "Free tier limit reached (used=%d/%d), switching to paid key",
+                info.get("used", 0),
+                info.get("limit", 0),
+            )
+            return KeyResolution(
+                api_key=self._paid_key,
+                tier="gemini_paid",
+                mode="auto",
+            )
+
+        # Both tiers exhausted (D-01)
+        logger.warning(
+            "Both free and paid tiers exhausted — tier=exhausted"
         )
-        return KeyResolution(
-            api_key=self._paid_key,
-            tier="gemini_paid",
-            mode="auto",
-        )
+        return KeyResolution(api_key="", tier="exhausted", mode="auto")
 
     def _forced_resolution(self, tier: str, mode: str) -> KeyResolution:
         """Build a forced KeyResolution, with fallback if paid key unavailable."""

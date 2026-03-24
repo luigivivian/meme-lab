@@ -52,11 +52,13 @@ async def test_resolve_returns_free_when_under_limit(selector, mock_session):
 
 @pytest.mark.asyncio
 async def test_resolve_returns_paid_when_over_limit(selector, mock_session):
-    """When check_limit rejects, resolve returns paid key with mode=auto."""
-    mock_check = AsyncMock(return_value=(False, {
-        "used": 15, "limit": 15, "remaining": 0,
-        "resets_at": "2026-03-25T00:00:00-07:00",
-    }))
+    """When free check_limit rejects but paid allows, resolve returns paid key."""
+    mock_check = AsyncMock(side_effect=[
+        (False, {"used": 15, "limit": 15, "remaining": 0,
+                 "resets_at": "2026-03-25T00:00:00-07:00"}),
+        (True, {"used": 0, "limit": 0, "remaining": -1,
+                "resets_at": "2026-03-25T00:00:00-07:00"}),
+    ])
     with patch("src.services.key_selector.UsageRepository") as MockRepo:
         MockRepo.return_value.check_limit = mock_check
         result = await selector.resolve(user_id=1, session=mock_session)
@@ -72,13 +74,17 @@ async def test_resolve_returns_paid_when_over_limit(selector, mock_session):
 
 @pytest.mark.asyncio
 async def test_free_only_mode_no_paid_key(mock_session, monkeypatch):
-    """Without GOOGLE_API_KEY_PAID, selector uses free-only mode and skips DB."""
+    """Without GOOGLE_API_KEY_PAID, selector uses free-only mode with DB check."""
     monkeypatch.delenv("GOOGLE_API_KEY_PAID", raising=False)
     sel = UsageAwareKeySelector()
 
+    mock_check = AsyncMock(return_value=(True, {
+        "used": 5, "limit": 15, "remaining": 10,
+        "resets_at": "2026-03-25T00:00:00-07:00",
+    }))
     with patch("src.services.key_selector.UsageRepository") as MockRepo:
+        MockRepo.return_value.check_limit = mock_check
         result = await sel.resolve(user_id=1, session=mock_session)
-        MockRepo.assert_not_called()
 
     assert result.tier == "gemini_free"
     assert result.mode == "free_only"
@@ -91,13 +97,17 @@ async def test_free_only_mode_no_paid_key(mock_session, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_free_only_mode_identical_keys(mock_session, monkeypatch):
-    """When paid key == free key, selector enters free-only mode."""
+    """When paid key == free key, selector enters free-only mode with DB check."""
     monkeypatch.setenv("GOOGLE_API_KEY_PAID", "test-free-key")
     sel = UsageAwareKeySelector()
 
+    mock_check = AsyncMock(return_value=(True, {
+        "used": 3, "limit": 15, "remaining": 12,
+        "resets_at": "2026-03-25T00:00:00-07:00",
+    }))
     with patch("src.services.key_selector.UsageRepository") as MockRepo:
+        MockRepo.return_value.check_limit = mock_check
         result = await sel.resolve(user_id=1, session=mock_session)
-        MockRepo.assert_not_called()
 
     assert result.tier == "gemini_free"
     assert result.mode == "free_only"
