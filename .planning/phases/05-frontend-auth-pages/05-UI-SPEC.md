@@ -21,7 +21,7 @@ created: 2026-03-24
 | Preset | not applicable |
 | Component library | radix-ui (Slot primitive), class-variance-authority |
 | Icon library | lucide-react |
-| Font | Inter (400, 500, 600, 700) via Google Fonts |
+| Font | Inter (400, 600) via Google Fonts |
 
 ---
 
@@ -47,10 +47,11 @@ Exceptions: none
 
 | Role | Size | Weight | Line Height | Usage in this phase |
 |------|------|--------|-------------|---------------------|
-| Body | 14px | 400 | 1.5 | Form helper text, link text, error messages |
-| Label | 14px | 500 | 1.4 | Form field labels ("Email", "Senha") |
+| Body | 14px | 400 | 1.5 | Form helper text, link text, error messages, placeholders |
+| Label | 14px | 600 | 1.4 | Form field labels ("Email", "Senha"), card titles ("Entrar", "Criar conta"), button text |
 | Heading | 20px | 600 | 1.2 | Card title ("Entrar", "Criar conta") |
-| Display | 28px | 700 | 1.2 | Not used in this phase |
+
+Two weights only: **400** (regular) for body text, helper text, error messages, and placeholders; **600** (semibold) for labels, headings, and button text. Weight 500 removed (visually indistinguishable from 400 at 14px). Weight 700 removed (Display role unused in this phase).
 
 ---
 
@@ -63,11 +64,19 @@ Exceptions: none
 | Accent (10%) | #8B5CF6 (`--color-primary`) | Submit buttons, focus rings, link hover, loading spinner |
 | Destructive | #f43f5e (`--color-destructive`) | Inline validation error text, error border highlight |
 
+> **Color alignment note:** CONTEXT.md references `#7C3AED` as the purple accent, but `globals.css` declares `--color-primary: #8B5CF6` (along with `--color-accent`, `--color-ring`, and the gradient). **`#8B5CF6` is authoritative** as it is the value in the actual stylesheet. CONTEXT.md reference is outdated.
+
 Accent reserved for:
 - Submit button background ("Entrar", "Criar conta")
 - Focus ring on input fields (2px solid via `--color-ring`)
 - "Registrar" / "Entrar" navigation link hover underline
 - Loading spinner stroke color
+
+---
+
+## Focal Point
+
+The **primary visual anchor** is the centered auth card on the dark background. The user's eye is drawn to the card by the contrast between the `#0f0f14` card surface and the `#06060a` page background, with the `#8B5CF6` accent submit button as the strongest call-to-action element within the card.
 
 ---
 
@@ -164,6 +173,7 @@ Same layout as login with these differences:
 
 - **Show/hide toggle:** Yes. Button with `Eye` / `EyeOff` lucide icon at `absolute right-3 top-1/2 -translate-y-1/2`, ghost variant, icon size 16px
 - **Input type:** Toggles between `type="password"` and `type="text"`
+- **Accessibility:** Toggle button uses `aria-label="Mostrar senha"` when password is hidden, `aria-label="Ocultar senha"` when password is visible. Button has `type="button"` to prevent form submission.
 
 ---
 
@@ -193,6 +203,12 @@ Same layout as login with these differences:
 | Error: empty field (client) | "Campo obrigatorio." |
 | Error: server error (500) | "Erro no servidor. Tente novamente em alguns instantes." |
 | Error: network failure | "Sem conexao com o servidor. Verifique sua internet." |
+
+### Destructive Actions
+
+| Action | Confirmation Approach |
+|--------|----------------------|
+| Logout | No confirmation -- immediate on click. Deliberate decision: logout is low-risk (user can re-login), and a confirmation dialog adds friction to a single-user admin tool. |
 
 ---
 
@@ -264,6 +280,7 @@ if (token) {
 | Error association | Error `<p>` elements use `id` matching input `aria-describedby` |
 | Submit on Enter | Native form `<form onSubmit>` behavior |
 | Screen reader | Error messages use `role="alert"` |
+| Password toggle | `aria-label="Mostrar senha"` / `aria-label="Ocultar senha"` on show/hide button |
 | Color contrast | #f0f0f5 on #06060a = 18.1:1 (AAA). #8888a0 on #06060a = 5.7:1 (AA). #f43f5e on #0f0f14 = 5.4:1 (AA). |
 | Reduced motion | Existing `@media (prefers-reduced-motion)` disables all animations |
 
