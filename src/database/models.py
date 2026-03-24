@@ -1,4 +1,4 @@
-"""ORM models — 13 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+"""ORM models — 14 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
 
 from datetime import datetime
 from typing import Optional
@@ -520,6 +520,7 @@ class User(TimestampMixin, Base):
 
     # Relationships
     characters: Mapped[list["Character"]] = relationship(back_populates="owner")
+    api_usage_records: Mapped[list["ApiUsage"]] = relationship(back_populates="user")
 
     __table_args__ = (
         Index("idx_users_role", "role"),
@@ -544,4 +545,32 @@ class RefreshToken(TimestampMixin, Base):
     __table_args__ = (
         Index("idx_refresh_tokens_user_id", "user_id"),
         Index("idx_refresh_tokens_token_hash", "token_hash"),
+    )
+
+
+# ============================================================
+# 14. api_usage
+# ============================================================
+
+class ApiUsage(TimestampMixin, Base):
+    __tablename__ = "api_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    service: Mapped[str] = mapped_column(String(50), nullable=False)
+    tier: Mapped[str] = mapped_column(String(20), nullable=False)
+    date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    usage_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # Relationships
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="api_usage_records")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "service", "tier", "date", name="uq_api_usage_user_service_tier_date"),
+        Index("idx_api_usage_user_id", "user_id"),
+        Index("idx_api_usage_date", "date"),
+        Index("idx_api_usage_service", "service"),
     )
