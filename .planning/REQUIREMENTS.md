@@ -36,7 +36,7 @@
 - [x] **QUOT-03**: Limites diários configuráveis via env vars (GEMINI_IMAGE_DAILY_LIMIT_FREE)
 - [x] **QUOT-04**: Dual key management: key free como padrão, key paga como fallback
 - [x] **QUOT-05**: UsageAwareKeySelector que resolve qual key usar baseado no consumo
-- [ ] **QUOT-06**: Fallback automático para backgrounds estáticos quando limite free atingido
+- [x] **QUOT-06**: Fallback automático para backgrounds estáticos quando limite free atingido
 - [x] **QUOT-07**: Reset diário do contador (timezone-aware)
 
 ### Usage Dashboard
@@ -102,7 +102,7 @@
 | QUOT-03 | Phase 8 | Complete |
 | QUOT-04 | Phase 9 | Complete |
 | QUOT-05 | Phase 9 | Complete |
-| QUOT-06 | Phase 10 | Pending |
+| QUOT-06 | Phase 10 | Complete |
 | DASH-01 | Phase 11 | Pending |
 | DASH-02 | Phase 11 | Pending |
 | DASH-03 | Phase 11 | Pending |
