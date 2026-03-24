@@ -35,7 +35,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. A direct call to `GeminiImageClient.generate()` returns an image without a 400 error
   3. API startup logs show `"key: ***"` instead of the actual key value
   4. `GET /health` response includes Gemini model validation status
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — CORS fix, log sanitizer, test scaffold
+- [ ] 01-02-PLAN.md — Gemini model discovery, health endpoint
 
 ### Phase 2: Users Table
 **Goal**: MySQL has a users table that can store accounts, roles, and encrypted API keys
@@ -156,7 +160,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Pre-Conditions | 0/TBD | Not started | - |
+| 1. Pre-Conditions | 0/2 | Planning complete | - |
 | 2. Users Table | 0/TBD | Not started | - |
 | 3. Auth Backend | 0/TBD | Not started | - |
 | 4. Route Protection | 0/TBD | Not started | - |
