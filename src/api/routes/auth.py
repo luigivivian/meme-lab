@@ -12,6 +12,7 @@ from src.auth.schemas import (
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
+    UsageResponse,
     UserResponse,
 )
 from src.auth.service import AuthService
@@ -75,3 +76,16 @@ async def logout(body: RefreshRequest, session: AsyncSession = Depends(db_sessio
 async def me(current_user=Depends(get_current_user)):
     """Return current user profile (requires valid access token)."""
     return UserResponse.model_validate(current_user)
+
+
+@router.get("/me/usage", response_model=UsageResponse)
+async def me_usage(
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Return current user's API usage for today (QUOT-02, QUOT-03, D-04)."""
+    from src.database.repositories.usage_repo import UsageRepository
+
+    repo = UsageRepository(session)
+    data = await repo.get_user_usage(current_user.id)
+    return data
