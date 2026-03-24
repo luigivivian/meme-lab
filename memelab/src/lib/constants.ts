@@ -40,6 +40,8 @@ export const STATUS_COLORS: Record<string, string> = {
 
 export const SOURCE_COLORS: Record<string, string> = {
   gemini: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  gemini_free: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+  gemini_paid: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
   comfyui: "bg-purple-500/20 text-purple-400 border-purple-500/30",
   static: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
 };

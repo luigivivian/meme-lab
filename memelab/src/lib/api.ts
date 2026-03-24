@@ -386,6 +386,22 @@ export interface ContentPackagesResponse {
   packages: ContentPackageDB[];
 }
 
+// --- Usage ---
+export interface ServiceUsage {
+  service: string;
+  tier: string;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface UsageResponse {
+  services: ServiceUsage[];
+  resets_at: string;
+}
+
+export const getUsage = () => request<UsageResponse>("/auth/me/usage");
+
 // --- Status ---
 export const getStatus = () => request<StatusResponse>("/status");
 
