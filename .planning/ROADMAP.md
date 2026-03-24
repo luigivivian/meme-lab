@@ -140,7 +140,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 08-01-PLAN.md — UsageRepository (atomic upsert), limit config, GET /auth/me/usage endpoint, tests
+- [x] 08-01-PLAN.md — UsageRepository (atomic upsert), limit config, GET /auth/me/usage endpoint, tests
 
 ### Phase 9: Dual Key Management
 **Goal**: Image generation automatically uses the free Gemini key until the daily limit, then switches to the paid key
