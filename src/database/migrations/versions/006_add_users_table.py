@@ -1,7 +1,7 @@
 """add users table and characters.user_id FK
 
 Revision ID: 006
-Revises: 003
+Revises: 005
 Create Date: 2026-03-24
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers
 revision: str = '006'
-down_revision: Union[str, None] = '003'
+down_revision: Union[str, None] = '005'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
