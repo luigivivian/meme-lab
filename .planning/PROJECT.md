@@ -29,14 +29,15 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 ### Active
 
 - [ ] Nova Google API key configurada e funcionando (fix 400)
-- [ ] Página de login no frontend memeLab
-- [ ] Registro de novo usuário (frontend)
+- ✓ Página de login no frontend memeLab — Validated in Phase 5: frontend-auth-pages
+- ✓ Registro de novo usuário (frontend) — Validated in Phase 5: frontend-auth-pages
+- ✓ Proteção de rotas do frontend (redirect para /login) — Validated in Phase 6: frontend-route-protection
 - [ ] Tracking de uso da API por usuário por dia
 - [ ] Sistema de tiers: key free (padrão) + key paga (fallback)
 - [ ] Rate limiting baseado nos limites do plano free do Google
 - [ ] Fallback automático para backgrounds estáticos quando limite atingido
 - [ ] Dashboard de uso mostrando consumo diário vs limite
-- [ ] Proteção de rotas da API (autenticação obrigatória)
+- [ ] Proteção de rotas da API backend (autenticação obrigatória)
 
 ### Out of Scope
 
