@@ -9,7 +9,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import db_session, resolver_tema_batch, load_themes_config
+from src.api.deps import db_session, get_current_user, resolver_tema_batch, load_themes_config
 from src.api.models import BatchRequest
 from src.api.serializers import job_to_dict
 
@@ -144,7 +144,7 @@ def _run_batch_job(
 
 
 @router.post("/batch", summary="Lote com lista de temas")
-async def create_batch(req: BatchRequest, session: AsyncSession = Depends(db_session)):
+async def create_batch(req: BatchRequest, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.job_repo import BatchJobRepository
 
     job_id = uuid.uuid4().hex[:8]
@@ -169,6 +169,7 @@ async def create_batch(req: BatchRequest, session: AsyncSession = Depends(db_ses
 async def batch_from_config(
     auto_refine: bool = False,
     refinement_passes: int = 1,
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.job_repo import BatchJobRepository
@@ -195,7 +196,7 @@ async def batch_from_config(
 
 
 @router.get("/{job_id}", summary="Status de um job")
-async def get_job(job_id: str, session: AsyncSession = Depends(db_session)):
+async def get_job(job_id: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     job = JOBS.get(job_id)
     if job:
         return job
@@ -213,6 +214,7 @@ async def list_jobs(
     status: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.job_repo import BatchJobRepository

@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import db_session, validate_filename
+from src.api.deps import db_session, get_current_user, validate_filename
 from src.api.models import CharacterCreateRequest, CharacterUpdateRequest
 from src.api.serializers import character_to_detail, character_to_summary
 
@@ -158,6 +158,7 @@ def _generate_image_from_prompt(prompt: str) -> PIL.Image.Image | None:
 
 @router.get("")
 async def api_list_characters(
+    current_user=Depends(get_current_user),
     status: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -184,13 +185,13 @@ async def api_list_characters(
 
 
 @router.get("/{slug}")
-async def api_get_character(slug: str, session: AsyncSession = Depends(db_session)):
+async def api_get_character(slug: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     char, refs_counts, themes_count = await _get_char_with_counts(slug, session)
     return character_to_detail(char, refs_counts, themes_count)
 
 
 @router.post("", status_code=201)
-async def api_create_character(req: CharacterCreateRequest, session: AsyncSession = Depends(db_session)):
+async def api_create_character(req: CharacterCreateRequest, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.characters import slugify, create_character_dirs
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.repositories.theme_repo import ThemeRepository
@@ -239,7 +240,7 @@ async def api_create_character(req: CharacterCreateRequest, session: AsyncSessio
 
 
 @router.put("/{slug}")
-async def api_update_character(slug: str, req: CharacterUpdateRequest, session: AsyncSession = Depends(db_session)):
+async def api_update_character(slug: str, req: CharacterUpdateRequest, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import api_update_to_orm_dict
 
@@ -263,7 +264,7 @@ async def api_update_character(slug: str, req: CharacterUpdateRequest, session: 
 
 
 @router.delete("/{slug}")
-async def api_delete_character(slug: str, session: AsyncSession = Depends(db_session)):
+async def api_delete_character(slug: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.characters import DEFAULT_CHARACTER
     from src.database.repositories.character_repo import CharacterRepository
 
@@ -280,7 +281,7 @@ async def api_delete_character(slug: str, session: AsyncSession = Depends(db_ses
 # ── DNA / Profile Generation ────────────────────────────────────────────────
 
 @router.post("/generate-dna", summary="Gera DNA visual via Gemini")
-async def generate_character_dna(body: dict):
+async def generate_character_dna(body: dict, current_user=Depends(get_current_user)):
     from src.llm_client import generate
 
     description = body.get("description", "").strip()
@@ -302,7 +303,7 @@ async def generate_character_dna(body: dict):
 
 
 @router.post("/generate-profile", summary="Gera perfil completo via Gemini")
-async def generate_character_profile(body: dict):
+async def generate_character_profile(body: dict, current_user=Depends(get_current_user)):
     import json
     from src.llm_client import generate_json
 
@@ -334,7 +335,7 @@ async def generate_character_profile(body: dict):
 # ── Rendering Presets ────────────────────────────────────────────────────────
 
 @router.get("/rendering-presets", summary="Listar presets de rendering", tags=["Rendering"])
-async def get_rendering_presets():
+async def get_rendering_presets(current_user=Depends(get_current_user)):
     from src.image_gen.gemini_client import ART_STYLE_PRESETS, LIGHTING_PRESETS, CAMERA_PRESETS
     return {
         "art_style": {k: {"label": v["label"], "prompt": v["prompt"]} for k, v in ART_STYLE_PRESETS.items()},
@@ -346,7 +347,7 @@ async def get_rendering_presets():
 # ── Validation & Testing ────────────────────────────────────────────────────
 
 @router.get("/{slug}/validate", summary="Checklist de prontidao", tags=["Validation"])
-async def validate_character(slug: str, session: AsyncSession = Depends(db_session)):
+async def validate_character(slug: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.repositories.theme_repo import ThemeRepository
     from src.database.converters import orm_to_character_config
@@ -423,7 +424,7 @@ async def validate_character(slug: str, session: AsyncSession = Depends(db_sessi
 
 
 @router.post("/{slug}/test-phrases", summary="Gerar frases de teste", tags=["Validation"])
-async def test_character_phrases(slug: str, body: dict | None = None, session: AsyncSession = Depends(db_session)):
+async def test_character_phrases(slug: str, body: dict | None = None, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.llm_client import generate
     from src.database.repositories.character_repo import CharacterRepository
 
@@ -466,7 +467,7 @@ async def test_character_phrases(slug: str, body: dict | None = None, session: A
 
 
 @router.post("/{slug}/test-visual", summary="Gerar imagem de teste", tags=["Validation"])
-async def test_character_visual(slug: str, body: dict | None = None, session: AsyncSession = Depends(db_session)):
+async def test_character_visual(slug: str, body: dict | None = None, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
@@ -512,7 +513,7 @@ async def test_character_visual(slug: str, body: dict | None = None, session: As
 
 
 @router.post("/{slug}/test-compose", summary="Gerar meme completo de teste", tags=["Validation"])
-async def test_character_compose(slug: str, body: dict | None = None, session: AsyncSession = Depends(db_session)):
+async def test_character_compose(slug: str, body: dict | None = None, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.image_gen.gemini_client import GeminiImageClient, build_character_image_prompt, SITUACOES, _selecionar_referencias, _pil_para_part
     from src.image_maker import create_image
     from src.llm_client import generate
@@ -678,7 +679,7 @@ def _generate_refs_worker(
 
 
 @router.post("/{slug}/refs/generate", summary="Gerar batch de refs via Gemini", tags=["Refs"])
-async def generate_refs(slug: str, body: dict | None = None, session: AsyncSession = Depends(db_session)):
+async def generate_refs(slug: str, body: dict | None = None, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.characters import create_character_dirs
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
@@ -720,7 +721,7 @@ async def generate_refs(slug: str, body: dict | None = None, session: AsyncSessi
 
 
 @router.get("/{slug}/refs/generate/status", summary="Status da geracao de refs", tags=["Refs"])
-async def refs_generate_status(slug: str):
+async def refs_generate_status(slug: str, current_user=Depends(get_current_user)):
     jobs = [j for j in _ref_generation_jobs.values() if j["slug"] == slug]
     if not jobs:
         return {"status": "none", "message": "Nenhuma geracao em andamento"}
@@ -728,7 +729,7 @@ async def refs_generate_status(slug: str):
 
 
 @router.get("/{slug}/refs", summary="Lista refs do personagem", tags=["Refs"])
-async def list_refs(slug: str, session: AsyncSession = Depends(db_session)):
+async def list_refs(slug: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
@@ -759,7 +760,7 @@ async def list_refs(slug: str, session: AsyncSession = Depends(db_session)):
 
 
 @router.get("/{slug}/refs/image/{filename}", summary="Serve imagem de ref", tags=["Refs"])
-async def serve_ref_image(slug: str, filename: str, session: AsyncSession = Depends(db_session)):
+async def serve_ref_image(slug: str, filename: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
@@ -790,7 +791,7 @@ def _move_ref(config, filename: str, target_dir: Path, search_dirs: list[Path]):
 
 
 @router.post("/{slug}/refs/{filename}/approve", summary="Aprovar ref", tags=["Refs"])
-async def approve_ref(slug: str, filename: str, session: AsyncSession = Depends(db_session)):
+async def approve_ref(slug: str, filename: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
@@ -816,7 +817,7 @@ async def approve_ref(slug: str, filename: str, session: AsyncSession = Depends(
 
 
 @router.post("/{slug}/refs/{filename}/reject", summary="Rejeitar ref", tags=["Refs"])
-async def reject_ref(slug: str, filename: str, session: AsyncSession = Depends(db_session)):
+async def reject_ref(slug: str, filename: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
@@ -842,7 +843,7 @@ async def reject_ref(slug: str, filename: str, session: AsyncSession = Depends(d
 
 
 @router.delete("/{slug}/refs/{filename}", summary="Deletar ref", tags=["Refs"])
-async def delete_ref(slug: str, filename: str, session: AsyncSession = Depends(db_session)):
+async def delete_ref(slug: str, filename: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
@@ -871,7 +872,7 @@ async def delete_ref(slug: str, filename: str, session: AsyncSession = Depends(d
 
 
 @router.post("/{slug}/refs/upload", summary="Upload manual de refs", tags=["Refs"])
-async def upload_refs(slug: str, files: list[UploadFile], session: AsyncSession = Depends(db_session)):
+async def upload_refs(slug: str, files: list[UploadFile], current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 

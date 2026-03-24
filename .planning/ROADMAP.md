@@ -83,7 +83,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [x] 04-01-PLAN.md — Add Depends(get_current_user) to all 8 unprotected route modules
 
 ### Phase 5: Frontend Auth Pages
 **Goal**: Users can log in and register through the memeLab UI, and all API calls carry the JWT automatically
@@ -200,7 +200,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 1. Pre-Conditions | 0/2 | Planning complete | - |
 | 2. Users Table | 0/1 | Planning complete | - |
 | 3. Auth Backend | 1/2 | In Progress|  |
-| 4. Route Protection | 0/TBD | Not started | - |
+| 4. Route Protection | 1/1 | Complete | 2026-03-24 |
 | 5. Frontend Auth Pages | 0/2 | Planning complete | - |
 | 6. Frontend Route Protection | 0/1 | Planning complete | - |
 | 7. Usage Tracking Table | 1/1 | Complete   | 2026-03-24 |

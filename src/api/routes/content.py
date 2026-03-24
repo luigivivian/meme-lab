@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import db_session
+from src.api.deps import db_session, get_current_user
 from src.api.models import BatchExportRequest, GeneratePhrasesRequest
 from src.api.serializers import content_package_to_dict, generated_image_to_dict
 
@@ -29,6 +29,7 @@ async def list_content_packages(
     is_published: bool | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.content_repo import ContentPackageRepository
@@ -45,7 +46,7 @@ async def list_content_packages(
 
 
 @router.get("/content/{package_id}", summary="Detalhes de um content package")
-async def get_content_package(package_id: int, session: AsyncSession = Depends(db_session)):
+async def get_content_package(package_id: int, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
@@ -56,7 +57,7 @@ async def get_content_package(package_id: int, session: AsyncSession = Depends(d
 
 
 @router.post("/content/{package_id}/publish", summary="Marcar como publicado")
-async def publish_content_package(package_id: int, session: AsyncSession = Depends(db_session)):
+async def publish_content_package(package_id: int, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
@@ -146,7 +147,7 @@ def _add_package_to_zip(zf: zipfile.ZipFile, pkg, prefix: str = "") -> dict:
 
 
 @router.get("/content/{package_id}/export", summary="Exporta content package como ZIP")
-async def export_content_package(package_id: int, session: AsyncSession = Depends(db_session)):
+async def export_content_package(package_id: int, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     """Exporta um content package como arquivo .zip com imagem, caption, hashtags e metadados."""
     from src.database.repositories.content_repo import ContentPackageRepository
 
@@ -169,7 +170,7 @@ async def export_content_package(package_id: int, session: AsyncSession = Depend
 
 
 @router.post("/content/export", summary="Exporta batch de content packages como ZIP")
-async def export_content_batch(req: BatchExportRequest, session: AsyncSession = Depends(db_session)):
+async def export_content_batch(req: BatchExportRequest, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     """Exporta multiplos content packages como arquivo .zip com pasta por package e summary."""
     from src.database.repositories.content_repo import ContentPackageRepository
 
@@ -229,6 +230,7 @@ async def export_content_batch(req: BatchExportRequest, session: AsyncSession = 
 async def swap_phrase(
     package_id: int,
     phrase_index: int = Query(description="Indice da alternativa (0-based) no array phrase_alternatives"),
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     """Troca a frase principal por uma das alternativas A/B e recompoe a imagem."""
@@ -285,6 +287,7 @@ async def list_generated_images(
     source: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
     from src.database.repositories.content_repo import GeneratedImageRepository
@@ -300,7 +303,7 @@ async def list_generated_images(
 
 
 @router.get("/images/{image_id}", summary="Detalhes de uma imagem gerada", tags=["Images"])
-async def get_generated_image(image_id: int, session: AsyncSession = Depends(db_session)):
+async def get_generated_image(image_id: int, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.content_repo import GeneratedImageRepository
 
     repo = GeneratedImageRepository(session)
@@ -311,7 +314,7 @@ async def get_generated_image(image_id: int, session: AsyncSession = Depends(db_
 
 
 @router.get("/images/{image_id}/serve", summary="Serve arquivo da imagem", tags=["Images"])
-async def serve_generated_image(image_id: int, session: AsyncSession = Depends(db_session)):
+async def serve_generated_image(image_id: int, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.database.repositories.content_repo import GeneratedImageRepository
 
     repo = GeneratedImageRepository(session)
@@ -328,7 +331,7 @@ async def serve_generated_image(image_id: int, session: AsyncSession = Depends(d
 # ── Phrases ──────────────────────────────────────────────────────────────────
 
 @router.post("/phrases/generate", summary="Gera frases do Mago Mestre", tags=["Frases"])
-async def generate_phrases_route(req: GeneratePhrasesRequest):
+async def generate_phrases_route(req: GeneratePhrasesRequest, current_user=Depends(get_current_user)):
     from src.phrases import generate_phrases
     phrases = await asyncio.to_thread(generate_phrases, req.topic, req.count)
     return {"topic": req.topic, "phrases": phrases, "count": len(phrases)}
