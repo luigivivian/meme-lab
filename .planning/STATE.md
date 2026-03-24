@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase complete — ready for verification
-stopped_at: Phase 6 context gathered
-last_updated: "2026-03-24T14:42:45.833Z"
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-03-24T15:55:44.754Z"
 progress:
   total_phases: 11
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 5
+  total_plans: 8
+  completed_plans: 8
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** O pipeline nunca para de gerar conteúdo — degrada graciosamente quando limites são atingidos
-**Current focus:** Phase 05 — frontend-auth-pages
+**Current focus:** Phase 06 — frontend-route-protection
 
 ## Current Position
 
-Phase: 05 (frontend-auth-pages) — EXECUTING
-Plan: 2 of 2
+Phase: 06 (frontend-route-protection) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Plan: 2 of 2
 | Phase 03 P02 | 2 | 2 tasks | 6 files |
 | Phase 05 P01 | 2 | 2 tasks | 3 files |
 | Phase 05 P02 | 2 | 2 tasks | 2 files |
+| Phase 06 P01 | 8 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ Recent decisions affecting current work:
 - [Phase 05]: Auth endpoints excluded from 401 redirect to prevent redirect loops
 - [Phase 05]: SSR guard (typeof window !== undefined) on localStorage access
 - [Phase 05]: Validation uses local errors object accumulated then set once to avoid multiple re-renders
+- [Phase 06]: Client-side router.push() for all auth redirects, no Edge Middleware
 
 ### Pending Todos
 
@@ -95,6 +97,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T14:42:45.830Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-frontend-route-protection/06-CONTEXT.md
+Last session: 2026-03-24T15:55:44.751Z
+Stopped at: Completed 06-01-PLAN.md
+Resume file: None
