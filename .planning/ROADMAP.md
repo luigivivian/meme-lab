@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Route Protection** - Retrofit all 50+ API routes with JWT dependency injection
 - [ ] **Phase 5: Frontend Auth Pages** - Login page, register page, AuthContext, API header injection
 - [ ] **Phase 6: Frontend Route Protection** - Client-side auth guard redirecting unauthenticated visitors
-- [ ] **Phase 7: Usage Tracking Table** - Add api_usage table to MySQL with timezone-correct daily reset logic
+- [x] **Phase 7: Usage Tracking Table** - Add api_usage table to MySQL with timezone-correct daily reset logic (completed 2026-03-24)
 - [ ] **Phase 8: Atomic Counter** - Atomic usage increment, daily limit config, usage read endpoint
 - [ ] **Phase 9: Dual Key Management** - UsageAwareKeySelector choosing free vs paid Gemini key
 - [ ] **Phase 10: Static Fallback** - Automatic fallback to static backgrounds when both keys exhausted
@@ -124,10 +124,10 @@ Plans:
   1. `alembic upgrade head` creates the `api_usage` table with columns: id, user_id (FK), service, tier, date, usage_count, status, created_at
   2. The daily reset logic uses Pacific Time (America/Los_Angeles) — a record created at 23:59 PT and another at 00:01 PT the next day are in different date buckets
   3. Rolling back the migration drops the table cleanly
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 07-01-PLAN.md — ApiUsage model, migration 008, schema tests
+- [x] 07-01-PLAN.md — ApiUsage model, migration 008, schema tests
 
 ### Phase 8: Atomic Counter
 **Goal**: API usage increments atomically without race conditions, daily limits are configurable, and usage is readable via API
@@ -198,7 +198,7 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 4. Route Protection | 0/TBD | Not started | - |
 | 5. Frontend Auth Pages | 0/2 | Planning complete | - |
 | 6. Frontend Route Protection | 0/1 | Planning complete | - |
-| 7. Usage Tracking Table | 0/1 | Planning complete | - |
+| 7. Usage Tracking Table | 1/1 | Complete   | 2026-03-24 |
 | 8. Atomic Counter | 0/TBD | Not started | - |
 | 9. Dual Key Management | 0/TBD | Not started | - |
 | 10. Static Fallback | 0/TBD | Not started | - |

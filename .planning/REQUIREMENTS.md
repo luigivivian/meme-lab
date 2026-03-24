@@ -31,13 +31,13 @@
 
 ### Quota Control
 
-- [ ] **QUOT-01**: Tabela api_usage no MySQL (user_id, service, tier, date, count, status)
+- [x] **QUOT-01**: Tabela api_usage no MySQL (user_id, service, tier, date, count, status)
 - [ ] **QUOT-02**: Tracking atômico de uso por usuário por dia (SELECT FOR UPDATE)
 - [ ] **QUOT-03**: Limites diários configuráveis via env vars (GEMINI_IMAGE_DAILY_LIMIT_FREE)
 - [ ] **QUOT-04**: Dual key management: key free como padrão, key paga como fallback
 - [ ] **QUOT-05**: UsageAwareKeySelector que resolve qual key usar baseado no consumo
 - [ ] **QUOT-06**: Fallback automático para backgrounds estáticos quando limite free atingido
-- [ ] **QUOT-07**: Reset diário do contador (timezone-aware)
+- [x] **QUOT-07**: Reset diário do contador (timezone-aware)
 
 ### Usage Dashboard
 
@@ -96,8 +96,8 @@
 | FAUTH-04 | Phase 5 | Complete |
 | FAUTH-05 | Phase 5 | Complete |
 | FAUTH-03 | Phase 6 | Complete |
-| QUOT-01 | Phase 7 | Pending |
-| QUOT-07 | Phase 7 | Pending |
+| QUOT-01 | Phase 7 | Complete |
+| QUOT-07 | Phase 7 | Complete |
 | QUOT-02 | Phase 8 | Pending |
 | QUOT-03 | Phase 8 | Pending |
 | QUOT-04 | Phase 9 | Pending |
