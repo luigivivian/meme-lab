@@ -34,7 +34,7 @@ O pipeline nunca para de gerar conteúdo — quando a Gemini Image API atinge o 
 - ✓ Proteção de rotas do frontend (redirect para /login) — Validated in Phase 6: frontend-route-protection
 - ✓ Tracking de uso da API por usuário por dia — Validated in Phase 7: Usage Tracking Table
 - [ ] Sistema de tiers: key free (padrão) + key paga (fallback)
-- [ ] Rate limiting baseado nos limites do plano free do Google
+- ✓ Rate limiting baseado nos limites do plano free do Google — Validated in Phase 8: Atomic Counter
 - [ ] Fallback automático para backgrounds estáticos quando limite atingido
 - [ ] Dashboard de uso mostrando consumo diário vs limite
 - [ ] Proteção de rotas da API backend (autenticação obrigatória)
@@ -105,4 +105,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 7 completion*
+*Last updated: 2026-03-24 after Phase 8 completion*
