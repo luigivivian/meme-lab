@@ -181,10 +181,11 @@ Plans:
   1. The dashboard shows a widget with "N / M requests used today (free tier)" and a visual fill indicator
   2. Each generated image in the pipeline results list shows a badge: "gemini free", "gemini paid", or "static"
   3. `GET /auth/me/usage` returns data the widget consumes (used, limit, tier, remaining)
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — User model, migration 006, seed admin, Character FK
+- [ ] 11-01-PLAN.md — Data layer (TS interfaces, useUsage hook, SOURCE_COLORS) + Usage Card widget
+- [ ] 11-02-PLAN.md — Backend tier metadata in image_worker + tier-aware badge rendering
 **UI hint**: yes
 
 ## Progress
@@ -205,5 +206,5 @@ Note: Phase 7 (Usage Tracking Table) can start in parallel with Phase 3 once Pha
 | 7. Usage Tracking Table | 1/1 | Complete   | 2026-03-24 |
 | 8. Atomic Counter | 0/1 | Planning complete | - |
 | 9. Dual Key Management | 0/TBD | Not started | - |
-| 10. Static Fallback | 2/2 | Complete   | 2026-03-24 |
-| 11. Usage Dashboard | 0/TBD | Not started | - |
+| 10. Static Fallback | 2/2 | Complete    | 2026-03-24 |
+| 11. Usage Dashboard | 0/2 | Planning complete | - |
