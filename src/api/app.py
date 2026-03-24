@@ -44,6 +44,14 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info(f"Banco de dados inicializado: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
 
+    # Descobrir modelos de imagem Gemini (per D-03, D-04)
+    import asyncio
+    from src.image_gen.gemini_client import discover_image_models, update_modelos_imagem
+    discovered = await asyncio.to_thread(discover_image_models)
+    update_modelos_imagem(discovered)
+    app.state.gemini_image_models = discovered if discovered else []
+    logger.info(f"Gemini image models: {len(app.state.gemini_image_models)} modelo(s) validado(s)")
+
     # Iniciar scheduler de publicacao (processa posts a cada 60s)
     start_scheduler(interval_seconds=60)
     logger.info("Scheduler de publicacao iniciado")
@@ -103,6 +111,44 @@ async def llm_status():
         "ollama_model": OLLAMA_MODEL if LLM_BACKEND == "ollama" else None,
         "ollama_available": ollama_ok,
         "effective": "ollama" if (_should_use_ollama() and ollama_ok) else "gemini",
+    }
+
+
+@app.get("/health", tags=["System"], summary="Health check: DB + Gemini model validation")
+async def health():
+    """Health check com status do banco de dados e validacao de modelos Gemini.
+
+    Endpoint nao autenticado (per D-10) — exempto de JWT em fases futuras.
+    """
+    from sqlalchemy import text
+
+    # DB check
+    db_ok = False
+    db_error = None
+    try:
+        from src.database.session import async_session_factory
+        async with async_session_factory() as session:
+            await session.execute(text("SELECT 1"))
+            db_ok = True
+    except Exception as e:
+        db_error = str(e)
+
+    # Gemini models (populated at startup)
+    gemini_models = getattr(app.state, "gemini_image_models", [])
+
+    overall = "healthy" if (db_ok and len(gemini_models) > 0) else "degraded"
+
+    return {
+        "status": overall,
+        "database": {
+            "connected": db_ok,
+            "error": db_error,
+        },
+        "gemini_image": {
+            "models_available": len(gemini_models),
+            "models": gemini_models,
+            "validation": "ok" if gemini_models else "no image models found",
+        },
     }
 
 
