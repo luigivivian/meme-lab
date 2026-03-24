@@ -1,4 +1,7 @@
-"""Rotas de geracao de imagens (single, refine, compose)."""
+"""Rotas de geracao de imagens (single, refine, compose).
+
+Wired with UsageAwareKeySelector (Phase 9) for dual-key resolution.
+"""
 
 import asyncio
 import random
@@ -6,17 +9,55 @@ from datetime import datetime
 from pathlib import Path
 
 import PIL.Image
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import resolver_tema, output_dir
+from src.api.deps import resolver_tema, output_dir, get_current_user, db_session
 from src.api.models import SingleRequest, RefineRequest, ComposeImageRequest
+from src.services.key_selector import UsageAwareKeySelector
+from src.database.repositories.usage_repo import UsageRepository
 
 router = APIRouter(prefix="/generate", tags=["Geracao"])
 
 
+async def _resolve_key(
+    force_tier: str | None,
+    current_user,
+    session: AsyncSession,
+):
+    """Resolve API key via selector. Admin-only force_tier (D-08)."""
+    effective_force = force_tier if (force_tier and current_user.role == "admin") else None
+
+    selector = UsageAwareKeySelector()
+    resolution = await selector.resolve(
+        user_id=current_user.id,
+        session=session,
+        force_tier=effective_force,
+    )
+    return resolution
+
+
+async def _increment_usage(session: AsyncSession, user_id: int, tier: str):
+    """Increment usage counter after successful generation."""
+    repo = UsageRepository(session)
+    await repo.increment(
+        user_id=user_id,
+        service="gemini_image",
+        tier=tier.replace("gemini_", ""),  # "free" or "paid"
+    )
+    await session.commit()
+
+
 @router.post("/single", summary="Gera uma imagem individual")
-def generate_single(req: SingleRequest):
+async def generate_single(
+    req: SingleRequest,
+    force_tier: str | None = Query(None, pattern="^(free|paid)$"),
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
     from src.image_gen.gemini_client import GeminiImageClient
+
+    resolution = await _resolve_key(force_tier, current_user, session)
 
     client = GeminiImageClient()
     if not client.is_available():
@@ -27,23 +68,32 @@ def generate_single(req: SingleRequest):
     nome = f"single_{req.theme_key}_{ts}"
 
     if req.auto_refine:
-        path = client.generate_with_refinement(
-            situacao_key=situacao_key,
-            descricao_custom=acao,
-            cenario_custom=cenario,
-            passes_refinamento=req.refinement_passes,
-            nome_arquivo=nome,
+        path = await asyncio.to_thread(
+            client.generate_with_refinement,
+            situacao_key,
+            acao,
+            cenario,
+            req.refinement_passes,
+            "",  # instrucao_refinamento
+            nome,
+            resolution.api_key,
         )
         final_file = f"{nome}_final.png" if path else None
     else:
-        result = client.generate_image(
-            situacao_key=situacao_key,
-            descricao_custom=acao,
-            cenario_custom=cenario,
-            nome_arquivo=nome,
+        result = await asyncio.to_thread(
+            lambda: client.generate_image(
+                situacao_key=situacao_key,
+                descricao_custom=acao,
+                cenario_custom=cenario,
+                nome_arquivo=nome,
+                api_key=resolution.api_key,
+            )
         )
         path = result.path if result else None
         final_file = f"{nome}.png" if path else None
+
+    if path:
+        await _increment_usage(session, current_user.id, resolution.tier)
 
     return {
         "success": path is not None,
@@ -52,13 +102,22 @@ def generate_single(req: SingleRequest):
         "path": path,
         "refined": req.auto_refine,
         "refinement_passes": req.refinement_passes if req.auto_refine else 0,
+        "tier": resolution.tier,
+        "key_mode": resolution.mode,
     }
 
 
 @router.post("/refine", summary="Refina uma imagem existente", tags=["Refinamento"])
-def refine_existing(req: RefineRequest):
+async def refine_existing(
+    req: RefineRequest,
+    force_tier: str | None = Query(None, pattern="^(free|paid)$"),
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
     from src.image_gen.gemini_client import GeminiImageClient
     from src.api.deps import validate_filename
+
+    resolution = await _resolve_key(force_tier, current_user, session)
 
     validate_filename(req.filename)
     out = output_dir()
@@ -79,17 +138,23 @@ def refine_existing(req: RefineRequest):
     resultados = []
     for i in range(req.passes):
         nome_ref = f"{stem}_ref{i + 1}_{ts}"
-        ref_path = client.refine_image(
-            imagem_base=img,
-            instrucao=req.instrucao,
-            referencias_adicionais=req.referencias_adicionais,
-            nome_arquivo=nome_ref,
+        ref_path = await asyncio.to_thread(
+            lambda im=img, nr=nome_ref: client.refine_image(
+                imagem_base=im,
+                instrucao=req.instrucao,
+                referencias_adicionais=req.referencias_adicionais,
+                nome_arquivo=nr,
+                api_key=resolution.api_key,
+            )
         )
         if ref_path is not None:
             img = PIL.Image.open(ref_path).convert("RGB")
             resultados.append({"pass": i + 1, "file": f"{nome_ref}.png", "path": ref_path})
         else:
             break
+
+    if resultados:
+        await _increment_usage(session, current_user.id, resolution.tier)
 
     return {
         "success": len(resultados) > 0,
@@ -98,16 +163,26 @@ def refine_existing(req: RefineRequest):
         "passes_requested": req.passes,
         "results": resultados,
         "final_file": resultados[-1]["file"] if resultados else None,
+        "tier": resolution.tier,
+        "key_mode": resolution.mode,
     }
 
 
 @router.post("/compose", summary="Background + frase = imagem final")
-async def compose_image(req: ComposeImageRequest):
+async def compose_image(
+    req: ComposeImageRequest,
+    force_tier: str | None = Query(None, pattern="^(free|paid)$"),
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
     from src.image_gen.gemini_client import GeminiImageClient
     from src.image_maker import create_image
     from config import GENERATED_BACKGROUNDS_DIR, OUTPUT_DIR
 
+    resolution = await _resolve_key(force_tier, current_user, session)
+
     bg_path = None
+    generated_bg = False
 
     if req.background_filename:
         candidate = GENERATED_BACKGROUNDS_DIR / req.background_filename
@@ -127,6 +202,9 @@ async def compose_image(req: ComposeImageRequest):
                     client.generate_with_refinement,
                     req.situacao, req.descricao_custom, req.cenario_custom,
                     req.refinement_passes,
+                    "",  # instrucao_refinamento
+                    "",  # nome_arquivo
+                    resolution.api_key,
                 )
             else:
                 bg_result = await asyncio.to_thread(
@@ -135,9 +213,12 @@ async def compose_image(req: ComposeImageRequest):
                         descricao_custom=req.descricao_custom,
                         cenario_custom=req.cenario_custom,
                         phrase_context=phrase_ctx,
+                        api_key=resolution.api_key,
                     )
                 )
                 bg_path = bg_result.path if bg_result else None
+            if bg_path:
+                generated_bg = True
 
     if bg_path is None:
         from config import BACKGROUNDS_DIR
@@ -148,9 +229,14 @@ async def compose_image(req: ComposeImageRequest):
 
     image_path = await asyncio.to_thread(create_image, req.phrase, bg_path)
 
+    if generated_bg:
+        await _increment_usage(session, current_user.id, resolution.tier)
+
     return {
         "success": True,
         "image_path": image_path,
         "phrase": req.phrase,
         "background": bg_path,
+        "tier": resolution.tier,
+        "key_mode": resolution.mode,
     }
