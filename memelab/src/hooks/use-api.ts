@@ -156,3 +156,9 @@ export function useBestTimes() {
     revalidateOnFocus: false,
   });
 }
+
+export function useUsage() {
+  return useSWR("usage", () => api.getUsage(), {
+    refreshInterval: 30000,
+  });
+}
