@@ -12,6 +12,8 @@ import logging
 import random
 from dataclasses import dataclass, field
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from config import COMFYUI_MAX_CONCURRENT, GEMINI_MAX_CONCURRENT, GEMINI_IMAGE_ENABLED, IMAGE_BACKEND_PRIORITY
 from src.image_maker import create_image
 from src.pipeline.models_v2 import WorkOrder, event_to_trend_item
@@ -144,12 +146,17 @@ class ImageWorker:
             logger.warning(f"[{work_order.order_id}] ComfyUI falhou: {e}")
         return None, "static", {}
 
-    async def compose(self, phrase: str, work_order: WorkOrder) -> ComposeResult:
+    async def compose(
+        self, phrase: str, work_order: WorkOrder,
+        user_id: int | None = None, session: AsyncSession | None = None,
+    ) -> ComposeResult:
         """Gera imagem composta para uma frase.
 
         Args:
             phrase: texto da frase para compor na imagem
             work_order: ordem de trabalho com metadados do tema
+            user_id: optional user ID for quota pre-check
+            session: optional DB session for quota pre-check
 
         Returns:
             ComposeResult com caminho da imagem e metadata
@@ -167,32 +174,50 @@ class ImageWorker:
         bg = None
         bg_source = "static"
         gen_metadata = {}
+        fallback_reason = None
 
-        # Determinar backend baseado no background_mode
-        mode = self._background_mode
-        if mode == "static":
-            # Pula todos os backends — vai direto pro fallback estatico
-            pass
-        elif mode == "comfyui":
-            bg, bg_source, gen_metadata = await self._try_comfyui(work_order, topic, situacao_key)
-        elif mode == "gemini":
-            bg, bg_source, gen_metadata = await self._try_gemini(work_order, phrase, situacao_key)
-        else:
-            # auto: usa prioridade configurada com fallback
-            if IMAGE_BACKEND_PRIORITY == "comfyui":
+        # Pre-check: quota exhaustion (D-04, D-05)
+        if user_id is not None and session is not None and self._background_mode not in ("static", "comfyui"):
+            try:
+                from src.services.key_selector import UsageAwareKeySelector
+                selector = UsageAwareKeySelector()
+                resolution = await selector.resolve(user_id=user_id, session=session)
+                if resolution.tier == "exhausted":
+                    logger.warning("Both tiers exhausted, using static fallback")
+                    fallback_reason = "quota_exhausted"
+                    bg = random.choice(self._generator.backgrounds)
+                    bg_source = "static"
+                    gen_metadata = {"theme_key": situacao_key, "fallback_reason": fallback_reason}
+            except Exception as e:
+                logger.warning(f"Quota pre-check failed ({e}), continuing with normal flow")
+
+        # Determinar backend baseado no background_mode (skip if pre-check already resolved)
+        if bg is None:
+            mode = self._background_mode
+            if mode == "static":
+                # Pula todos os backends — vai direto pro fallback estatico
+                fallback_reason = "mode_static"
+            elif mode == "comfyui":
                 bg, bg_source, gen_metadata = await self._try_comfyui(work_order, topic, situacao_key)
-                if bg is None:
-                    bg, bg_source, gen_metadata = await self._try_gemini(work_order, phrase, situacao_key)
-            else:
+            elif mode == "gemini":
                 bg, bg_source, gen_metadata = await self._try_gemini(work_order, phrase, situacao_key)
-                if bg is None:
+            else:
+                # auto: usa prioridade configurada com fallback
+                if IMAGE_BACKEND_PRIORITY == "comfyui":
                     bg, bg_source, gen_metadata = await self._try_comfyui(work_order, topic, situacao_key)
+                    if bg is None:
+                        bg, bg_source, gen_metadata = await self._try_gemini(work_order, phrase, situacao_key)
+                else:
+                    bg, bg_source, gen_metadata = await self._try_gemini(work_order, phrase, situacao_key)
+                    if bg is None:
+                        bg, bg_source, gen_metadata = await self._try_comfyui(work_order, topic, situacao_key)
 
         # Fallback final: background estatico
         if bg is None:
             bg = random.choice(self._generator.backgrounds)
             bg_source = "static"
-            gen_metadata = {"theme_key": situacao_key}
+            fallback_reason = fallback_reason or "generation_failed"
+            gen_metadata = {"theme_key": situacao_key, "fallback_reason": fallback_reason}
             logger.debug(f"[{work_order.order_id}] Usando background estatico: {bg}")
 
         # Compor imagem final com Pillow (layout do WorkOrder)
@@ -201,6 +226,9 @@ class ImageWorker:
             create_image, phrase, bg, None, self._watermark_text, layout,
         )
         gen_metadata["layout"] = layout
+        # Ensure fallback_reason in metadata for all static backgrounds
+        if bg_source == "static" and "fallback_reason" not in gen_metadata:
+            gen_metadata["fallback_reason"] = fallback_reason or "generation_failed"
         logger.info(f"[{work_order.order_id}] Imagem gerada (layout={layout}): {image_path}")
 
         return ComposeResult(
