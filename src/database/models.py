@@ -172,8 +172,8 @@ class PipelineRun(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
-    character_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("characters.id"), nullable=False
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default="queued")
     mode: Mapped[str] = mapped_column(String(20), default="agents", server_default="agents")
