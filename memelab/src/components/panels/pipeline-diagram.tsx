@@ -43,61 +43,49 @@ interface LayerDef {
 }
 
 const COLORS = [C.cobalt, C.indigo, C.violet, C.pink, C.peri] as const;
-const ICONS  = ["⬡", "⇌", "✦", "◈", "✧"]               as const;
+const ICONS  = ["✎", "◈", "⬡", "✦", "✧"]               as const;
 
 const PIPELINE: LayerDef[] = [
   {
-    id: "L1", label: "Monitoring", desc: "Fetch paralelo de trends",
-    flow: "parallel", output: "TrendEvents",
+    id: "L1", label: "Input", desc: "Tema + frases",
+    flow: "sequential", output: "Frases",
     steps: [
-      { id: "google_trends",     label: "Google Trends" },
-      { id: "reddit_memes",      label: "Reddit RSS"    },
-      { id: "rss_feeds",         label: "RSS Feeds"     },
-      { id: "youtube_rss",       label: "YouTube RSS"   },
-      { id: "gemini_web_trends", label: "Gemini Trends" },
-      { id: "brazil_viral_rss",  label: "Brasil Viral"  },
-      { id: "bluesky_trends",    label: "BlueSky"     },
-      { id: "hackernews_rss",    label: "HackerNews"  },
-      { id: "lemmy_communities", label: "Lemmy"       },
-      { id: "tiktok_trends",     label: "TikTok",    stub: true },
-      { id: "instagram_explore", label: "Instagram", stub: true },
-      { id: "twitter_x",         label: "Twitter/X", stub: true },
+      { id: "topic",   label: "Tema / Topico" },
+      { id: "phrases", label: "PhraseWorker (Gemini)" },
     ],
   },
   {
-    id: "L2", label: "Broker", desc: "Dedup + ranking",
-    flow: "sequential", output: "Ranked Events",
+    id: "L2", label: "Background", desc: "Resolucao de imagem",
+    flow: "parallel", output: "Backgrounds",
     steps: [
-      { id: "ingest", label: "Ingest Queue" },
-      { id: "dedup",  label: "Dedup Filter" },
-      { id: "rank",   label: "Rank & Sort"  },
+      { id: "pool",   label: "Pool Estatico (por tema)" },
+      { id: "gemini", label: "Gemini Image (opcional)" },
     ],
   },
   {
-    id: "L3", label: "Curator", desc: "Gemini seleciona",
-    flow: "sequential", output: "WorkOrders",
+    id: "L3", label: "Compose", desc: "Montagem do meme",
+    flow: "sequential", output: "Memes",
     steps: [
-      { id: "analyze",     label: "Gemini Analyzer" },
-      { id: "keyword_map", label: "Keyword Map"     },
-      { id: "work_orders", label: "WorkOrders"      },
+      { id: "overlay",   label: "Pillow Overlay" },
+      { id: "watermark", label: "Watermark" },
+      { id: "save",      label: "Salvar PNG" },
     ],
   },
   {
-    id: "L4", label: "Generation", desc: "Frases + backgrounds + composicao",
+    id: "L4", label: "Post-Prod", desc: "Enriquecimento",
     flow: "parallel", output: "ContentPackages",
-    steps: [
-      { id: "phrases",    label: "PhraseWorker" },
-      { id: "backgrounds", label: "BackgroundResolver" },
-      { id: "compose",    label: "ImageComposer" },
-    ],
-  },
-  {
-    id: "L5", label: "Post-Prod", desc: "Enriquecimento",
-    flow: "parallel", output: "Pacotes Finais",
     steps: [
       { id: "caption",  label: "CaptionWorker"  },
       { id: "hashtags", label: "HashtagWorker"  },
-      { id: "quality",  label: "QualityWorker"  },
+    ],
+  },
+  {
+    id: "L5", label: "Output", desc: "Pacotes finais",
+    flow: "sequential", output: "Publicacao",
+    steps: [
+      { id: "approve",  label: "Aprovacao" },
+      { id: "schedule", label: "Agendamento" },
+      { id: "publish",  label: "Publicacao", stub: true },
     ],
   },
 ];
@@ -117,11 +105,10 @@ const STAGGER_Y = [20, -20, 30, -20, 20];
 const BASE_Y    = 40;
 
 const EDGES_DEF = [
-  { id: "e1", from: "L1",     to: "L2"     },
-  { id: "e2", from: "L2",     to: "L3"     },
-  { id: "e3", from: "L3",     to: "L4"     },
-  { id: "e4", from: "L4",     to: "L5"     },
-  { id: "e5", from: "L5",     to: "output" },
+  { id: "e1", from: "L1", to: "L2" },
+  { id: "e2", from: "L2", to: "L3" },
+  { id: "e3", from: "L3", to: "L4" },
+  { id: "e4", from: "L4", to: "L5" },
 ];
 
 const GAP = 52;
@@ -139,19 +126,10 @@ function makeNodes(): CNode[] {
     color:       COLORS[i],
     pipelineIdx: i,
   }));
-
-  const lastX = 20 + 5 * (NW + GAP);
-  nodes.push({
-    id: "output", x: lastX, y: BASE_Y + 10,
-    w: 140, h: 68,
-    label: "Output", sub: "*.png + meta",
-    icon: "◇", color: C.lav, pipelineIdx: -1,
-  });
   return nodes;
 }
 
 function getStatus(id: string, layers?: Record<string, LayerStatus>): Status {
-  if (id === "output") return layers?.L5?.status === "done" ? "done" : "idle";
   return (layers?.[id]?.status ?? "idle") as Status;
 }
 
@@ -868,57 +846,51 @@ interface LogEntry {
 }
 
 const LAYER_META: Record<string, { icon: string; color: string; label: string }> = {
-  L1: { icon: "⬡", color: C.cobalt, label: "Monitoring" },
-  L2: { icon: "⇌", color: C.indigo, label: "Broker" },
-  L3: { icon: "✦", color: C.violet, label: "Curator" },
-  L4: { icon: "◈", color: C.pink,   label: "Generation" },
-  L5: { icon: "✧", color: C.peri,   label: "Post-Prod" },
+  L1: { icon: "✎", color: C.cobalt, label: "Input" },
+  L2: { icon: "◈", color: C.indigo, label: "Background" },
+  L3: { icon: "⬡", color: C.violet, label: "Compose" },
+  L4: { icon: "✦", color: C.pink,   label: "Post-Prod" },
+  L5: { icon: "✧", color: C.peri,   label: "Output" },
 };
 
 const LAYER_START_MSGS: Record<string, string> = {
-  L1: "Iniciando fetch paralelo de trends — 6 agents ativos",
-  L2: "Ingestao de eventos na fila de deduplicacao",
-  L3: "Gemini Analyzer selecionando melhores temas",
-  L4: "Gerando frases, resolvendo backgrounds e compondo memes",
-  L5: "Enriquecimento: caption, hashtags e quality score",
+  L1: "Processando tema e gerando frases via Gemini",
+  L2: "Resolvendo backgrounds — pool estatico ou Gemini Image",
+  L3: "Compondo memes — overlay de frase + watermark",
+  L4: "Gerando captions e hashtags",
+  L5: "Preparando pacotes para aprovacao",
 };
 
 const LAYER_DONE_MSGS: Record<string, string> = {
-  L1: "Coleta de trends concluida",
-  L2: "Ranking e deduplicacao finalizados",
-  L3: "WorkOrders criadas com sucesso",
-  L4: "Frases e imagens geradas",
-  L5: "Pacotes finais prontos para publicacao",
+  L1: "Frases geradas com sucesso",
+  L2: "Backgrounds resolvidos",
+  L3: "Memes compostos",
+  L4: "Captions e hashtags prontos",
+  L5: "Pacotes prontos para publicacao",
 };
 
 const LAYER_DETAIL_MSGS: Record<string, string[]> = {
   L1: [
-    "Google Trends BR — buscando topicos em alta",
-    "Reddit RSS — verificando 8 subreddits brasileiros",
-    "RSS Feeds — Sensacionalista + portais",
-    "YouTube RSS — canais BR verificados",
-    "Gemini Web Trends — grounding com Google Search",
-    "Brasil Viral RSS — HUEstation, Metropoles, Omelete",
+    "Recebendo tema ou frases literais do usuario",
+    "PhraseWorker — gerando frases via Gemini text API",
   ],
   L2: [
-    "Ingerindo eventos na asyncio.Queue",
-    "Filtrando duplicatas por similaridade",
-    "Ranking por score multi-fonte",
+    "Pool estatico — selecionando por tema do diretorio local",
+    "Gemini Image — geracao com refs visuais (quando ativado)",
   ],
   L3: [
-    "Gemini analisando relevancia e potencial viral",
-    "Mapeando keywords para situacoes visuais",
-    "Emitindo WorkOrders com situacao_key",
+    "Pillow — overlay de frase sobre background",
+    "Watermark — aplicando marca d'agua do personagem",
+    "Salvando PNG final em output/",
   ],
   L4: [
-    "PhraseWorker — gerando frases via Gemini API",
-    "BackgroundResolver — Gemini Image ou pool estatico por tema",
-    "ImageComposer — Pillow overlay (frase + watermark)",
-  ],
-  L5: [
     "CaptionWorker — legendas Instagram com CTA",
     "HashtagWorker — hashtags trending + branded",
-    "QualityWorker — scoring de qualidade final",
+  ],
+  L5: [
+    "Aguardando aprovacao manual",
+    "Agendamento de publicacao",
+    "Publicacao automatica (em breve)",
   ],
 };
 
@@ -1265,7 +1237,7 @@ function useLayerLogs(
         let extra = "";
         if (id === "L1" && stats?.trends) extra = ` — ${stats.trends} eventos coletados`;
         if (id === "L3" && stats?.orders) extra = ` — ${stats.orders} work orders`;
-        if (id === "L4" && stats?.images) extra = ` — ${stats.images} imagens geradas`;
+        if (id === "L3" && stats?.images) extra = ` — ${stats.images} memes compostos`;
         if (id === "L5" && stats?.packages) extra = ` — ${stats.packages} pacotes finais`;
         addLog(id, (LAYER_DONE_MSGS[id] ?? `${meta.label} concluido`) + extra, "success");
       }
