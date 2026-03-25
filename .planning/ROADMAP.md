@@ -17,7 +17,7 @@
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 12: Pipeline Simplification** - Manual pipeline mode with static backgrounds and Pillow composition, zero Gemini Image calls
-- [ ] **Phase 13: Tenant Isolation** - Per-user data scoping across all resources with admin bypass
+- [x] **Phase 13: Tenant Isolation** - Per-user data scoping across all resources with admin bypass (completed 2026-03-25)
 - [ ] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, CDN image upload, token lifecycle management
 - [ ] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts
 - [ ] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history
@@ -129,7 +129,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 12. Pipeline Simplification | 2/3 | In Progress|  |
-| 13. Tenant Isolation | 2/3 | In Progress|  |
+| 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
