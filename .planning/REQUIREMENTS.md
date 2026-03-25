@@ -16,10 +16,10 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 
 ### Multi-Tenant Isolation
 
-- [ ] **TENANT-01**: User sees only their own data across all resources (characters, runs, images, posts)
-- [ ] **TENANT-02**: All tables have user_id FK with scoped queries (pipeline_runs, content_packages, generated_images, scheduled_posts, work_orders, batch_jobs, themes)
-- [ ] **TENANT-03**: Admin user can access all users' data via admin bypass
-- [ ] **TENANT-04**: Cross-user data access returns 403 (not 404)
+- [x] **TENANT-01**: User sees only their own data across all resources (characters, runs, images, posts)
+- [x] **TENANT-02**: All tables have user_id FK with scoped queries (pipeline_runs, content_packages, generated_images, scheduled_posts, work_orders, batch_jobs, themes)
+- [x] **TENANT-03**: Admin user can access all users' data via admin bypass
+- [x] **TENANT-04**: Cross-user data access returns 403 (not 404)
 
 ### Instagram Auto-Publishing
 
@@ -96,10 +96,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PIPE-02 | Phase 12 | Complete |
 | PIPE-03 | Phase 12 | Complete |
 | PIPE-04 | Phase 12 | Complete |
-| TENANT-01 | Phase 13 | Pending |
-| TENANT-02 | Phase 13 | Pending |
-| TENANT-03 | Phase 13 | Pending |
-| TENANT-04 | Phase 13 | Pending |
+| TENANT-01 | Phase 13 | Complete |
+| TENANT-02 | Phase 13 | Complete |
+| TENANT-03 | Phase 13 | Complete |
+| TENANT-04 | Phase 13 | Complete |
 | PUB-01 | Phase 14 | Pending |
 | PUB-02 | Phase 14 | Pending |
 | PUB-07 | Phase 14 | Pending |

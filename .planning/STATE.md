@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Ready to execute
-stopped_at: Phase 13 context gathered
-last_updated: "2026-03-25T02:25:23.114Z"
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-03-25T02:55:52.433Z"
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 3
-  completed_plans: 2
+  total_plans: 6
+  completed_plans: 3
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 12 — pipeline-simplification
+**Current focus:** Phase 13 — tenant-isolation
 
 ## Current Position
 
-Phase: 12 (pipeline-simplification) — EXECUTING
-Plan: 3 of 3
+Phase: 13 (tenant-isolation) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Plan: 3 of 3
 *Updated after each plan completion*
 | Phase 12 P01 | 9min | 2 tasks | 9 files |
 | Phase 12 P02 | 8min | 2 tasks | 4 files |
+| Phase 13 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Hex color passed via background_path param — avoids new parameter, detected by startswith('#')
 - [Phase 12]: Manual pipeline forces background_mode=static and use_gemini_image=False — zero Gemini Image calls guaranteed
 - [Phase 12]: Optimistic UI updates for approve/reject — immediate feedback, revert on API error
+- [Phase 13]: Fetch-then-check pattern for 403 vs 404 distinction in CharacterRepository
+- [Phase 13]: PermissionError at repo level, HTTPException 403 at deps.py helper level
 
 ### Pending Todos
 
@@ -77,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T02:25:23.111Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-tenant-isolation/13-CONTEXT.md
+Last session: 2026-03-25T02:55:52.429Z
+Stopped at: Completed 13-01-PLAN.md
+Resume file: None
