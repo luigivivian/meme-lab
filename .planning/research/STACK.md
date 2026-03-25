@@ -1,249 +1,246 @@
-# Technology Stack — Auth, Rate Limiting & API Usage Control
+# Technology Stack -- v2.0 New Feature Additions
 
-**Project:** Clip-Flow Auth Milestone
-**Researched:** 2026-03-23
-**Scope:** Libraries to add on top of existing FastAPI + SQLAlchemy 2.0 async + MySQL + Next.js 15
-
----
-
-## Context
-
-This milestone adds auth, rate limiting, and Gemini API usage control to an existing system.
-The constraint is "maintain stack" — no new frameworks, no Redis, no external auth services.
-Everything must work with what's already present: FastAPI, SQLAlchemy 2.0 async, aiomysql, MySQL.
-
-The existing `cryptography>=42.0` is already installed as a transitive dependency.
+**Project:** Clip-Flow v2.0 (Pipeline Simplification, Auto-Publishing, Multi-Tenant)
+**Researched:** 2026-03-24
+**Overall confidence:** HIGH -- all recommendations verified against codebase; version pins use >= to let pip resolve latest compatible
 
 ---
 
-## Recommended Additions
+## Existing Stack (reference only -- NOT re-researched)
 
-### 1. Password Hashing
+- Python 3.14, FastAPI, SQLAlchemy 2.0 async, MySQL/aiomysql, Alembic (8 migrations)
+- Next.js 15, TypeScript, Tailwind CSS v4, Radix UI, SWR 2.x, Framer Motion, Lucide React
+- Google Gemini API (text), Pillow, bcrypt, PyJWT (`import jwt`), httpx, APScheduler
+- cryptography (Fernet for API key encryption), PyYAML, feedparser
+- 14 ORM tables, users + refresh_tokens + api_usage already exist
 
-| Library | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `passlib[bcrypt]` | `>=1.7.4` | Hash + verify passwords | Industry standard for FastAPI auth. bcrypt extra pulls `bcrypt>=4.0` which is actively maintained. `passlib` provides a stable API over the underlying bcrypt implementation and handles salting automatically. |
-
-**Confidence:** HIGH — passlib[bcrypt] is the explicit recommendation in FastAPI's official security documentation.
-
-**What NOT to use:**
-- `argon2-cffi` directly: stronger algorithm but passlib's argon2 support is less ergonomic. For v1 with a single admin, bcrypt is sufficient and has better FastAPI ecosystem support.
-- Rolling your own with `hashlib`: never do this. bcrypt is designed for passwords (slow by design); SHA-256/SHA-512 are not.
-
-```bash
-pip install "passlib[bcrypt]>=1.7.4"
-```
+**Gap found:** PyJWT is used in `src/auth/jwt.py` but NOT listed in `requirements.txt`. Add `PyJWT>=2.8.0` to requirements.txt during next phase.
 
 ---
 
-### 2. JWT Token Generation & Validation
+## Recommended Stack
 
-| Library | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `python-jose[cryptography]` | `>=3.3.0` | Create and validate JWT tokens | Most widely used JWT library in the FastAPI ecosystem. The `[cryptography]` extra uses the already-installed `cryptography` package for HS256/RS256. Minimal dependency footprint. |
+### New Python Backend Libraries (5 packages)
 
-**Confidence:** HIGH — python-jose[cryptography] is used in FastAPI's official JWT tutorial and all major FastAPI boilerplates as of 2025.
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **aiosmtplib** | >=2.0.0 | Async SMTP for password reset emails | Native asyncio, works with FastAPI without blocking. ~50KB. Universal: swap SMTP provider by changing env vars. |
+| **pyotp** | >=2.9.0 | TOTP 2FA generation/verification | De facto Python TOTP library. RFC 6238 compliant. Zero dependencies. Works with Google Authenticator, Authy, 1Password. |
+| **qrcode[pil]** | >=8.0 | QR code for authenticator app setup | Generates PNG QR codes users scan to set up 2FA. `[pil]` extra uses Pillow (already installed). |
+| **authlib** | >=1.3.0 | Google OAuth 2.0 / OpenID Connect | Full OAuth2+OIDC. Integrates natively with httpx (already in stack) via `AsyncOAuth2Client`. Handles Google login flow. |
+| **stripe** | >=11.0.0 | Stripe billing SDK (official) | Official Python SDK. Subscriptions, invoices, webhooks, customer portal. Supports BRL. |
 
-**What NOT to use:**
-- `PyJWT`: also valid, roughly equivalent. python-jose has a slightly simpler API for the specific FastAPI `Depends()` pattern and is what official docs show. Either works; pick one and stay consistent. Recommendation: python-jose to match official docs.
-- `authlib`: excellent library but designed for full OAuth2 flows. Overkill for email+password JWT in an internal tool.
+### New Frontend Libraries (1 package)
 
-```bash
-pip install "python-jose[cryptography]>=3.3.0"
-```
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **recharts** | >=2.15.0 | Dashboard charts (usage history, cost reports) | Built on D3, React-native components. Declarative API. ~45KB gzipped. Most popular React chart library. |
+
+### Infrastructure (no new services)
+
+No new infrastructure needed. MySQL handles everything. No Redis, no message queue, no new databases.
 
 ---
 
-### 3. FastAPI OAuth2 Password Flow (built-in, zero install)
+## Detailed Rationale by Feature Area
 
-FastAPI includes `fastapi.security.OAuth2PasswordBearer` and `fastapi.security.OAuth2PasswordRequestForm` in its standard library. These integrate directly with FastAPI's `Depends()` and appear in Swagger UI as a proper "Authorize" button.
+### 1. Instagram Auto-Publishing
 
-**Confidence:** HIGH — part of FastAPI stdlib since v0.63.
+**No new libraries needed.** Existing code fully covers this.
 
-**Pattern:**
+| Component | File | Status |
+|-----------|------|--------|
+| Instagram Graph API client | `src/services/instagram_client.py` | COMPLETE -- async httpx, image/carousel/reel/insights |
+| Publishing service | `src/services/publisher.py` | COMPLETE -- queue processing, retry logic, platform dispatch |
+| Scheduler worker | `src/services/scheduler_worker.py` | COMPLETE -- APScheduler 60s interval |
+
+**What needs wiring (zero new deps):**
+- Connect `InstagramClient` into `PublishingService._publish_instagram()` (currently returns placeholder -- line 146)
+- Facebook long-lived token exchange via httpx (standard HTTP calls to `graph.facebook.com/oauth/access_token`)
+- Per-user `INSTAGRAM_ACCESS_TOKEN` + `INSTAGRAM_BUSINESS_ID` storage in users table (multi-tenant)
+- Image URL exposure: configure `INSTAGRAM_CDN_BASE` or use FastAPI static files + ngrok/tunnel
+
+**Calendar UI:** recharts handles timeline visualization, existing Radix components handle date inputs.
+
+**Confidence:** HIGH -- code reviewed directly, all methods implemented.
+
+---
+
+### 2. SMTP for Password Reset Emails
+
+**Use aiosmtplib because** it is the standard async SMTP client for Python. Direct use, no framework wrapper needed for 2 email types (password reset + optional verification).
+
+| Rejected | Reason |
+|----------|--------|
+| `smtplib` (stdlib) | Synchronous. Would need `asyncio.to_thread()` for every send. |
+| `fastapi-mail` | Wraps aiosmtplib + Jinja2. Overkill for 2 email types. |
+| SendGrid/Mailgun SDK | Vendor lock-in. SMTP is universal: swap provider by changing 4 env vars. |
+
+**Implementation pattern:**
 ```python
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import aiosmtplib
+from email.message import EmailMessage
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+async def send_reset_email(to: str, reset_token: str):
+    msg = EmailMessage()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to
+    msg["Subject"] = "Redefinir senha - Clip-Flow"
+    msg.set_content(f"Link: {FRONTEND_URL}/reset-password?token={reset_token}")
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
-    ...
+    await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT,
+                          username=SMTP_USER, password=SMTP_PASS, use_tls=True)
 ```
 
-This is the correct approach for stateless JWT auth in FastAPI. No additional library needed.
+**DB addition:** `password_reset_tokens` table (token_hash, user_id, expires_at, used_at). Tokens expire in 1 hour, single-use.
+
+**Confidence:** HIGH
 
 ---
 
-### 4. Rate Limiting — MySQL-Backed (no Redis required)
+### 3. TOTP for Two-Factor Authentication (2FA)
 
-**Decision: Custom sliding-window counter in MySQL via SQLAlchemy, not slowapi.**
+**Use pyotp because** there is no competing library worth considering. pyotp IS the Python TOTP library (~3.5k GitHub stars, actively maintained, zero deps, RFC 6238).
 
-Rationale:
-- `slowapi` (the standard FastAPI rate limiter) wraps `limits` library, which defaults to in-memory or Redis backends. The in-memory backend is per-process and doesn't persist across restarts. Redis would be a new infrastructure dependency.
-- The project already has MySQL + SQLAlchemy 2.0 async. A `api_usage` table (see Database section) stores requests per user per day and serves double duty as rate limiting state AND usage dashboard data. No new dependency, no new infrastructure.
-- For this workload (single-user or small team using a meme generator), MySQL-based rate limiting is completely adequate. A Redis Semaphore adds complexity with no benefit.
-
-**What NOT to use:**
-- `slowapi` with in-memory backend: resets on every server restart, doesn't work across multiple processes.
-- `slowapi` with Redis: valid architecture but adds Redis as a new infrastructure dependency, violating the "maintain stack" constraint.
-- `starlette-exceptionhandlers` + custom middleware: unnecessarily complex.
-
-**Implementation pattern (no extra pip install):**
+**Implementation pattern:**
 ```python
-# In deps.py — check usage before each protected endpoint
-async def check_rate_limit(user_id: int, api_key_tier: str, session: AsyncSession):
-    today_count = await usage_repo.count_today(user_id, "gemini_image")
-    limit = FREE_TIER_LIMIT if api_key_tier == "free" else PAID_TIER_LIMIT
-    if today_count >= limit:
-        raise HTTPException(429, detail="Daily limit reached")
+import pyotp, qrcode, io
+
+def setup_2fa(email: str) -> tuple[str, bytes]:
+    secret = pyotp.random_base32()
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=email, issuer_name="Clip-Flow")
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return secret, buf.getvalue()
+
+def verify_2fa(secret: str, code: str) -> bool:
+    return pyotp.TOTP(secret).verify(code, valid_window=1)  # +/- 30s tolerance
 ```
+
+**DB additions on `users` table:**
+- `totp_secret` VARCHAR(64) nullable -- encrypted with Fernet (cryptography already installed)
+- `totp_enabled` BOOLEAN default false
+- New `backup_codes` table -- hashed recovery codes (10 codes, bcrypt-hashed)
+
+**Auth flow change:** After successful password login, if `totp_enabled=true`, return a temporary `2fa_required` response instead of the JWT. Frontend shows TOTP input. Second request with code completes login and returns JWT.
+
+**Confidence:** HIGH
 
 ---
 
-### 5. Frontend Auth — Next.js 15 (existing stack)
+### 4. OAuth Google Login
 
-| Library | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| No new library — use built-in `fetch` + React state | — | HTTP calls to `/auth/token` and `/auth/me` | The existing memeLab frontend already uses direct `fetch` calls via `src/lib/api.ts`. Adding a full auth library (NextAuth, Auth.js) would be overkill for a simple JWT login form. |
-| `js-cookie` | `>=3.0.5` | Store JWT token in httpOnly-compatible cookie | Thin (800 bytes), widely used. Needed for persistent login across page refreshes. Alternative: `localStorage` — simpler but less secure. For a single-user internal tool, localStorage is acceptable; js-cookie is slightly better practice. |
+**Use authlib because** it provides full OAuth2+OIDC with native httpx integration (`AsyncOAuth2Client`). Handles Google, GitHub, any provider. Well-maintained (~4k stars).
 
-**Confidence:** MEDIUM — based on codebase analysis of existing `api.ts` pattern. Verified that Next.js 15 App Router works fine with a simple custom auth context + fetch approach.
+| Rejected | Reason |
+|----------|--------|
+| `python-social-auth` | Heavy Django-oriented framework. Brings its own ORM, pipelines, session management. Overkill. |
+| Manual OAuth (python-jose) | Requires building entire flow: state, PKCE, token exchange, JWKS verification. Error-prone. |
+| `fastapi-sso` | Thin wrapper, limited providers, less maintained than authlib. |
 
-**What NOT to use:**
-- `NextAuth` / `Auth.js`: excellent for production multi-tenant SaaS, but adds significant complexity (database adapter, session management, callback URLs). The milestone explicitly rules out OAuth and keeps auth simple.
-- `@tanstack/react-query` for auth state: the existing code uses plain hooks (`use-api.ts`). Consistent to keep that pattern.
+**Note:** authlib does NOT replace PyJWT. authlib handles the Google OAuth dance; PyJWT continues to issue app JWTs.
 
-```bash
-cd memelab && npm install js-cookie@>=3.0.5 @types/js-cookie
-```
-
----
-
-## Database Schema (New Tables)
-
-Two new tables via Alembic migration. No new ORM library — uses existing SQLAlchemy 2.0 patterns.
-
-### Table: `users`
-
+**Implementation pattern:**
 ```python
-class User(TimestampMixin, Base):
-    __tablename__ = "users"
+from authlib.integrations.httpx_client import AsyncOAuth2Client
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[str] = mapped_column(String(20), default="user", server_default="user")  # admin | user
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+google = AsyncOAuth2Client(
+    client_id=GOOGLE_OAUTH_CLIENT_ID,
+    client_secret=GOOGLE_OAUTH_CLIENT_SECRET,
+    redirect_uri=f"{API_URL}/auth/google/callback",
+)
 
-    # API key tiers
-    gemini_free_key: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    gemini_paid_key: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    active_key_tier: Mapped[str] = mapped_column(String(10), default="free", server_default="free")
-
-    # Multi-tenant prep: will FK to characters eventually
-    usage_logs: Mapped[list["ApiUsageLog"]] = relationship(back_populates="user")
+# Route: /auth/google -> redirect to Google consent screen
+# Route: /auth/google/callback -> exchange code, get user info, create/link account, issue JWT
 ```
 
-**Note on API key storage:** Store encrypted at rest using `cryptography.fernet.Fernet` (already available via `cryptography>=42.0`). Never store plaintext API keys in the database.
+**DB additions on `users` table:**
+- `oauth_provider` VARCHAR(20) nullable -- "google" or null for email/password
+- `oauth_id` VARCHAR(255) nullable -- Google unique user ID
+- `password_hash` becomes nullable (OAuth-only users have no password)
 
-### Table: `api_usage_logs`
+**Confidence:** HIGH
 
+---
+
+### 5. Stripe for Billing/Payment (Multi-Tenant)
+
+**Use Stripe Checkout (hosted), not custom payment forms.** This means:
+- Backend creates a Checkout Session URL, frontend redirects to it
+- Zero frontend Stripe SDK needed (`@stripe/react-stripe-js` NOT required)
+- Stripe handles PCI compliance, card input, 3D Secure
+- Customer Portal for subscription management (self-service, less backend code)
+
+**Implementation pattern:**
 ```python
-class ApiUsageLog(Base):
-    __tablename__ = "api_usage_logs"
+import stripe
+stripe.api_key = STRIPE_SECRET_KEY
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    api_service: Mapped[str] = mapped_column(String(50), nullable=False)  # gemini_image | gemini_text | pipeline_run
-    key_tier: Mapped[str] = mapped_column(String(10), nullable=False)  # free | paid
-    status: Mapped[str] = mapped_column(String(20), nullable=False)  # success | rate_limited | error | fallback_static
-    endpoint: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    used_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False, index=True)
+# Checkout session for subscription
+session = stripe.checkout.Session.create(
+    customer=customer_stripe_id,
+    mode="subscription",
+    line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+    success_url=f"{FRONTEND_URL}/billing?success=true",
+    cancel_url=f"{FRONTEND_URL}/billing?canceled=true",
+)
+# Return session.url to frontend -> frontend does window.location.href = url
 
-    __table_args__ = (
-        Index("idx_usage_user_date", "user_id", "used_at"),
-        Index("idx_usage_service", "api_service"),
-    )
+# Webhook handler (critical for subscription state)
+@app.post("/webhooks/stripe")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig = request.headers["stripe-signature"]
+    event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    match event.type:
+        case "customer.subscription.created": ...
+        case "customer.subscription.updated": ...
+        case "customer.subscription.deleted": ...
+        case "invoice.payment_failed": ...
 ```
 
-This single table serves three purposes:
-1. Rate limiting: `COUNT(*) WHERE user_id=X AND api_service='gemini_image' AND DATE(used_at)=TODAY`
-2. Usage dashboard: daily/weekly aggregates
-3. Fallback tracking: how often did we fall back to static backgrounds
+**DB additions:**
+- `stripe_customer_id` VARCHAR(255) on `users` table
+- New `subscriptions` table: stripe_subscription_id, user_id, plan, status, current_period_start, current_period_end
+
+**Confidence:** HIGH -- official SDK, architecture pattern well-established.
 
 ---
 
-## Gemini API Key Management
+### 6. Dashboard Charts (Frontend)
 
-**Decision: Dual-key in database, per-user, encrypted with Fernet.**
+**Use recharts because** it is built on D3, uses React-native components with declarative API, and is the most popular React charting library. ~45KB gzipped.
 
-| Component | Approach | Why |
-|-----------|----------|-----|
-| Key storage | `cryptography.fernet.Fernet` symmetric encryption, keys stored encrypted in `users.gemini_free_key` | Already have `cryptography>=42.0`. AES-128-CBC + HMAC-SHA256. Single encryption key via `FERNET_KEY` env var. |
-| Key selection | Service layer checks `api_usage_logs` count → use free key → if limit approaching, switch to paid key | Simple state machine. No external service. |
-| Limit tracking | MySQL `api_usage_logs` with `DATE(used_at) = CURDATE()` | Exact counts per day. Resets at midnight naturally. |
-| Fallback | `gemini_image → static backgrounds` | Existing `GeminiImageClient` fallback path is already implemented — just needs a signal to skip Gemini. |
+| Rejected | Reason |
+|----------|--------|
+| `chart.js` + `react-chartjs-2` | Canvas-based, harder to style with Tailwind, imperative API. |
+| `@nivo/core` | Heavier (~100KB+). Overkill for usage/cost charts. |
+| `visx` (Airbnb) | Low-level D3 wrapper. Maximum flexibility but too much effort for standard dashboard charts. |
+| `tremor` | Full dashboard component library. Would conflict with existing Radix UI components. |
 
-**Free tier limits to enforce (from PROJECT.md context, needs validation at runtime):**
-- Imagen 3: ~50 RPM, target daily limit configurable per user
-- Gemini 2.0 Flash (text): 15 RPM, 1500 RPD — track separately
-- Configurable thresholds in `config.py`: `GEMINI_IMAGE_DAILY_LIMIT_FREE=450` (conservative, under the ~500/day estimate)
+**Dashboard v2 charts needed:**
+- 30-day usage history: `LineChart` (API calls per day)
+- Limit alerts (80%/95%): horizontal `ReferenceLine` on the line chart
+- Cost report: `BarChart` (cost per service per period)
 
-**What NOT to do:**
-- Do not call the Google AI Studio API to check quota programmatically. There is no stable programmatic quota API; track usage locally.
-- Do not use environment variables for the second API key. The per-user dual-key model requires database storage.
+**Confidence:** HIGH
 
 ---
 
-## Route Protection Pattern
+### 7. Pipeline Simplification & Multi-Character
 
-Use FastAPI's existing `Depends()` pattern, consistent with how `db_session` works in `deps.py`:
+**No new libraries needed.** Pure architectural refactoring using existing tools.
 
-```python
-# src/api/deps.py additions
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    session: AsyncSession = Depends(db_session),
-) -> User:
-    """Validates JWT and returns current user. Raises 401 if invalid."""
-    ...
+| Change | Uses |
+|--------|------|
+| Decouple trend agents | Code restructuring only |
+| Manual pipeline trigger | FastAPI (existing) |
+| Skip Gemini Image | Pillow (existing) |
+| Theme-based composition | PyYAML (existing) |
+| Per-character pipeline | SQLAlchemy queries filtered by character_id (existing) |
 
-async def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin":
-        raise HTTPException(403, "Admin only")
-    return current_user
-```
-
-Apply to routers via `dependencies=[Depends(get_current_user)]` at the router level, not per-route — cleaner for protecting entire modules.
-
-**CORS update required:** Current `allow_origins=["*"]` must change to specific origin list when credentials are involved. `allow_credentials=True` with wildcard origins is rejected by browsers (CORS spec). Update to `allow_origins=["http://localhost:3000"]` (dev) with a configurable `ALLOWED_ORIGINS` env var.
-
----
-
-## Full Installation Summary
-
-**New Python packages:**
-```bash
-pip install "passlib[bcrypt]>=1.7.4" "python-jose[cryptography]>=3.3.0"
-```
-
-**New Node packages:**
-```bash
-cd memelab && npm install js-cookie@^3.0.5 @types/js-cookie
-```
-
-**New environment variables (.env):**
-```
-JWT_SECRET_KEY=<random 32+ byte hex string>
-JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=480
-FERNET_KEY=<base64-encoded 32-byte key, generated via Fernet.generate_key()>
-GEMINI_IMAGE_DAILY_LIMIT_FREE=450
-ALLOWED_ORIGINS=http://localhost:3000
-```
-
-**New Alembic migration:**
-- `006_add_users_and_usage_logs.py` — creates `users` and `api_usage_logs` tables
+**Confidence:** HIGH
 
 ---
 
@@ -251,25 +248,145 @@ ALLOWED_ORIGINS=http://localhost:3000
 
 | Category | Recommended | Alternative | Why Not |
 |----------|-------------|-------------|---------|
-| Password hashing | `passlib[bcrypt]` | `argon2-cffi` | argon2 is stronger but passlib's argon2 support is less ergonomic; bcrypt is perfectly adequate for v1 |
-| JWT | `python-jose[cryptography]` | `PyJWT` | Both valid; python-jose matches FastAPI official docs, less friction |
-| Rate limiting | Custom MySQL counter | `slowapi` + Redis | Redis is a new infrastructure dependency; MySQL already available |
-| Rate limiting | Custom MySQL counter | `slowapi` in-memory | Resets on restart; per-process only; not persistent |
-| Auth service | Custom JWT | Auth0 / Supabase | External dependency, cost, overkill for single-user tool |
-| Frontend auth | Custom fetch + `js-cookie` | NextAuth / Auth.js | Heavy framework; OAuth setup required; PROJECT.md rules out OAuth for v1 |
-| Key encryption | `cryptography.fernet` | Store as plaintext | Never store API keys plaintext — security baseline requirement |
+| SMTP | aiosmtplib | fastapi-mail | Only 2 email types; direct SMTP is simpler |
+| SMTP | aiosmtplib | SendGrid SDK | Vendor lock-in; SMTP is universal |
+| OAuth | authlib | python-social-auth | Django-heavy, brings own ORM models |
+| OAuth | authlib | fastapi-sso | Less maintained, fewer providers |
+| TOTP | pyotp | Manual HMAC | pyotp is the standard; no reason to reimplement RFC 6238 |
+| Charts | recharts | @nivo/core | Overkill for simple dashboard charts |
+| Charts | recharts | tremor | Conflicts with existing Radix UI design system |
+| Payments | Stripe Checkout (hosted) | Custom Stripe Elements | Checkout avoids PCI scope, needs zero frontend SDK |
+| Task Queue | APScheduler (keep) | Celery/Dramatiq | Would add Redis + worker process; APScheduler handles publishing loop fine |
+
+---
+
+## Complete New Dependencies Summary
+
+### Python Backend (5 new packages)
+
+```
+aiosmtplib>=2.0.0        # Async SMTP for password reset emails
+pyotp>=2.9.0             # TOTP 2FA generation/verification
+qrcode[pil]>=8.0         # QR code for authenticator setup (uses Pillow, already installed)
+authlib>=1.3.0           # Google OAuth 2.0 client (uses httpx, already installed)
+stripe>=11.0.0           # Stripe billing SDK
+```
+
+**Also add (missing from requirements.txt):**
+```
+PyJWT>=2.8.0             # Already used in src/auth/jwt.py but not listed in requirements.txt
+```
+
+**Total new install footprint:** ~2MB (stripe is the largest at ~1.5MB)
+
+### Frontend (1 new package)
+
+```
+recharts>=2.15.0         # Dashboard charts (line, bar, area)
+```
+
+**Bundle impact:** ~45KB gzipped
+
+### Installation Commands
+
+```bash
+# Backend -- add to requirements.txt and install
+pip install "aiosmtplib>=2.0.0" "pyotp>=2.9.0" "qrcode[pil]>=8.0" "authlib>=1.3.0" "stripe>=11.0.0" "PyJWT>=2.8.0"
+
+# Frontend
+cd memelab && npm install recharts
+```
+
+---
+
+## What NOT to Add
+
+| Library | Why Not |
+|---------|---------|
+| `celery` / `dramatiq` | APScheduler already handles the 60s publishing loop. A task queue adds Redis + worker process complexity. Revisit only if job volume exceeds what APScheduler handles. |
+| `redis` | PROJECT.md: "MySQL-based counter suficiente." Redis adds infrastructure. Not needed until APScheduler proves insufficient. |
+| `fastapi-mail` | Wraps aiosmtplib + Jinja2 templates. Project has 2 email types. Direct aiosmtplib is simpler. |
+| `python-social-auth` | Heavy Django framework. authlib handles OAuth cleanly. |
+| `next-auth` / `Auth.js` | Project has working custom JWT auth. Introducing next-auth means rewriting entire frontend auth. Add Google OAuth within existing pattern instead. |
+| `@stripe/react-stripe-js` | Only needed for custom payment forms. Stripe Checkout (hosted page) needs zero frontend SDK. |
+| `passlib` | bcrypt is already working directly in the codebase. passlib adds unnecessary abstraction. |
+| `python-jose` | Codebase uses PyJWT directly (`import jwt`). Both work. Do not switch. |
+| `slowapi` | Rate limiting is already MySQL-based via api_usage table. Works fine. |
+| `@tanstack/react-query` | SWR is already in the stack for data fetching. Do not add a competing library. |
+| `Jinja2` (for emails) | Two email types do not justify a template engine. f-strings or string.Template suffice. |
+
+---
+
+## New Environment Variables
+
+```env
+# SMTP (Password Reset)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=noreply@yourdomain.com
+SMTP_PASS=app-password-here
+SMTP_FROM="Clip-Flow <noreply@yourdomain.com>"
+
+# Google OAuth
+GOOGLE_OAUTH_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=xxx
+
+# Stripe Billing
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_ID=price_xxx
+
+# URLs (for OAuth callbacks, email links, Stripe redirects)
+FRONTEND_URL=http://localhost:3000
+API_URL=http://127.0.0.1:8000
+```
+
+---
+
+## Database Schema Additions (Preview)
+
+### Modified: `users` table (new columns)
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `totp_secret` | VARCHAR(64) nullable | Fernet-encrypted TOTP secret |
+| `totp_enabled` | BOOLEAN default false | Whether 2FA is active |
+| `oauth_provider` | VARCHAR(20) nullable | "google" or null |
+| `oauth_id` | VARCHAR(255) nullable | Provider unique user ID |
+| `stripe_customer_id` | VARCHAR(255) nullable | Stripe customer reference |
+| `password_hash` | Make nullable | OAuth-only users have no password |
+| `instagram_access_token` | TEXT nullable | Fernet-encrypted, per-user (multi-tenant) |
+| `instagram_business_id` | VARCHAR(100) nullable | Per-user IG business account |
+
+### New tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `password_reset_tokens` | Single-use reset links | token_hash, user_id, expires_at, used_at |
+| `backup_codes` | 2FA recovery codes | user_id, code_hash, used_at |
+| `subscriptions` | Stripe subscription state | stripe_subscription_id, user_id, plan, status, current_period_end |
+
+---
+
+## Phase Ordering Implications (from stack perspective)
+
+1. **Pipeline refactor** -- Zero new deps. Pure code restructuring. Do first because it simplifies everything downstream.
+2. **Multi-character pipeline** -- Zero new deps. Uses existing Pillow + themes + SQLAlchemy queries filtered by character_id.
+3. **Auth v2 (SMTP + TOTP + OAuth)** -- 3 small new Python libs (aiosmtplib, pyotp+qrcode, authlib). Builds on existing auth module.
+4. **Dashboard v2** -- 1 new frontend lib (recharts). Independent of auth changes. Backend uses existing SQLAlchemy for aggregation queries.
+5. **Auto-publishing Instagram** -- Zero new deps. Wires existing InstagramClient into PublishingService. Needs per-user token storage from auth v2.
+6. **Multi-tenant + Stripe** -- 1 new Python lib (stripe). Most complex phase. Needs auth v2 (user isolation) + dashboard v2 (billing UI) as prerequisites.
 
 ---
 
 ## Sources
 
-- FastAPI Security documentation (official): https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/
-  Confidence: HIGH — official source, documents python-jose[cryptography] + passlib[bcrypt] as the recommended approach
-- SQLAlchemy 2.0 async ORM: https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html
-  Confidence: HIGH — existing codebase already uses this correctly
-- PROJECT.md constraints: "Manter Python + FastAPI + MySQL + Next.js (não introduzir novos frameworks)"
-  Confidence: HIGH — explicit project constraint
-- Codebase analysis (`src/api/deps.py`, `src/database/models.py`, `requirements.txt`): existing patterns verified by direct file read
-  Confidence: HIGH — first-party source
-- Google AI Studio free tier limits: mentioned in PROJECT.md as "needs confirmation at runtime" — the values in this document are estimates from PROJECT.md context, not verified against current Google docs
-  Confidence: LOW — treat as configurable defaults, not hardcoded limits. Validate against https://ai.google.dev/pricing at implementation time.
+- `src/services/instagram_client.py` -- direct code review (HIGH confidence)
+- `src/services/publisher.py` -- direct code review, confirmed placeholder at line 146 (HIGH confidence)
+- `src/services/scheduler_worker.py` -- direct code review (HIGH confidence)
+- `src/auth/jwt.py` -- direct code review, confirmed PyJWT usage (HIGH confidence)
+- `requirements.txt` -- direct file read, confirmed PyJWT missing (HIGH confidence)
+- `memelab/package.json` -- direct file read, confirmed current frontend deps (HIGH confidence)
+- `.planning/PROJECT.md` -- project constraints and decisions (HIGH confidence)
+- Library recommendations (pyotp, aiosmtplib, authlib, stripe, recharts) -- training data up to May 2025 (MEDIUM confidence on exact latest versions; `>=` pins ensure pip resolves latest compatible)
