@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import db_session, get_current_user
 from src.auth.schemas import (
+    CostStatsResponse,
     LoginRequest,
     MessageResponse,
     RefreshRequest,
@@ -88,4 +89,17 @@ async def me_usage(
 
     repo = UsageRepository(session)
     data = await repo.get_user_usage(current_user.id)
+    return data
+
+
+@router.get("/me/cost-stats", response_model=CostStatsResponse)
+async def me_cost_stats(
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Return cumulative Gemini Image cost statistics for the current user."""
+    from src.database.repositories.usage_repo import UsageRepository
+
+    repo = UsageRepository(session)
+    data = await repo.get_cost_stats(current_user.id)
     return data
