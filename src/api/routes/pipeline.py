@@ -382,38 +382,50 @@ async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
                 logger.warning(f"Manual pipeline: phrase generation failed: {e}, using topic as phrase")
                 phrases = [request.topic] * request.count
 
-        # Resolve background_path
+        # Resolve background pool
+        bg_fixed = None  # Single fixed background (solid color or user-selected image)
+        bg_pool = []     # Pool of backgrounds to pick randomly per meme
+
         if request.background_type == "solid" and request.background_color:
-            bg_path = request.background_color  # Hex string like "#1A1A3E"
+            bg_fixed = request.background_color  # Hex string like "#1A1A3E"
         elif request.background_type == "image" and request.background_image:
-            bg_path = str(Path("assets/backgrounds") / character_slug / request.background_image)
+            bg_fixed = str(_cfg.BACKGROUNDS_DIR / character_slug / request.background_image)
         elif request.background_type == "image":
-            # Pick a random existing background from the character's directory
-            char_bg_dir = Path("assets/backgrounds") / character_slug
-            bg_files = []
+            # Build pool of available backgrounds for random selection per meme
+            char_bg_dir = _cfg.BACKGROUNDS_DIR / character_slug
             if char_bg_dir.exists():
                 for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
-                    bg_files.extend(char_bg_dir.glob(ext))
+                    bg_pool.extend(char_bg_dir.glob(ext))
             # Legacy fallback: assets/backgrounds/mago/ for mago-mestre
-            if not bg_files and character_slug == "mago-mestre":
-                legacy_dir = Path("assets/backgrounds") / "mago"
+            if not bg_pool and character_slug == "mago-mestre":
+                legacy_dir = _cfg.BACKGROUNDS_DIR / "mago"
                 if legacy_dir.exists():
                     for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
-                        bg_files.extend(legacy_dir.glob(ext))
-            if bg_files:
-                bg_path = str(random.choice(bg_files))
-            else:
-                # Fallback: any background from assets/backgrounds/
+                        bg_pool.extend(legacy_dir.glob(ext))
+            if not bg_pool:
                 all_bgs = list(_cfg.BACKGROUNDS_DIR.rglob("*.png")) + list(_cfg.BACKGROUNDS_DIR.rglob("*.jpg"))
-                bg_path = str(random.choice(all_bgs)) if all_bgs else "#1A1A3E"
-        else:
-            bg_path = "#1A1A3E"
+                bg_pool = all_bgs if all_bgs else []
+
+        if not bg_fixed and not bg_pool:
+            bg_fixed = "#1A1A3E"
+
+        # Filter by theme if possible (match theme_key in filename)
+        if bg_pool and request.theme_key:
+            theme_matched = [f for f in bg_pool if request.theme_key in f.stem]
+            if theme_matched:
+                bg_pool = theme_matched
 
         # Compose memes
         _cfg.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         results = []
         for i, phrase in enumerate(phrases):
             try:
+                # Pick a different random background per meme
+                if bg_fixed:
+                    bg_path = bg_fixed
+                else:
+                    bg_path = str(random.choice(bg_pool))
+
                 output_path = str(_cfg.OUTPUT_DIR / f"manual_{run_id}_{i}.png")
                 image_path = await asyncio.to_thread(
                     create_image,
