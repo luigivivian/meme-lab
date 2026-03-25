@@ -6,6 +6,7 @@ Extrai a logica do notebook Colab (mago_api_server) em modulo reutilizavel.
 
 import asyncio
 import logging
+import math
 import random
 import time
 from dataclasses import dataclass, field
@@ -36,6 +37,7 @@ class ImageGenerationResult:
     rendering_config: dict = field(default_factory=dict)
     phrase_context_used: bool = False
     character_dna_used: bool = False
+    estimated_cost_usd: float = 0.0
 
 
 def discover_image_models() -> list[str]:
@@ -75,6 +77,47 @@ _FALLBACK_MODELOS_IMAGEM = [
 # Lista dinamica — populada por discover_image_models() no startup
 # Se discovery nao rodar, usa fallback
 MODELOS_IMAGEM: list[str] = list(_FALLBACK_MODELOS_IMAGEM)
+
+# ── Gemini Image Pricing Constants ───────────────────────────────────────────
+# Gemini 2.5 Flash Image pricing (pay-as-you-go, per 1M tokens)
+GEMINI_INPUT_PRICE_PER_M = 0.30         # $0.30/1M input tokens
+GEMINI_IMAGE_OUTPUT_PRICE_PER_M = 30.00 # $30.00/1M image output tokens
+GEMINI_IMAGE_OUTPUT_TOKENS = 1290       # ~tokens per generated image at 1024px
+
+
+def estimate_image_input_tokens(width: int, height: int) -> int:
+    """Tile-based token estimation for a single input image.
+
+    Gemini charges ceil(w/768) * ceil(h/768) * 258 tokens per image.
+    """
+    tiles = math.ceil(width / 768) * math.ceil(height / 768)
+    return tiles * 258
+
+
+def estimate_generation_cost(
+    input_images: list[tuple[int, int]], text_chars: int
+) -> dict:
+    """Estimate cost of a single Gemini Image generation.
+
+    Args:
+        input_images: list of (width, height) tuples for input reference images.
+        text_chars: total character count of text prompt parts.
+
+    Returns:
+        dict with input_tokens, output_tokens, estimated_cost_usd.
+    """
+    img_tokens = sum(
+        estimate_image_input_tokens(w, h) for w, h in input_images
+    )
+    text_tokens = text_chars // 4
+    total_input = img_tokens + text_tokens
+    input_cost = total_input * GEMINI_INPUT_PRICE_PER_M / 1_000_000
+    output_cost = GEMINI_IMAGE_OUTPUT_TOKENS * GEMINI_IMAGE_OUTPUT_PRICE_PER_M / 1_000_000
+    return {
+        "input_tokens": total_input,
+        "output_tokens": GEMINI_IMAGE_OUTPUT_TOKENS,
+        "estimated_cost_usd": input_cost + output_cost,
+    }
 
 
 def update_modelos_imagem(discovered: list[str]):
@@ -779,7 +822,11 @@ class GeminiImageClient:
         except Exception:
             return False
 
-    def _tentar_gerar(self, modelo: str, partes: list, temperatura: float, api_key: str | None = None) -> PIL.Image.Image | None:
+    def _tentar_gerar(
+        self, modelo: str, partes: list, temperatura: float,
+        api_key: str | None = None,
+        input_image_dims: list[tuple[int, int]] | None = None,
+    ) -> PIL.Image.Image | None:
         """Tenta gerar imagem com um modelo. Retorna PIL.Image ou None."""
         from google.genai import types
 
@@ -794,8 +841,16 @@ class GeminiImageClient:
         ]
         img_bytes_total = sum(len(p.inline_data.data) for p in img_parts)
         text_chars = sum(len(p) for p in partes if isinstance(p, str))
-        # Gemini: ~258 tokens per image tile (1 tile per ~768px), ~4 chars per text token
-        estimated_tokens = len(img_parts) * 258 + text_chars // 4
+
+        # Token estimation: tile-based when dims available, flat fallback otherwise
+        if input_image_dims:
+            estimated_tokens = sum(
+                estimate_image_input_tokens(w, h) for w, h in input_image_dims
+            ) + text_chars // 4
+        else:
+            # Flat fallback (legacy callers without dims)
+            estimated_tokens = len(img_parts) * 258 + text_chars // 4
+
         logger.info(
             f"[payload] modelo={modelo} key={key_hint} "
             f"parts={len(partes)} (imgs={len(img_parts)} img_bytes={img_bytes_total:,} "
@@ -816,27 +871,25 @@ class GeminiImageClient:
                 return PIL.Image.open(BytesIO(part.inline_data.data))
         return None
 
-    def _tentar_modelos(self, partes: list, temperatura: float, api_key: str | None = None) -> PIL.Image.Image | None:
+    def _tentar_modelos(
+        self, partes: list, temperatura: float,
+        api_key: str | None = None,
+        input_image_dims: list[tuple[int, int]] | None = None,
+    ) -> PIL.Image.Image | None:
         """Tenta modelos em ordem. No 429, pula pro proximo imediatamente."""
         key_hint = f"...{api_key[-6:]}" if api_key else "default(_get_client)"
-        # Filtrar modelos incompativeis com free tier
-        # imagen-*: API diferente (predict, nao generateContent)
-        # gemini-3-pro-image, gemini-3.1-flash-image: limit=0 no free tier
-        modelos = [
-            m for m in MODELOS_IMAGEM
-            if not m.startswith("imagen-")
-            and "gemini-3-pro" not in m
-            and "gemini-3.1-flash" not in m
-        ]
-        # Fallback: se filtrou tudo, usar ao menos o primeiro disponivel
-        if not modelos:
-            modelos = [m for m in MODELOS_IMAGEM if not m.startswith("imagen-")]
+        # Filtrar modelos incompativeis (imagen-* usa API predict, nao generateContent)
+        # Tentar todos os gemini-*-image models — free tier limits mudam frequentemente
+        modelos = [m for m in MODELOS_IMAGEM if not m.startswith("imagen-")]
         logger.info(f"_tentar_modelos: key={key_hint}, modelos={modelos}")
         rate_limited_count = 0
 
         for modelo in modelos:
             try:
-                imagem = self._tentar_gerar(modelo, partes, temperatura, api_key=api_key)
+                imagem = self._tentar_gerar(
+                    modelo, partes, temperatura, api_key=api_key,
+                    input_image_dims=input_image_dims,
+                )
                 if imagem is None:
                     logger.warning(f"{modelo}: resposta sem imagem, tentando proximo")
                     continue
@@ -942,9 +995,20 @@ class GeminiImageClient:
         )
         partes.append(prompt_texto)
 
+        # Collect resized reference image dimensions for cost estimation
+        ref_dims = [_redimensionar(img, 1024).size for img in refs]
+        text_chars = sum(len(p) for p in partes if isinstance(p, str))
+        cost_info = estimate_generation_cost(ref_dims, text_chars)
+        logger.info(
+            f"[cost] estimated: ${cost_info['estimated_cost_usd']:.6f} "
+            f"(input={cost_info['input_tokens']} tokens, output={cost_info['output_tokens']} tokens)"
+        )
+
         logger.info(f"Gerando: situacao={situacao_key}, refs={len(refs)}, custom_dna={bool(self._character_dna)}")
 
-        imagem = self._tentar_modelos(partes, self.temperatura, api_key=api_key)
+        imagem = self._tentar_modelos(
+            partes, self.temperatura, api_key=api_key, input_image_dims=ref_dims,
+        )
 
         if imagem is None:
             logger.error("Todos os modelos falharam")
@@ -979,6 +1043,7 @@ class GeminiImageClient:
             rendering_config=rendering_dict,
             phrase_context_used=bool(phrase_context),
             character_dna_used=bool(self._character_dna),
+            estimated_cost_usd=cost_info["estimated_cost_usd"],
         )
 
     def refine_image(
@@ -1000,12 +1065,13 @@ class GeminiImageClient:
         partes.append("THIS IS THE IMAGE TO REFINE. Keep the exact same composition and character:")
         partes.append(_pil_para_part(imagem_base))
 
+        refine_refs: list[PIL.Image.Image] = []
         if self._referencias and referencias_adicionais > 0:
-            refs = _selecionar_referencias(self._referencias, n=referencias_adicionais)
+            refine_refs = _selecionar_referencias(self._referencias, n=referencias_adicionais)
             partes.append(
-                f"These {len(refs)} images are the ORIGINAL CHARACTER REFERENCES for consistency:"
+                f"These {len(refine_refs)} images are the ORIGINAL CHARACTER REFERENCES for consistency:"
             )
-            for r in refs:
+            for r in refine_refs:
                 partes.append(_pil_para_part(r))
 
         instrucao_final = instrucao or (
@@ -1033,9 +1099,24 @@ class GeminiImageClient:
 
         partes.append(prompt)
 
+        # Cost estimation for refinement
+        refine_dims = [_redimensionar(imagem_base, 1024).size]
+        if refine_refs:
+            refine_dims.extend(
+                _redimensionar(r, 1024).size for r in refine_refs
+            )
+        refine_text_chars = sum(len(p) for p in partes if isinstance(p, str))
+        refine_cost = estimate_generation_cost(refine_dims, refine_text_chars)
+        logger.info(
+            f"[cost] refine estimated: ${refine_cost['estimated_cost_usd']:.6f} "
+            f"(input={refine_cost['input_tokens']} tokens, output={refine_cost['output_tokens']} tokens)"
+        )
+
         logger.info(f"Refinando imagem (refs adicionais: {referencias_adicionais})")
 
-        imagem = self._tentar_modelos(partes, temperatura=0.4, api_key=api_key)
+        imagem = self._tentar_modelos(
+            partes, temperatura=0.4, api_key=api_key, input_image_dims=refine_dims,
+        )
 
         if imagem is None:
             logger.error("Refinamento falhou em todos os modelos")
