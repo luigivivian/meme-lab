@@ -9,10 +9,10 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 
 ### Pipeline Simplification
 
-- [ ] **PIPE-01**: User can run pipeline in manual mode with pre-existing backgrounds (zero Gemini Image calls)
-- [ ] **PIPE-02**: User can select theme/background for pipeline composition
-- [ ] **PIPE-03**: User can preview composed memes before publishing (approve/reject)
-- [ ] **PIPE-04**: Pipeline composes images via Pillow with static backgrounds + phrases
+- [x] **PIPE-01**: User can run pipeline in manual mode with pre-existing backgrounds (zero Gemini Image calls)
+- [x] **PIPE-02**: User can select theme/background for pipeline composition
+- [x] **PIPE-03**: User can preview composed memes before publishing (approve/reject)
+- [x] **PIPE-04**: Pipeline composes images via Pillow with static backgrounds + phrases
 
 ### Multi-Tenant Isolation
 
@@ -92,10 +92,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PIPE-01 | Phase 12 | Pending |
-| PIPE-02 | Phase 12 | Pending |
-| PIPE-03 | Phase 12 | Pending |
-| PIPE-04 | Phase 12 | Pending |
+| PIPE-01 | Phase 12 | Complete |
+| PIPE-02 | Phase 12 | Complete |
+| PIPE-03 | Phase 12 | Complete |
+| PIPE-04 | Phase 12 | Complete |
 | TENANT-01 | Phase 13 | Pending |
 | TENANT-02 | Phase 13 | Pending |
 | TENANT-03 | Phase 13 | Pending |
