@@ -209,17 +209,18 @@ class CharacterDetail(BaseModel):
 # ===== Manual Pipeline (Phase 12) =====
 
 class ManualRunRequest(BaseModel):
-    """Manual pipeline run -- zero Gemini Image calls. Per D-06."""
+    """Manual pipeline run with optional Gemini Image generation."""
     input_mode: str = Field(description="'topic' or 'phrase'")
     topic: str = Field(default="", description="Topic for Gemini phrase generation (input_mode='topic')")
     phrases: list[str] = Field(default=[], description="Literal phrases, one per meme (input_mode='phrase')")
     count: int = Field(default=3, ge=1, le=10, description="Meme count per D-08")
     theme_key: str = Field(default="sabedoria", description="Theme key from themes.yaml")
-    background_type: str = Field(default="solid", description="'solid' or 'image'")
+    background_type: str = Field(default="image", description="'solid' or 'image'")
     background_color: str = Field(default="", description="Hex color e.g. '#1A1A3E' (when background_type='solid')")
     background_image: str = Field(default="", description="Filename from character backgrounds (when background_type='image')")
     layout: str = Field(default="bottom", description="Layout template: bottom, top, center, split_top")
     enable_l5: bool = Field(default=True, description="Run L5 post-production per D-09")
+    use_gemini_image: bool = Field(default=False, description="Generate background via Gemini API (consumes quota)")
     character_slug: str | None = Field(default=None, description="Character slug for backgrounds and watermark")
 
 

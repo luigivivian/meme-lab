@@ -382,21 +382,30 @@ async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
                 logger.warning(f"Manual pipeline: phrase generation failed: {e}, using topic as phrase")
                 phrases = [request.topic] * request.count
 
-        # Resolve background pool
-        bg_fixed = None  # Single fixed background (solid color or user-selected image)
-        bg_pool = []     # Pool of backgrounds to pick randomly per meme
+        # Initialize Gemini Image client if enabled
+        gemini_client = None
+        if request.use_gemini_image:
+            try:
+                from src.image_gen.gemini_client import GeminiImageClient
+                gemini_client = GeminiImageClient()
+                if not gemini_client.is_available():
+                    logger.warning("Gemini Image not available, falling back to static")
+                    gemini_client = None
+            except Exception as e:
+                logger.warning(f"Failed to init Gemini Image: {e}")
 
-        if request.background_type == "solid" and request.background_color:
-            bg_fixed = request.background_color  # Hex string like "#1A1A3E"
-        elif request.background_type == "image" and request.background_image:
+        # Resolve background pool (used when Gemini is off or fails)
+        bg_fixed = None  # User-selected specific image
+        bg_pool = []     # Pool of backgrounds for random selection
+
+        if request.background_image:
             bg_fixed = str(_cfg.BACKGROUNDS_DIR / character_slug / request.background_image)
-        elif request.background_type == "image":
-            # Build pool of available backgrounds for random selection per meme
+        else:
+            # Build pool of available backgrounds
             char_bg_dir = _cfg.BACKGROUNDS_DIR / character_slug
             if char_bg_dir.exists():
                 for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
                     bg_pool.extend(char_bg_dir.glob(ext))
-            # Legacy fallback: assets/backgrounds/mago/ for mago-mestre
             if not bg_pool and character_slug == "mago-mestre":
                 legacy_dir = _cfg.BACKGROUNDS_DIR / "mago"
                 if legacy_dir.exists():
@@ -406,10 +415,7 @@ async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
                 all_bgs = list(_cfg.BACKGROUNDS_DIR.rglob("*.png")) + list(_cfg.BACKGROUNDS_DIR.rglob("*.jpg"))
                 bg_pool = all_bgs if all_bgs else []
 
-        if not bg_fixed and not bg_pool:
-            bg_fixed = "#1A1A3E"
-
-        # Filter by theme if possible (match theme_key in filename)
+        # Filter by theme if possible
         if bg_pool and request.theme_key:
             theme_matched = [f for f in bg_pool if request.theme_key in f.stem]
             if theme_matched:
@@ -420,11 +426,31 @@ async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
         results = []
         for i, phrase in enumerate(phrases):
             try:
-                # Pick a different random background per meme
-                if bg_fixed:
-                    bg_path = bg_fixed
-                else:
-                    bg_path = str(random.choice(bg_pool))
+                bg_path = None
+                bg_source = "static"
+
+                # Try Gemini generation first if enabled
+                if gemini_client:
+                    try:
+                        gen_result = await gemini_client.agenerate_image(
+                            situacao_key=request.theme_key,
+                            phrase_context=phrase,
+                        )
+                        if gen_result:
+                            bg_path = gen_result.path
+                            bg_source = "gemini"
+                            logger.info(f"Manual pipeline [{i}]: Gemini background generated: {bg_path}")
+                    except Exception as e:
+                        logger.warning(f"Manual pipeline [{i}]: Gemini failed ({e}), using static fallback")
+
+                # Fallback to static background
+                if not bg_path:
+                    if bg_fixed:
+                        bg_path = bg_fixed
+                    elif bg_pool:
+                        bg_path = str(random.choice(bg_pool))
+                    else:
+                        bg_path = "#1A1A3E"
 
                 output_path = str(_cfg.OUTPUT_DIR / f"manual_{run_id}_{i}.png")
                 image_path = await asyncio.to_thread(
@@ -439,6 +465,7 @@ async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
                     "phrase": phrase,
                     "image_path": image_path,
                     "background_path": bg_path,
+                    "background_source": bg_source,
                 })
             except Exception as e:
                 logger.error(f"Manual pipeline: failed to compose image {i}: {e}")
@@ -524,17 +551,14 @@ async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
         logger.error(f"Manual pipeline {run_id} failed: {e}")
 
 
-@router.post("/manual-run", summary="Manual pipeline run (zero Gemini Image)")
+@router.post("/manual-run", summary="Manual pipeline run (optional Gemini Image)")
 async def manual_run(
     request: ManualRunRequest,
     background_tasks: BackgroundTasks,
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
-    """Run manual pipeline: compose memes with solid-color or existing backgrounds.
-
-    FORCE background_mode='static' and use_gemini_image=False.
-    """
+    """Run manual pipeline: compose memes with existing backgrounds or optional Gemini generation."""
     from src.database.repositories.pipeline_repo import PipelineRunRepository
 
     run_id = uuid.uuid4().hex[:8]
@@ -554,15 +578,11 @@ async def manual_run(
         "status": "queued",
         "mode": "manual",
         "requested_count": request.count,
-        "use_gemini_image": False,
+        "use_gemini_image": request.use_gemini_image,
         "theme_tags": [request.theme_key] if request.theme_key else [],
         "character_id": character_id,
     })
     await session.commit()
-
-    # FORCE static mode -- NEVER allow Gemini Image in manual pipeline
-    background_mode = "static"
-    use_gemini_image = False
 
     background_tasks.add_task(_run_manual_pipeline_task, run_id, request)
     return pipeline_run_to_dict(run)

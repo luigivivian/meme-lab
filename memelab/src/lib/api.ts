@@ -477,6 +477,7 @@ export interface ManualRunParams {
   background_image?: string;
   layout?: string;
   enable_l5?: boolean;
+  use_gemini_image?: boolean;
   character_slug?: string;
 }
 
