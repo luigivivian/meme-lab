@@ -49,3 +49,10 @@ class ServiceUsage(BaseModel):
 class UsageResponse(BaseModel):
     services: list[ServiceUsage]
     resets_at: str
+
+
+class CostStatsResponse(BaseModel):
+    total_cost_usd: float
+    total_images: int
+    avg_cost_per_image: float
+    days_tracked: int
