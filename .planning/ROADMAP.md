@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 12-01-PLAN.md — Backend: DB migration, image_maker hex colors, themes.yaml palettes, API endpoints
-- [ ] 12-02-PLAN.md — Frontend: API client, hooks, Pipeline page rewrite per UI-SPEC
+- [x] 12-02-PLAN.md — Frontend: API client, hooks, Pipeline page rewrite per UI-SPEC
 - [ ] 12-03-PLAN.md — Integration: migration + servers + human verification checkpoint
 
 ### Phase 13: Tenant Isolation
@@ -127,7 +127,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 12. Pipeline Simplification | 1/3 | In Progress|  |
+| 12. Pipeline Simplification | 2/3 | In Progress|  |
 | 13. Tenant Isolation | 0/? | Not started | - |
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
