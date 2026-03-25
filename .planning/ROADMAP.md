@@ -50,11 +50,12 @@ Plans:
   2. All tenant-scoped tables have a user_id foreign key and all repository queries filter by it
   3. An admin user can access any user's data through admin-flagged requests
   4. A user attempting to access another user's resource receives a 403 Forbidden (not 404 Not Found)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 13-01: TBD
-- [ ] 13-02: TBD
+- [ ] 13-01-PLAN.md — Foundation: migration (backfill + NOT NULL + Theme.user_id), CharacterRepo tenant filtering, deps.py helper, test scaffold
+- [ ] 13-02-PLAN.md — Remaining repos: pipeline, content, job, theme, schedule repos with tenant filtering
+- [ ] 13-03-PLAN.md — Route wiring: all 9 route files pass current_user to repos, catch PermissionError as 403
 
 ### Phase 14: Instagram Connection & CDN
 **Goal**: Users can connect their Instagram Business Account and have their images uploaded to a CDN with public URLs ready for Instagram publishing
@@ -128,7 +129,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 12. Pipeline Simplification | 2/3 | In Progress|  |
-| 13. Tenant Isolation | 0/? | Not started | - |
+| 13. Tenant Isolation | 0/3 | Not started | - |
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
