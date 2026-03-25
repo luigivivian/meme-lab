@@ -575,6 +575,7 @@ class ApiUsage(TimestampMixin, Base):
     tier: Mapped[str] = mapped_column(String(20), nullable=False)
     date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     usage_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
     status: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # Relationships
