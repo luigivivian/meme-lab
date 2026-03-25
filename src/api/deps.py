@@ -49,6 +49,26 @@ async def get_current_user(
     return user
 
 
+# ── Tenant helpers ───────────────────────────────────────────────────
+
+async def get_user_character(
+    slug: str,
+    current_user,
+    session: AsyncSession,
+) -> "Character":
+    """Load character by slug, enforce ownership. Raises 404 or 403."""
+    from src.database.repositories.character_repo import CharacterRepository
+
+    repo = CharacterRepository(session)
+    try:
+        character = await repo.get_by_slug(slug, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    return character
+
+
 # ── Path helpers ─────────────────────────────────────────────────────────────
 
 def config_dir() -> Path:
