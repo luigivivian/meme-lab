@@ -73,7 +73,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+1. **Revise pipeline de geracao de imagem** — `2026-03-25-revise-pipeline-de-geracao-de-imagem.md`
+   Pipeline quebrada: limite de refs excedido (20 carregadas), sem log de payload, tokens não estimados, outputs memes/backgrounds não separados.
 
 ### Blockers/Concerns
 
