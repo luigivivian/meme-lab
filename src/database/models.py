@@ -72,13 +72,13 @@ class Character(TimestampMixin, Base):
     # Soft delete
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
-    # Owner (multi-tenant prep, per D-07)
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
+    # Owner (multi-tenant, per D-07/D-09)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
     )
 
     # Relationships
-    owner: Mapped[Optional["User"]] = relationship(back_populates="characters")
+    owner: Mapped["User"] = relationship(back_populates="characters")
     refs: Mapped[list["CharacterRef"]] = relationship(
         back_populates="character", cascade="all, delete-orphan"
     )
@@ -146,13 +146,20 @@ class Theme(TimestampMixin, Base):
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
-    # Relationship
+    # Owner (multi-tenant, per D-03)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+
+    # Relationships
     character: Mapped[Optional["Character"]] = relationship(back_populates="themes")
+    owner: Mapped[Optional["User"]] = relationship("User")
 
     __table_args__ = (
         UniqueConstraint("character_id", "key", name="uq_themes_character_key"),
         Index("idx_themes_character_id", "character_id"),
         Index("idx_themes_key", "key"),
+        Index("idx_themes_user_id", "user_id"),
     )
 
 
@@ -165,8 +172,8 @@ class PipelineRun(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
-    character_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("characters.id"), nullable=True
+    character_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=False
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default="queued")
     mode: Mapped[str] = mapped_column(String(20), default="agents", server_default="agents")
@@ -195,7 +202,7 @@ class PipelineRun(TimestampMixin, Base):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
-    character: Mapped[Optional["Character"]] = relationship(back_populates="pipeline_runs")
+    character: Mapped["Character"] = relationship(back_populates="pipeline_runs")
     trend_events: Mapped[list["TrendEvent"]] = relationship(
         back_populates="pipeline_run", cascade="all, delete-orphan"
     )
