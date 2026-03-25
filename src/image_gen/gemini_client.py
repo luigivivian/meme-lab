@@ -787,18 +787,19 @@ class GeminiImageClient:
         client = self._get_image_client(api_key) if api_key else _get_client()
         key_hint = f"...{api_key[-6:]}" if api_key else "default(GOOGLE_API_KEY)"
 
-        # Log payload: contar partes e estimar tokens
-        img_parts_count = sum(
-            1 for p in partes
+        # Log payload: contar partes, bytes de imagens e estimar tokens
+        img_parts = [
+            p for p in partes
             if not isinstance(p, str) and hasattr(p, "inline_data") and p.inline_data
-        )
+        ]
+        img_bytes_total = sum(len(p.inline_data.data) for p in img_parts)
         text_chars = sum(len(p) for p in partes if isinstance(p, str))
-        # Estimativa rough: ~258 tokens por imagem (Gemini), ~4 chars por token de texto
-        estimated_tokens = img_parts_count * 258 + text_chars // 4
+        # Gemini: ~258 tokens per image tile (1 tile per ~768px), ~4 chars per text token
+        estimated_tokens = len(img_parts) * 258 + text_chars // 4
         logger.info(
             f"[payload] modelo={modelo} key={key_hint} "
-            f"parts={len(partes)} (imgs={img_parts_count} text_chars={text_chars}) "
-            f"~{estimated_tokens} tokens estimados"
+            f"parts={len(partes)} (imgs={len(img_parts)} img_bytes={img_bytes_total:,} "
+            f"text_chars={text_chars}) ~{estimated_tokens} tokens estimados"
         )
 
         response = client.models.generate_content(
@@ -837,9 +838,10 @@ class GeminiImageClient:
                     logger.warning(f"{modelo}: nao disponivel (404), tentando proximo")
                 elif "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                     rate_limited_count += 1
-                    logger.warning(f"{modelo}: 429 rate limited, tentando proximo modelo")
+                    # Log full error to see which limit was hit
+                    logger.warning(f"{modelo}: 429 FULL ERROR: {msg[:500]}")
                 else:
-                    logger.error(f"{modelo}: {type(e).__name__}: {msg[:200]}")
+                    logger.error(f"{modelo}: {type(e).__name__}: {msg[:500]}")
 
         if rate_limited_count == len(modelos):
             logger.error(
