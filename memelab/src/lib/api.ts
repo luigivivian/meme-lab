@@ -145,12 +145,14 @@ export interface ImageMetadata {
 }
 
 export interface ContentPackage {
+  id?: number;
   phrase: string;
   image_path: string;
   topic: string;
   caption: string;
   hashtags: string;
   quality_score: number;
+  approval_status?: string;
   background_path?: string;
   background_source?: string;
   image_metadata?: ImageMetadata;
@@ -372,6 +374,7 @@ export interface ContentPackageDB {
   caption: string;
   hashtags: string[];
   quality_score: number;
+  approval_status?: string;
   image_metadata: ImageMetadata;
   is_published: boolean;
   published_at: string | null;
@@ -460,6 +463,89 @@ export const getPipelineStatus = (runId: string) =>
   request<PipelineRunResult>(`/pipeline/status/${runId}`);
 export const getPipelineRuns = () =>
   request<PipelineRunsResponse>("/pipeline/runs");
+
+// --- Manual Pipeline (Phase 12) ---
+
+export interface ManualRunParams {
+  input_mode: "topic" | "phrase";
+  topic?: string;
+  phrases?: string[];
+  count?: number;
+  theme_key?: string;
+  background_type?: "solid" | "image";
+  background_color?: string;
+  background_image?: string;
+  layout?: string;
+  enable_l5?: boolean;
+  character_slug?: string;
+}
+
+export interface ThemeWithColors {
+  key: string;
+  label: string;
+  colors: string[];
+}
+
+export interface BackgroundFile {
+  filename: string;
+  path: string;
+}
+
+export interface ApprovalResponse {
+  id?: number;
+  updated?: number;
+  approval_status: string;
+}
+
+export const manualRun = (params: ManualRunParams) =>
+  request<PipelineRunResult>("/pipeline/manual-run", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+
+export const approveContent = (packageId: number) =>
+  request<ApprovalResponse>(`/pipeline/content/${packageId}/approve`, { method: "PATCH" });
+
+export const rejectContent = (packageId: number) =>
+  request<ApprovalResponse>(`/pipeline/content/${packageId}/reject`, { method: "PATCH" });
+
+export const unrejectContent = (packageId: number) =>
+  request<ApprovalResponse>(`/pipeline/content/${packageId}/unreject`, { method: "PATCH" });
+
+export const bulkApproveContent = (packageIds: number[]) =>
+  request<ApprovalResponse>("/pipeline/content/bulk-approve", {
+    method: "PATCH",
+    body: JSON.stringify({ package_ids: packageIds }),
+  });
+
+export const bulkRejectContent = (packageIds: number[]) =>
+  request<ApprovalResponse>("/pipeline/content/bulk-reject", {
+    method: "PATCH",
+    body: JSON.stringify({ package_ids: packageIds }),
+  });
+
+export const uploadBackground = async (file: File, characterSlug: string) => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const formData = new FormData();
+  formData.append("file", file);
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(
+    `${BASE}/pipeline/backgrounds/upload?character_slug=${encodeURIComponent(characterSlug)}`,
+    { method: "POST", headers, body: formData }
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`Upload ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<{ filename: string; path: string; width: number; height: number }>;
+};
+
+export const listBackgrounds = (characterSlug: string) =>
+  request<{ backgrounds: BackgroundFile[] }>(`/pipeline/backgrounds/${encodeURIComponent(characterSlug)}`);
+
+export const getThemesWithColors = () =>
+  request<{ themes: ThemeWithColors[] }>("/pipeline/themes");
 
 // --- Generation ---
 export interface ComposeParams {
