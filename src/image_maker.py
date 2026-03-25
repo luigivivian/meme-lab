@@ -23,6 +23,7 @@ from config import (
     TEXT_VERTICAL_POSITION,
     FONTS_DIR,
     OUTPUT_DIR,
+    GENERATED_MEMES_DIR,
     LAYOUT_TEMPLATES,
     LAYOUT_DEFAULT,
 )
@@ -304,11 +305,11 @@ def create_image(
     final = bg.convert("RGB")
 
     if output_path is None:
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        GENERATED_MEMES_DIR.mkdir(parents=True, exist_ok=True)
         slug = "_".join(text.lower().split()[:4])
         slug = unicodedata.normalize("NFKD", slug).encode("ascii", "ignore").decode()
         slug = "".join(c for c in slug if c.isalnum() or c == "_")[:40]
-        output_path = str(OUTPUT_DIR / f"{slug}.png")
+        output_path = str(GENERATED_MEMES_DIR / f"{slug}.png")
 
     final.save(output_path, quality=95)
     return output_path

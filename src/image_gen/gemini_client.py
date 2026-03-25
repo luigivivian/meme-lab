@@ -68,9 +68,7 @@ def discover_image_models() -> list[str]:
 
 # Fallback: modelos conhecidos (usados se discovery falhar)
 _FALLBACK_MODELOS_IMAGEM = [
-    "gemini-2.5-flash-image",
-    "gemini-3.1-flash-image-preview",
-    "gemini-3-pro-image-preview",
+    "gemini-2.5-flash-image",  # Nano Banana Flash — 500 RPD, 15 RPM, up to 14 refs
 ]
 
 # Lista dinamica — populada por discover_image_models() no startup
@@ -694,7 +692,7 @@ class GeminiImageClient:
         self,
         reference_dir: str | Path | None = None,
         output_dir: str | Path | None = None,
-        n_referencias: int = 5,
+        n_referencias: int = 3,
         temperatura: float = 0.85,
         max_retries_429: int = 2,
         wait_base_429: int = 60,
@@ -706,8 +704,15 @@ class GeminiImageClient:
     ):
         from config import COMFYUI_REFERENCE_DIR, GENERATED_BACKGROUNDS_DIR
 
+        from config import GEMINI_IMAGE_MAX_REFS
         self.reference_dir = Path(reference_dir or COMFYUI_REFERENCE_DIR)
         self.output_dir = Path(output_dir or GENERATED_BACKGROUNDS_DIR)
+        if n_referencias > GEMINI_IMAGE_MAX_REFS:
+            logger.warning(
+                f"n_referencias={n_referencias} excede limite da API ({GEMINI_IMAGE_MAX_REFS}). "
+                f"Ajustando para {GEMINI_IMAGE_MAX_REFS}."
+            )
+            n_referencias = GEMINI_IMAGE_MAX_REFS
         self.n_referencias = n_referencias
         self.temperatura = temperatura
         self.max_retries_429 = max_retries_429
@@ -754,7 +759,15 @@ class GeminiImageClient:
                     logger.warning(f"Erro ao carregar referencia {img_path.name}: {e}")
 
         self._loaded = True
-        logger.info(f"Carregadas {len(self._referencias)} imagens de referencia")
+        n = len(self._referencias)
+        from config import GEMINI_IMAGE_MAX_REFS
+        if n > GEMINI_IMAGE_MAX_REFS:
+            logger.warning(
+                f"Carregadas {n} imagens de referencia — excede limite da API ({GEMINI_IMAGE_MAX_REFS}). "
+                f"Serao selecionadas no maximo {self.n_referencias} por geracao."
+            )
+        else:
+            logger.info(f"Carregadas {n} imagens de referencia")
 
     def is_available(self) -> bool:
         """Verifica se o client tem referencias e API key configurada."""
@@ -769,7 +782,24 @@ class GeminiImageClient:
         """Tenta gerar imagem com um modelo. Retorna PIL.Image ou None."""
         from google.genai import types
 
+        using_custom = bool(api_key)
         client = self._get_image_client(api_key) if api_key else _get_client()
+        key_hint = f"...{api_key[-6:]}" if api_key else "default(GOOGLE_API_KEY)"
+
+        # Log payload: contar partes e estimar tokens
+        img_parts_count = sum(
+            1 for p in partes
+            if not isinstance(p, str) and hasattr(p, "inline_data") and p.inline_data
+        )
+        text_chars = sum(len(p) for p in partes if isinstance(p, str))
+        # Estimativa rough: ~258 tokens por imagem (Gemini), ~4 chars por token de texto
+        estimated_tokens = img_parts_count * 258 + text_chars // 4
+        logger.info(
+            f"[payload] modelo={modelo} key={key_hint} "
+            f"parts={len(partes)} (imgs={img_parts_count} text_chars={text_chars}) "
+            f"~{estimated_tokens} tokens estimados"
+        )
+
         response = client.models.generate_content(
             model=modelo,
             contents=partes,
@@ -786,6 +816,8 @@ class GeminiImageClient:
 
     def _tentar_modelos(self, partes: list, temperatura: float, api_key: str | None = None) -> PIL.Image.Image | None:
         """Tenta todos os modelos em ordem com retry para 429."""
+        key_hint = f"...{api_key[-6:]}" if api_key else "default(_get_client)"
+        logger.info(f"_tentar_modelos: key={key_hint}, modelos={MODELOS_IMAGEM}")
         for modelo in MODELOS_IMAGEM:
             for tentativa in range(self.max_retries_429):
                 try:
