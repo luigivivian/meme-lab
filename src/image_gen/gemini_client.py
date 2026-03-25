@@ -131,67 +131,24 @@ def update_modelos_imagem(discovered: list[str]):
         logger.warning(f"Usando fallback MODELOS_IMAGEM: {MODELOS_IMAGEM}")
 
 # DNA do personagem — fotorrealista cinematico (Gandalf o Cinzento)
-CHARACTER_DNA = """Photorealistic fantasy portrait of an ancient wise wizard with the following EXACT traits (NEVER change):
+CHARACTER_DNA = """Photorealistic ancient wizard (~90yo). EXACT traits:
+FACE: deeply wrinkled, aquiline nose, bushy silver-grey brows, pale blue-grey eyes (#8FA8C8), age spots
+BEARD: very long silver-white (#E8E8F0) reaching chest, unkempt, individual strands visible
+HAT: tall pointed grey felt (#4A5568), weathered, bent tip — NEVER remove
+ROBES: charcoal-grey wool, midnight blue outer (#1A1A3E), worn leather belt, brass buckle (#C8A84E), frayed gold embroidery
+STAFF: gnarled dark oak (#3E2723), carved runes, ember-gold glow top (#FFD54F)
+PHYSIQUE: tall, lean, slightly hunched, weathered hands
+RENDER: photorealistic cinematic, 85mm f/1.8, skin pores, film grain, 8K detail. NO cartoon/cel-shading/stylization."""
 
-FACE & SKIN:
-- Approximately 90 years old, deeply wrinkled weathered skin with natural skin pores
-- Prominent aquiline nose, thick bushy silver-grey eyebrows
-- Piercing intense pale blue-grey eyes with depth, wisdom, and subtle moisture reflection
-- Weathered smile lines, age spots on temples, hyper realistic skin texture
-
-BEARD & HAIR:
-- Very long flowing silver-white beard reaching chest, slightly unkempt natural texture
-- Individual hair strands visible, natural grey-white gradients (NEVER short or neat)
-- Wispy silver hair visible under hat brim
-
-HAT:
-- Wide-brimmed tall pointed grey felt hat, aged and slightly bent at tip
-- Weathered fabric texture, subtle dust and wear marks (NEVER remove, NEVER clean/new looking)
-
-ROBES & CLOTHING:
-- Weathered charcoal-grey wool robes with natural fabric folds and weight
-- Dark midnight blue outer layer (#1A1A3E) with worn leather belt and aged brass buckle
-- Subtle silver-gold thread embroidery on edges, slightly frayed
-- Worn brown leather boots with creases and dust
-
-STAFF:
-- Massive gnarled wooden staff of dark twisted oak (#3E2723)
-- Ancient runes barely visible carved into wood grain
-- Faint warm ember-golden glow at the top (#FFD54F), like dying embers
-
-PHYSIQUE:
-- Tall, lean, slightly hunched posture conveying age and wisdom
-- Large weathered hands with visible veins and knuckles
-
-RENDERING STYLE:
-- Photorealistic cinematic portrait, 85mm lens f/1.8 equivalent
-- Natural subsurface skin scattering, cinematic color grading
-- Subtle film grain, studio-quality lighting
-- Hyper realistic fabric textures, 8K detail level
-- NO cartoon, NO cel-shading, NO flat colors, NO stylization
-
-COLOR PALETTE (strict reference):
-Beard/Hair: #E8E8F0 (silver-white) | Hat: #4A5568 (weathered grey) |
-Robes: #1A1A3E (dark midnight blue) | Gold details: #C8A84E (aged brass) |
-Staff: #3E2723 (dark oak) | Staff glow: #FFD54F (warm ember) | Eyes: #8FA8C8 (pale blue-grey)"""
-
-COMPOSITION = """Vertical 4:5 aspect ratio (1080x1350 pixels).
-Character positioned in lower two-thirds of frame — lower third preferred.
-Upper 35-40% of image open and clear for text overlay.
-Shallow depth of field on background, f/1.8 bokeh effect.
-Soft dramatic side lighting, cinematic color grading.
-Dark atmospheric fantasy setting with warm golden accent rim lighting.
-Camera angle: slight low angle, eye-level to mid-chest framing."""
+COMPOSITION = """Vertical 4:5. Character in lower 2/3, upper 35-40% clear for text overlay.
+Shallow DOF bokeh, dramatic side lighting, dark fantasy setting, warm golden rim light.
+Slight low angle, eye-to-chest framing."""
 
 NEGATIVE_TRAITS = (
-    "NOT cartoon, NOT cel-shading, NOT flat colors, NOT anime/manga, NOT chibi, "
-    "NOT stylized, NOT illustration, NOT watercolor, NOT oil painting brush strokes visible, "
-    "NOT young wizard, NOT clean/new clothing, NOT bright saturated colors, "
-    "NOT centered in frame, NOT bright white background, NOT without hat, NOT short beard, "
-    "NOT threatening expression, NOT different colored robes, "
-    "ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CAPTIONS, NO WATERMARKS, NO TYPOGRAPHY in the image. "
-    "The image must contain ZERO written text of any kind. "
-    "photorealism only, no stylization whatsoever"
+    "NO text/letters/words/captions/watermarks/typography. ZERO written text. "
+    "NO cartoon, cel-shading, flat colors, anime, illustration, watercolor. "
+    "NO young wizard, clean clothing, bright colors, short beard, no hat. "
+    "Photorealism only."
 )
 
 # 13 situacoes pre-definidas
@@ -611,12 +568,16 @@ def _selecionar_referencias(
 
 
 def _pil_para_part(img: PIL.Image.Image):
-    """Converte PIL.Image para Part do Gemini (inline bytes)."""
+    """Converte PIL.Image para Part do Gemini (inline bytes).
+
+    Resize to 768px max — keeps each image at 1 tile (258 tokens)
+    instead of 4 tiles (1032 tokens) at 1024px. 75% token savings.
+    """
     from google.genai import types
 
-    img_r = _redimensionar(img, 1024)
+    img_r = _redimensionar(img, 768)
     buf = BytesIO()
-    img_r.save(buf, format="JPEG", quality=90)
+    img_r.save(buf, format="JPEG", quality=85)
     return types.Part.from_bytes(data=buf.getvalue(), mime_type="image/jpeg")
 
 
