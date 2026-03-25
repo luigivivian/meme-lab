@@ -4,7 +4,7 @@ milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Ready to plan
 stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-03-25T03:49:18.911Z"
+last_updated: "2026-03-25T22:14:32Z"
 progress:
   total_phases: 6
   completed_phases: 1
@@ -50,6 +50,7 @@ Plan: Not started
 | Phase 12 P02 | 8min | 2 tasks | 4 files |
 | Phase 13 P01 | 3min | 2 tasks | 5 files |
 | Phase 13 P02 | 3min | 2 tasks | 5 files |
+| Quick 260325-qhl | 6min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Recent decisions affecting current work:
 - [Phase 13]: PermissionError at repo level, HTTPException 403 at deps.py helper level
 - [Phase 13]: Transitive ownership via Character join for all child-table repos (consistent pattern)
 - [Phase 13]: ThemeRepository hybrid ownership: global themes public, user themes by user_id, character themes by Character.user_id
+- [Quick 260325-qhl]: Tile-based token estimation: ceil(w/768)*ceil(h/768)*258 per input image
+- [Quick 260325-qhl]: cost_usd accumulated via upsert per day/service/tier bucket in api_usage
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T03:01:14.820Z
-Stopped at: Completed 13-02-PLAN.md
+Last session: 2026-03-25T22:14:32Z
+Stopped at: Completed quick/260325-qhl (Gemini Image cost tracking)
 Resume file: None
