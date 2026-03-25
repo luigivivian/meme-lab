@@ -16,7 +16,9 @@ Plataforma de geração e publicação automatizada de memes para Instagram. Pip
 - Dashboard v2: histórico 30 dias, alertas de limite, relatório de custos
 - Multi-tenant: isolamento por usuário, API keys por usuário, billing
 
-## Current State (v1.0 shipped 2026-03-24)
+## Current State (updated 2026-03-25)
+
+**Tenant isolation complete (Phase 13).** Every API route now enforces user-scoped data access. All 5 repositories have user-aware read methods with admin bypass. Character creation sets user_id. PermissionError from repos is caught as 403 at the HTTP layer. 16/16 must-haves verified, TENANT-01 through TENANT-04 satisfied.
 
 **Auth & Quota complete.** Full authentication (register/login/JWT/refresh/logout), all API routes protected, frontend auth pages with route guards, dual Gemini key management with atomic usage tracking, and graceful static fallback when API limits are exhausted.
 
