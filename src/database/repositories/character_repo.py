@@ -1,34 +1,56 @@
-"""Repository para Characters e CharacterRefs."""
+"""Repository para Characters e CharacterRefs — with tenant isolation."""
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.database.models import Character, CharacterRef
+from src.database.models import Character, CharacterRef, User
+
+
+def _is_admin(user: User | None) -> bool:
+    """Check if user has admin role (or no user filtering requested)."""
+    return user is None or getattr(user, "role", "user") == "admin"
 
 
 class CharacterRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_slug(self, slug: str, include_deleted: bool = False) -> Character | None:
+    async def get_by_slug(
+        self, slug: str, user: User | None = None, include_deleted: bool = False
+    ) -> Character | None:
         stmt = select(Character).where(Character.slug == slug)
         if not include_deleted:
             stmt = stmt.where(Character.is_deleted == False)  # noqa: E712
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        character = result.scalar_one_or_none()
+        if character and user is not None and not _is_admin(user):
+            if character.user_id != user.id:
+                raise PermissionError("forbidden")
+        return character
 
-    async def get_by_id(self, character_id: int) -> Character | None:
+    async def get_by_id(
+        self, character_id: int, user: User | None = None
+    ) -> Character | None:
         stmt = select(Character).where(
             Character.id == character_id, Character.is_deleted == False  # noqa: E712
         )
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        character = result.scalar_one_or_none()
+        if character and user is not None and not _is_admin(user):
+            if character.user_id != user.id:
+                raise PermissionError("forbidden")
+        return character
 
-    async def list_all(self, include_deleted: bool = False) -> list[Character]:
+    async def list_all(
+        self, user: User | None = None, include_deleted: bool = False
+    ) -> list[Character]:
         stmt = select(Character).order_by(Character.created_at.desc())
         if not include_deleted:
             stmt = stmt.where(Character.is_deleted == False)  # noqa: E712
+        # Tenant filtering: non-admin sees only own characters
+        if user is not None and not _is_admin(user):
+            stmt = stmt.where(Character.user_id == user.id)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
@@ -38,8 +60,10 @@ class CharacterRepository:
         await self.session.flush()
         return character
 
-    async def update(self, slug: str, data: dict) -> Character | None:
-        character = await self.get_by_slug(slug)
+    async def update(
+        self, slug: str, data: dict, user: User | None = None
+    ) -> Character | None:
+        character = await self.get_by_slug(slug, user=user)
         if not character:
             return None
         for key, value in data.items():
@@ -48,16 +72,18 @@ class CharacterRepository:
         await self.session.flush()
         return character
 
-    async def soft_delete(self, slug: str) -> bool:
-        character = await self.get_by_slug(slug)
+    async def soft_delete(self, slug: str, user: User | None = None) -> bool:
+        character = await self.get_by_slug(slug, user=user)
         if not character:
             return False
         character.is_deleted = True
         await self.session.flush()
         return True
 
-    async def exists(self, slug: str) -> bool:
+    async def exists(self, slug: str, user: User | None = None) -> bool:
         stmt = select(func.count()).select_from(Character).where(Character.slug == slug)
+        if user is not None and not _is_admin(user):
+            stmt = stmt.where(Character.user_id == user.id)
         result = await self.session.execute(stmt)
         return result.scalar_one() > 0
 
