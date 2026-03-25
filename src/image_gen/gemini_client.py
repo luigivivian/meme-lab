@@ -819,8 +819,18 @@ class GeminiImageClient:
     def _tentar_modelos(self, partes: list, temperatura: float, api_key: str | None = None) -> PIL.Image.Image | None:
         """Tenta modelos em ordem. No 429, pula pro proximo imediatamente."""
         key_hint = f"...{api_key[-6:]}" if api_key else "default(_get_client)"
-        # Filtrar modelos imagen-* (usam API diferente — Imagen, nao generateContent)
-        modelos = [m for m in MODELOS_IMAGEM if not m.startswith("imagen-")]
+        # Filtrar modelos incompativeis com free tier
+        # imagen-*: API diferente (predict, nao generateContent)
+        # gemini-3-pro-image, gemini-3.1-flash-image: limit=0 no free tier
+        modelos = [
+            m for m in MODELOS_IMAGEM
+            if not m.startswith("imagen-")
+            and "gemini-3-pro" not in m
+            and "gemini-3.1-flash" not in m
+        ]
+        # Fallback: se filtrou tudo, usar ao menos o primeiro disponivel
+        if not modelos:
+            modelos = [m for m in MODELOS_IMAGEM if not m.startswith("imagen-")]
         logger.info(f"_tentar_modelos: key={key_hint}, modelos={modelos}")
         rate_limited_count = 0
 
@@ -839,7 +849,7 @@ class GeminiImageClient:
                 elif "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                     rate_limited_count += 1
                     # Log full error to see which limit was hit
-                    logger.warning(f"{modelo}: 429 FULL ERROR: {msg[:500]}")
+                    logger.warning(f"{modelo}: 429 FULL ERROR: {msg[:800]}")
                 else:
                     logger.error(f"{modelo}: {type(e).__name__}: {msg[:500]}")
 
