@@ -26,6 +26,8 @@ async def _resolve_key(
     session: AsyncSession,
 ):
     """Resolve API key via selector. Admin-only force_tier (D-08)."""
+    import logging
+    _log = logging.getLogger("clip-flow.generation")
     effective_force = force_tier if (force_tier and current_user.role == "admin") else None
 
     selector = UsageAwareKeySelector()
@@ -34,6 +36,8 @@ async def _resolve_key(
         session=session,
         force_tier=effective_force,
     )
+    key_hint = f"...{resolution.api_key[-6:]}" if resolution.api_key else "EMPTY"
+    _log.info(f"_resolve_key: tier={resolution.tier}, mode={resolution.mode}, key={key_hint}")
     return resolution
 
 
@@ -55,45 +59,65 @@ async def generate_single(
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
+    import logging
+    _log = logging.getLogger("clip-flow.generation")
+
     from src.image_gen.gemini_client import GeminiImageClient
 
-    resolution = await _resolve_key(force_tier, current_user, session)
+    _log.info(f"[single] theme={req.theme_key}, auto_refine={req.auto_refine}")
+
+    try:
+        resolution = await _resolve_key(force_tier, current_user, session)
+    except Exception as e:
+        _log.error(f"[single] key resolution failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Key resolution failed: {e}")
+
+    _log.info(f"[single] key resolved: tier={resolution.tier}, mode={resolution.mode}")
 
     client = GeminiImageClient()
     if not client.is_available():
-        raise HTTPException(status_code=503, detail="Gemini Image nao disponivel")
+        _log.warning("[single] Gemini Image not available (no refs or API key)")
+        raise HTTPException(status_code=503, detail="Gemini Image nao disponivel (sem referencias ou API key)")
 
     situacao_key, acao, cenario = resolver_tema(req.theme_key, req.acao_custom, req.cenario_custom)
+    _log.info(f"[single] situacao={situacao_key}, acao={acao[:60]}...")
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     nome = f"single_{req.theme_key}_{ts}"
 
-    if req.auto_refine:
-        path = await asyncio.to_thread(
-            client.generate_with_refinement,
-            situacao_key,
-            acao,
-            cenario,
-            req.refinement_passes,
-            "",  # instrucao_refinamento
-            nome,
-            resolution.api_key,
-        )
-        final_file = f"{nome}_final.png" if path else None
-    else:
-        result = await asyncio.to_thread(
-            lambda: client.generate_image(
-                situacao_key=situacao_key,
-                descricao_custom=acao,
-                cenario_custom=cenario,
-                nome_arquivo=nome,
-                api_key=resolution.api_key,
+    try:
+        if req.auto_refine:
+            path = await asyncio.to_thread(
+                client.generate_with_refinement,
+                situacao_key,
+                acao,
+                cenario,
+                req.refinement_passes,
+                "",  # instrucao_refinamento
+                nome,
+                resolution.api_key,
             )
-        )
-        path = result.path if result else None
-        final_file = f"{nome}.png" if path else None
+            final_file = f"{nome}_final.png" if path else None
+        else:
+            result = await asyncio.to_thread(
+                lambda: client.generate_image(
+                    situacao_key=situacao_key,
+                    descricao_custom=acao,
+                    cenario_custom=cenario,
+                    nome_arquivo=nome,
+                    api_key=resolution.api_key,
+                )
+            )
+            path = result.path if result else None
+            final_file = f"{nome}.png" if path else None
+    except Exception as e:
+        _log.error(f"[single] generation failed: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=502, detail=f"Gemini generation failed: {e}")
 
     if path:
+        _log.info(f"[single] success: {path}")
         await _increment_usage(session, current_user.id, resolution.tier)
+    else:
+        _log.warning(f"[single] all models failed, no image generated")
 
     return {
         "success": path is not None,
