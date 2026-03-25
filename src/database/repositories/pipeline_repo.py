@@ -1,4 +1,4 @@
-"""Repository para PipelineRun, TrendEvent, WorkOrder e AgentStat."""
+"""Repository para PipelineRun, TrendEvent, WorkOrder e AgentStat — with tenant isolation."""
 
 from datetime import datetime
 from typing import Optional
@@ -7,7 +7,12 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.database.models import PipelineRun, TrendEvent, WorkOrder, AgentStat
+from src.database.models import PipelineRun, TrendEvent, WorkOrder, AgentStat, Character, User
+
+
+def _is_admin(user: User | None) -> bool:
+    """Check if user has admin role (or no user filtering requested)."""
+    return user is None or getattr(user, "role", "user") == "admin"
 
 
 class PipelineRunRepository:
@@ -16,12 +21,21 @@ class PipelineRunRepository:
 
     # ---- PipelineRun ----
 
-    async def get_by_run_id(self, run_id: str) -> PipelineRun | None:
+    async def get_by_run_id(
+        self, run_id: str, user: User | None = None
+    ) -> PipelineRun | None:
         stmt = select(PipelineRun).where(PipelineRun.run_id == run_id)
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        run = result.scalar_one_or_none()
+        if run and not _is_admin(user):
+            character = await self.session.get(Character, run.character_id)
+            if not character or character.user_id != user.id:
+                raise PermissionError("forbidden")
+        return run
 
-    async def get_by_run_id_with_relations(self, run_id: str) -> PipelineRun | None:
+    async def get_by_run_id_with_relations(
+        self, run_id: str, user: User | None = None
+    ) -> PipelineRun | None:
         stmt = (
             select(PipelineRun)
             .where(PipelineRun.run_id == run_id)
@@ -33,7 +47,12 @@ class PipelineRunRepository:
             )
         )
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        run = result.scalar_one_or_none()
+        if run and not _is_admin(user):
+            character = await self.session.get(Character, run.character_id)
+            if not character or character.user_id != user.id:
+                raise PermissionError("forbidden")
+        return run
 
     async def list_runs(
         self,
@@ -41,12 +60,18 @@ class PipelineRunRepository:
         offset: int = 0,
         status: str | None = None,
         character_id: int | None = None,
+        user: User | None = None,
     ) -> list[PipelineRun]:
         stmt = select(PipelineRun).order_by(PipelineRun.started_at.desc())
         if status:
             stmt = stmt.where(PipelineRun.status == status)
         if character_id is not None:
             stmt = stmt.where(PipelineRun.character_id == character_id)
+        # Tenant filtering: join Character to filter by user_id
+        if not _is_admin(user):
+            stmt = stmt.join(
+                Character, PipelineRun.character_id == Character.id
+            ).where(Character.user_id == user.id)
         stmt = stmt.offset(offset).limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
@@ -87,8 +112,21 @@ class PipelineRunRepository:
         await self.session.flush()
         return run
 
-    async def count_runs(self) -> int:
+    async def count_runs(
+        self,
+        status: str | None = None,
+        character_id: int | None = None,
+        user: User | None = None,
+    ) -> int:
         stmt = select(func.count()).select_from(PipelineRun)
+        if status:
+            stmt = stmt.where(PipelineRun.status == status)
+        if character_id is not None:
+            stmt = stmt.where(PipelineRun.character_id == character_id)
+        if not _is_admin(user):
+            stmt = stmt.join(
+                Character, PipelineRun.character_id == Character.id
+            ).where(Character.user_id == user.id)
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
