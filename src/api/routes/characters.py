@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import db_session, get_current_user, validate_filename
+from src.api.deps import db_session, get_current_user, get_user_character, validate_filename
 from src.api.models import CharacterCreateRequest, CharacterUpdateRequest
 from src.api.serializers import character_to_detail, character_to_summary
 
@@ -109,16 +109,14 @@ _ref_generation_jobs: dict[str, dict] = {}
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-async def _get_char_with_counts(slug: str, session: AsyncSession):
-    """Retorna (char, refs_counts, themes_count) ou raise 404."""
+async def _get_char_with_counts(slug: str, current_user, session: AsyncSession):
+    """Retorna (char, refs_counts, themes_count) ou raise 404/403."""
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.repositories.theme_repo import ThemeRepository
 
-    repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
+    char = await get_user_character(slug, current_user, session)
 
+    repo = CharacterRepository(session)
     refs_counts = await repo.count_refs_by_status(char.id)
     theme_repo = ThemeRepository(session)
     themes_count = await theme_repo.count_for_character(char.id)
@@ -169,7 +167,7 @@ async def api_list_characters(
 
     repo = CharacterRepository(session)
     theme_repo = ThemeRepository(session)
-    characters = await repo.list_all()
+    characters = await repo.list_all(user=current_user)
     if status:
         characters = [c for c in characters if c.status == status]
     total = len(characters)
@@ -186,7 +184,7 @@ async def api_list_characters(
 
 @router.get("/{slug}")
 async def api_get_character(slug: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
-    char, refs_counts, themes_count = await _get_char_with_counts(slug, session)
+    char, refs_counts, themes_count = await _get_char_with_counts(slug, current_user, session)
     return character_to_detail(char, refs_counts, themes_count)
 
 
@@ -210,6 +208,7 @@ async def api_create_character(req: CharacterCreateRequest, current_user=Depends
     data = {
         "slug": slug, "name": req.name,
         "handle": req.handle,
+        "user_id": current_user.id,
         "watermark": req.watermark or req.handle or "",
         "status": "draft",
         "system_prompt": req.persona.system_prompt,
@@ -244,7 +243,7 @@ async def api_update_character(slug: str, req: CharacterUpdateRequest, current_u
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import api_update_to_orm_dict
 
-    char, refs_counts, themes_count = await _get_char_with_counts(slug, session)
+    char, refs_counts, themes_count = await _get_char_with_counts(slug, current_user, session)
 
     if req.status is not None and req.status not in ("draft", "refining", "ready"):
         raise HTTPException(status_code=400, detail="Status invalido")
@@ -270,6 +269,9 @@ async def api_delete_character(slug: str, current_user=Depends(get_current_user)
 
     if slug == DEFAULT_CHARACTER:
         raise HTTPException(status_code=400, detail="Nao e possivel deletar o personagem padrao")
+
+    # Validate ownership before deleting
+    await get_user_character(slug, current_user, session)
 
     repo = CharacterRepository(session)
     deleted = await repo.soft_delete(slug)
@@ -352,10 +354,8 @@ async def validate_character(slug: str, current_user=Depends(get_current_user), 
     from src.database.repositories.theme_repo import ThemeRepository
     from src.database.converters import orm_to_character_config
 
+    char = await get_user_character(slug, current_user, session)
     repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
 
     config = orm_to_character_config(char)
     refs_stats = config.refs_stats()
@@ -426,12 +426,8 @@ async def validate_character(slug: str, current_user=Depends(get_current_user), 
 @router.post("/{slug}/test-phrases", summary="Gerar frases de teste", tags=["Validation"])
 async def test_character_phrases(slug: str, body: dict | None = None, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
     from src.llm_client import generate
-    from src.database.repositories.character_repo import CharacterRepository
 
-    repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
+    char = await get_user_character(slug, current_user, session)
     if not char.system_prompt:
         raise HTTPException(status_code=400, detail="Personagem sem system prompt definido")
 
@@ -468,13 +464,9 @@ async def test_character_phrases(slug: str, body: dict | None = None, current_us
 
 @router.post("/{slug}/test-visual", summary="Gerar imagem de teste", tags=["Validation"])
 async def test_character_visual(slug: str, body: dict | None = None, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
-    from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
-    repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
+    char = await get_user_character(slug, current_user, session)
     if not char.character_dna:
         raise HTTPException(status_code=400, detail="Personagem sem DNA visual definido")
 
@@ -517,14 +509,10 @@ async def test_character_compose(slug: str, body: dict | None = None, current_us
     from src.image_gen.gemini_client import GeminiImageClient, build_character_image_prompt, SITUACOES, _selecionar_referencias, _pil_para_part
     from src.image_maker import create_image
     from src.llm_client import generate
-    from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
     from config import OUTPUT_DIR
 
-    repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
+    char = await get_user_character(slug, current_user, session)
     if not char.system_prompt:
         raise HTTPException(status_code=400, detail="Personagem sem system prompt")
     if not char.character_dna:
@@ -684,10 +672,8 @@ async def generate_refs(slug: str, body: dict | None = None, current_user=Depend
     from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
+    char = await get_user_character(slug, current_user, session)
     repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
     if not char.character_dna:
         raise HTTPException(status_code=400, detail="Personagem sem DNA visual definido")
 
@@ -730,13 +716,9 @@ async def refs_generate_status(slug: str, current_user=Depends(get_current_user)
 
 @router.get("/{slug}/refs", summary="Lista refs do personagem", tags=["Refs"])
 async def list_refs(slug: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
-    from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
-    repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
+    char = await get_user_character(slug, current_user, session)
 
     config = orm_to_character_config(char)
 
@@ -761,14 +743,10 @@ async def list_refs(slug: str, current_user=Depends(get_current_user), session: 
 
 @router.get("/{slug}/refs/image/{filename}", summary="Serve imagem de ref", tags=["Refs"])
 async def serve_ref_image(slug: str, filename: str, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
-    from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
     validate_filename(filename)
-    repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
+    char = await get_user_character(slug, current_user, session)
 
     config = orm_to_character_config(char)
     for folder in [config.approved_refs_dir, config.pending_refs_dir, config.rejected_refs_dir]:
@@ -796,10 +774,8 @@ async def approve_ref(slug: str, filename: str, current_user=Depends(get_current
     from src.database.converters import orm_to_character_config
 
     validate_filename(filename)
+    char = await get_user_character(slug, current_user, session)
     repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
 
     config = orm_to_character_config(char)
 
@@ -822,10 +798,8 @@ async def reject_ref(slug: str, filename: str, current_user=Depends(get_current_
     from src.database.converters import orm_to_character_config
 
     validate_filename(filename)
+    char = await get_user_character(slug, current_user, session)
     repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
 
     config = orm_to_character_config(char)
 
@@ -848,10 +822,8 @@ async def delete_ref(slug: str, filename: str, current_user=Depends(get_current_
     from src.database.converters import orm_to_character_config
 
     validate_filename(filename)
+    char = await get_user_character(slug, current_user, session)
     repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
 
     config = orm_to_character_config(char)
     deleted = False
@@ -873,13 +845,9 @@ async def delete_ref(slug: str, filename: str, current_user=Depends(get_current_
 
 @router.post("/{slug}/refs/upload", summary="Upload manual de refs", tags=["Refs"])
 async def upload_refs(slug: str, files: list[UploadFile], current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
-    from src.database.repositories.character_repo import CharacterRepository
     from src.database.converters import orm_to_character_config
 
-    repo = CharacterRepository(session)
-    char = await repo.get_by_slug(slug)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Personagem nao encontrado: {slug}")
+    char = await get_user_character(slug, current_user, session)
 
     config = orm_to_character_config(char)
     config.pending_refs_dir.mkdir(parents=True, exist_ok=True)
