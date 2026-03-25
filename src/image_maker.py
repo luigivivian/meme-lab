@@ -207,9 +207,21 @@ def create_image(
     text_align = layout_config.get("text_align", "center")
     margin_left = layout_config.get("margin_left", 80)
 
-    # Abrir e redimensionar background
-    bg = Image.open(background_path).convert("RGBA")
-    bg = _crop_center(bg, IMAGE_WIDTH, IMAGE_HEIGHT)
+    # Detect solid color hex string (per D-01, D-03)
+    if isinstance(background_path, str) and background_path.startswith("#"):
+        hex_color = background_path.lstrip("#")
+        if len(hex_color) == 3:
+            hex_color = "".join(c * 2 for c in hex_color)
+        if len(hex_color) != 6:
+            raise ValueError(f"Invalid hex color: {background_path}")
+        try:
+            r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        except ValueError:
+            raise ValueError(f"Invalid hex color: {background_path}")
+        bg = Image.new("RGBA", (IMAGE_WIDTH, IMAGE_HEIGHT), (r, g, b, 255))
+    else:
+        bg = Image.open(background_path).convert("RGBA")
+        bg = _crop_center(bg, IMAGE_WIDTH, IMAGE_HEIGHT)
 
     # 1. Overlay azul noturno semi-transparente
     overlay = Image.new("RGBA", (IMAGE_WIDTH, IMAGE_HEIGHT), OVERLAY_COLOR)
