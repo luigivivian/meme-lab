@@ -544,6 +544,12 @@ export const uploadBackground = async (file: File, characterSlug: string) => {
 export const listBackgrounds = (characterSlug: string) =>
   request<{ backgrounds: BackgroundFile[] }>(`/pipeline/backgrounds/${encodeURIComponent(characterSlug)}`);
 
+export const deleteBackground = (filename: string, characterSlug: string) =>
+  request<{ deleted: string }>(
+    `/pipeline/backgrounds/${encodeURIComponent(characterSlug)}/${encodeURIComponent(filename)}`,
+    { method: "DELETE" }
+  );
+
 export const getThemesWithColors = () =>
   request<{ themes: ThemeWithColors[] }>("/pipeline/themes");
 

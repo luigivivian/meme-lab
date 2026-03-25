@@ -132,6 +132,7 @@ async def _run_pipeline_task(run_id: str, request: PipelineRunRequest):
             cost_mode=effective_cost_mode,
             background_mode=request.background_mode,
             manual_topics=manual_topics,
+            character_slug=request.character_slug or "mago-mestre",
             **char_kwargs,
         )
         result = await orchestrator.run()
@@ -388,21 +389,27 @@ async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
             bg_path = request.background_color  # Hex string like "#1A1A3E"
         elif request.background_type == "image" and request.background_image:
             bg_path = str(Path("assets/backgrounds") / character_slug / request.background_image)
+        elif request.background_type == "image":
+            # Pick a random existing background from the character's directory
+            char_bg_dir = Path("assets/backgrounds") / character_slug
+            bg_files = []
+            if char_bg_dir.exists():
+                for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+                    bg_files.extend(char_bg_dir.glob(ext))
+            # Legacy fallback: assets/backgrounds/mago/ for mago-mestre
+            if not bg_files and character_slug == "mago-mestre":
+                legacy_dir = Path("assets/backgrounds") / "mago"
+                if legacy_dir.exists():
+                    for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+                        bg_files.extend(legacy_dir.glob(ext))
+            if bg_files:
+                bg_path = str(random.choice(bg_files))
+            else:
+                # Fallback: any background from assets/backgrounds/
+                all_bgs = list(_cfg.BACKGROUNDS_DIR.rglob("*.png")) + list(_cfg.BACKGROUNDS_DIR.rglob("*.jpg"))
+                bg_path = str(random.choice(all_bgs)) if all_bgs else "#1A1A3E"
         else:
-            # Fallback: use first color from theme
-            try:
-                import yaml
-                themes_path = Path("config/themes.yaml")
-                with open(themes_path, encoding="utf-8") as f:
-                    themes = yaml.safe_load(f)
-                theme_colors = None
-                for t in themes:
-                    if t.get("key") == request.theme_key:
-                        theme_colors = t.get("colors", [])
-                        break
-                bg_path = theme_colors[0] if theme_colors else "#1A1A3E"
-            except Exception:
-                bg_path = "#1A1A3E"
+            bg_path = "#1A1A3E"
 
         # Compose memes
         _cfg.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -689,15 +696,56 @@ async def list_backgrounds(
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
-    await get_user_character(character_slug, current_user, session)
-    bg_dir = Path("assets/backgrounds") / character_slug
-    if not bg_dir.exists():
-        return {"backgrounds": []}
+    # Backgrounds are read-only static assets — no ownership check needed.
+    # Only upload_background enforces ownership.
+    from src.database.repositories.character_repo import CharacterRepository
+    repo = CharacterRepository(session)
+    char = await repo.get_by_slug(character_slug)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+
     files = []
-    for f in sorted(bg_dir.iterdir()):
-        if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
-            files.append({"filename": f.name, "path": str(f)})
+    _EXTS = (".jpg", ".jpeg", ".png", ".webp")
+
+    # Primary: character-specific directory
+    bg_dir = Path("assets/backgrounds") / character_slug
+    if bg_dir.exists():
+        for f in sorted(bg_dir.iterdir()):
+            if f.suffix.lower() in _EXTS:
+                files.append({"filename": f.name, "path": str(f)})
+
+    # Legacy fallback: assets/backgrounds/mago/ for mago-mestre
+    if character_slug == "mago-mestre" and not files:
+        legacy_dir = Path("assets/backgrounds") / "mago"
+        if legacy_dir.exists():
+            for f in sorted(legacy_dir.iterdir()):
+                if f.suffix.lower() in _EXTS:
+                    files.append({"filename": f.name, "path": str(f)})
+
     return {"backgrounds": files}
+
+
+@router.delete("/backgrounds/{character_slug}/{filename}", summary="Delete background image")
+async def delete_background(
+    character_slug: str,
+    filename: str,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    # Validate ownership
+    char = await get_user_character(character_slug, current_user, session)
+
+    # Prevent path traversal
+    safe_name = Path(filename).name
+    if safe_name != filename or ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    bg_path = Path("assets/backgrounds") / character_slug / safe_name
+    if not bg_path.exists():
+        raise HTTPException(status_code=404, detail="Background not found")
+
+    await asyncio.to_thread(bg_path.unlink)
+    return {"deleted": safe_name}
 
 
 # ── Themes with colors ──────────────────────────────────────────────────────
