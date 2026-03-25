@@ -143,8 +143,11 @@ COMFYUI_SAMPLING_STEPS = 25
 # Guidance scale para Flux
 COMFYUI_GUIDANCE = 4.0
 
-# Diretorio para backgrounds gerados
+# Diretorio para backgrounds gerados (sem texto — prontos para reuso)
 GENERATED_BACKGROUNDS_DIR = OUTPUT_DIR / "backgrounds_generated"
+
+# Diretorio para memes finais (background + frase sobreposta pelo Pillow)
+GENERATED_MEMES_DIR = OUTPUT_DIR / "memes"
 
 # Fallback: se ComfyUI falhar, usar backgrounds estaticos
 COMFYUI_FALLBACK_TO_STATIC = True
@@ -173,8 +176,11 @@ GEMINI_IMAGE_ENABLED = True
 # Temperatura para geracao de imagem (0.0-2.0, mais alto = mais criativo)
 GEMINI_IMAGE_TEMPERATURE = 0.85
 
-# Quantas imagens de referencia enviar por geracao (3-7 recomendado, max 14)
-GEMINI_IMAGE_N_REFS = 5
+# Quantas imagens de referencia enviar por geracao (3 recomendado, max 14)
+GEMINI_IMAGE_N_REFS = int(os.getenv("GEMINI_IMAGE_N_REFS", "3"))
+
+# Limite maximo de refs permitido pela API Gemini (gemini-2.5-flash-image: up to 14)
+GEMINI_IMAGE_MAX_REFS = 14
 
 # Retry para rate limit 429
 GEMINI_IMAGE_MAX_RETRIES = 2
