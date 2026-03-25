@@ -13,8 +13,6 @@ import {
   Copy,
   Check,
   Info,
-  ImageIcon,
-  Palette,
   Plus,
   Upload,
 } from "lucide-react";
@@ -570,10 +568,9 @@ function ManualRunForm({
     phrases: string[];
     count: number;
     theme_key: string;
-    background_type: "solid" | "image";
-    background_color: string;
     background_image: string;
     enable_l5: boolean;
+    use_gemini_image: boolean;
   }) => void;
 }) {
   const { activeCharacter } = useCharacterContext();
@@ -584,12 +581,9 @@ function ManualRunForm({
   const [phraseValue, setPhraseValue] = useState("");
   const [count, setCount] = useState(3);
   const [themeKey, setThemeKey] = useState("sabedoria");
-  const [backgroundType, setBackgroundType] = useState<"solid" | "image">(
-    "image"
-  );
-  const [backgroundColor, setBackgroundColor] = useState("");
   const [backgroundImage, setBackgroundImage] = useState("");
   const [enableL5, setEnableL5] = useState(true);
+  const [useGeminiImage, setUseGeminiImage] = useState(false);
 
   // Theme data
   const [themes, setThemes] = useState<ThemeWithColors[]>([]);
@@ -603,25 +597,14 @@ function ManualRunForm({
       .catch(() => {});
   }, []);
 
-  // Load backgrounds when character or type changes
+  // Load backgrounds on mount and when character changes
   useEffect(() => {
-    if (backgroundType === "image" && characterSlug) {
+    if (characterSlug) {
       listBackgrounds(characterSlug)
         .then((r) => setBackgrounds(r.backgrounds))
         .catch(() => setBackgrounds([]));
     }
-  }, [backgroundType, characterSlug]);
-
-  // Get colors for selected theme
-  const selectedTheme = themes.find((t) => t.key === themeKey);
-  const themeColors = selectedTheme?.colors ?? [];
-
-  // Auto-select first color when theme changes
-  useEffect(() => {
-    if (backgroundType === "solid" && themeColors.length > 0 && !backgroundColor) {
-      setBackgroundColor(themeColors[0]);
-    }
-  }, [themeKey, themeColors, backgroundType, backgroundColor]);
+  }, [characterSlug]);
 
   const handleUpload = async (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
@@ -664,10 +647,9 @@ function ManualRunForm({
         .filter(Boolean),
       count,
       theme_key: themeKey,
-      background_type: backgroundType,
-      background_color: backgroundColor,
       background_image: backgroundImage,
       enable_l5: enableL5,
+      use_gemini_image: useGeminiImage,
     });
   };
 
@@ -711,51 +693,6 @@ function ManualRunForm({
           </TabsContent>
         </Tabs>
 
-        {/* Background Type Selector */}
-        <div className="space-y-2">
-          <label className="text-sm font-normal text-muted-foreground">
-            Background
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setBackgroundType("solid")}
-              className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-all duration-200 ${
-                backgroundType === "solid"
-                  ? "border-[#8B5CF6] bg-[#8B5CF6]/10"
-                  : "border-white/5 bg-secondary/30 hover:border-white/10"
-              }`}
-            >
-              <Palette
-                className={`h-5 w-5 ${
-                  backgroundType === "solid"
-                    ? "text-[#8B5CF6]"
-                    : "text-muted-foreground"
-                }`}
-              />
-              <span className="text-sm font-normal">Cor solida</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setBackgroundType("image")}
-              className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-all duration-200 ${
-                backgroundType === "image"
-                  ? "border-[#8B5CF6] bg-[#8B5CF6]/10"
-                  : "border-white/5 bg-secondary/30 hover:border-white/10"
-              }`}
-            >
-              <ImageIcon
-                className={`h-5 w-5 ${
-                  backgroundType === "image"
-                    ? "text-[#8B5CF6]"
-                    : "text-muted-foreground"
-                }`}
-              />
-              <span className="text-sm font-normal">Imagem</span>
-            </button>
-          </div>
-        </div>
-
         {/* Theme Select */}
         <div className="space-y-2">
           <label className="text-sm font-normal text-muted-foreground">
@@ -775,33 +712,8 @@ function ManualRunForm({
           </Select>
         </div>
 
-        {/* Color Palette Picker (solid mode) */}
-        {backgroundType === "solid" && themeColors.length > 0 && (
-          <div className="space-y-2">
-            <label className="text-sm font-normal text-muted-foreground">
-              Cor do background
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {themeColors.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setBackgroundColor(color)}
-                  className={`w-8 h-8 rounded-full transition-all ${
-                    backgroundColor === color
-                      ? "ring-2 ring-[#8B5CF6] ring-offset-2 ring-offset-[#06060a]"
-                      : "hover:scale-110"
-                  }`}
-                  style={{ backgroundColor: color }}
-                  title={color}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Background Image Picker (image mode) */}
-        {backgroundType === "image" && (
+        {/* Background Image Picker */}
+        {(
           <div className="space-y-2">
             <label className="text-sm font-normal text-muted-foreground">
               Background image
@@ -881,6 +793,20 @@ function ManualRunForm({
             className="font-normal"
           />
         </div>
+
+        {/* Gemini Image Toggle */}
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={useGeminiImage}
+            onChange={(e) => setUseGeminiImage(e.target.checked)}
+            className="h-4 w-4 rounded accent-[#8B5CF6]"
+          />
+          <div className="text-sm font-normal">
+            Gerar background via Gemini
+            <span className="text-muted-foreground text-xs ml-1">(consome API)</span>
+          </div>
+        </label>
 
         {/* L5 Toggle */}
         <label className="flex items-center gap-3 cursor-pointer">
@@ -968,10 +894,9 @@ function PipelinePageInner() {
     phrases: string[];
     count: number;
     theme_key: string;
-    background_type: "solid" | "image";
-    background_color: string;
     background_image: string;
     enable_l5: boolean;
+    use_gemini_image: boolean;
   }) => {
     manualPipeline.run({
       input_mode: params.input_mode,
@@ -979,11 +904,12 @@ function PipelinePageInner() {
       phrases: params.phrases,
       count: params.count,
       theme_key: params.theme_key,
-      background_type: params.background_type,
-      background_color: params.background_color,
+      background_type: "image",
+      background_color: "",
       background_image: params.background_image,
       layout: "bottom",
       enable_l5: params.enable_l5,
+      use_gemini_image: params.use_gemini_image,
       character_slug: characterSlug,
     });
   };

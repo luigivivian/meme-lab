@@ -83,11 +83,12 @@ const PIPELINE: LayerDef[] = [
     ],
   },
   {
-    id: "L4", label: "Generation", desc: "Frases + imagens",
+    id: "L4", label: "Generation", desc: "Frases + backgrounds + composicao",
     flow: "parallel", output: "ContentPackages",
     steps: [
-      { id: "phrases", label: "PhraseWorker" },
-      { id: "images",  label: "ImageWorker"  },
+      { id: "phrases",    label: "PhraseWorker" },
+      { id: "backgrounds", label: "BackgroundResolver" },
+      { id: "compose",    label: "ImageComposer" },
     ],
   },
   {
@@ -878,7 +879,7 @@ const LAYER_START_MSGS: Record<string, string> = {
   L1: "Iniciando fetch paralelo de trends — 6 agents ativos",
   L2: "Ingestao de eventos na fila de deduplicacao",
   L3: "Gemini Analyzer selecionando melhores temas",
-  L4: "Gerando frases e backgrounds em paralelo",
+  L4: "Gerando frases, resolvendo backgrounds e compondo memes",
   L5: "Enriquecimento: caption, hashtags e quality score",
 };
 
@@ -911,7 +912,8 @@ const LAYER_DETAIL_MSGS: Record<string, string[]> = {
   ],
   L4: [
     "PhraseWorker — gerando frases via Gemini API",
-    "ImageWorker — Gemini Image com refs do mago",
+    "BackgroundResolver — Gemini Image ou pool estatico por tema",
+    "ImageComposer — Pillow overlay (frase + watermark)",
   ],
   L5: [
     "CaptionWorker — legendas Instagram com CTA",
