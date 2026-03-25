@@ -1,4 +1,4 @@
-"""Repository para ContentPackage e GeneratedImage."""
+"""Repository para ContentPackage e GeneratedImage — with tenant isolation."""
 
 from datetime import datetime, timedelta
 from typing import Optional
@@ -7,17 +7,29 @@ from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.database.models import ContentPackage, GeneratedImage
+from src.database.models import ContentPackage, GeneratedImage, Character, User
+
+
+def _is_admin(user: User | None) -> bool:
+    """Check if user has admin role (or no user filtering requested)."""
+    return user is None or getattr(user, "role", "user") == "admin"
 
 
 class ContentPackageRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_id(self, package_id: int) -> ContentPackage | None:
+    async def get_by_id(
+        self, package_id: int, user: User | None = None
+    ) -> ContentPackage | None:
         stmt = select(ContentPackage).where(ContentPackage.id == package_id)
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        package = result.scalar_one_or_none()
+        if package and not _is_admin(user):
+            character = await self.session.get(Character, package.character_id)
+            if not character or character.user_id != user.id:
+                raise PermissionError("forbidden")
+        return package
 
     async def list_packages(
         self,
@@ -28,6 +40,7 @@ class ContentPackageRepository:
         min_quality: float | None = None,
         is_published: bool | None = None,
         approval_status: str | None = None,
+        user: User | None = None,
     ) -> list[ContentPackage]:
         stmt = select(ContentPackage).order_by(ContentPackage.created_at.desc())
         if character_id is not None:
@@ -40,6 +53,11 @@ class ContentPackageRepository:
             stmt = stmt.where(ContentPackage.is_published == is_published)
         if approval_status is not None:
             stmt = stmt.where(ContentPackage.approval_status == approval_status)
+        # Tenant filtering: join Character to filter by user_id
+        if not _is_admin(user):
+            stmt = stmt.join(
+                Character, ContentPackage.character_id == Character.id
+            ).where(Character.user_id == user.id)
         stmt = stmt.offset(offset).limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
@@ -75,14 +93,27 @@ class ContentPackageRepository:
         await self.session.flush()
         return package
 
-    async def count(self, character_id: int | None = None) -> int:
+    async def count(
+        self,
+        character_id: int | None = None,
+        user: User | None = None,
+    ) -> int:
         stmt = select(func.count()).select_from(ContentPackage)
         if character_id is not None:
             stmt = stmt.where(ContentPackage.character_id == character_id)
+        if not _is_admin(user):
+            stmt = stmt.join(
+                Character, ContentPackage.character_id == Character.id
+            ).where(Character.user_id == user.id)
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
-    async def get_by_ids(self, package_ids: list[int], load_character: bool = False) -> list[ContentPackage]:
+    async def get_by_ids(
+        self,
+        package_ids: list[int],
+        load_character: bool = False,
+        user: User | None = None,
+    ) -> list[ContentPackage]:
         """Busca multiplos packages por lista de IDs."""
         if not package_ids:
             return []
@@ -93,10 +124,16 @@ class ContentPackageRepository:
         )
         if load_character:
             stmt = stmt.options(selectinload(ContentPackage.character))
+        if not _is_admin(user):
+            stmt = stmt.join(
+                Character, ContentPackage.character_id == Character.id
+            ).where(Character.user_id == user.id)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_id_with_character(self, package_id: int) -> ContentPackage | None:
+    async def get_by_id_with_character(
+        self, package_id: int, user: User | None = None
+    ) -> ContentPackage | None:
         """Busca package por ID com eager load do personagem."""
         stmt = (
             select(ContentPackage)
@@ -104,7 +141,11 @@ class ContentPackageRepository:
             .options(selectinload(ContentPackage.character))
         )
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        package = result.scalar_one_or_none()
+        if package and not _is_admin(user):
+            if not package.character or package.character.user_id != user.id:
+                raise PermissionError("forbidden")
+        return package
 
     async def get_for_run(self, pipeline_run_id: int) -> list[ContentPackage]:
         stmt = (
@@ -153,10 +194,17 @@ class GeneratedImageRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_id(self, image_id: int) -> GeneratedImage | None:
+    async def get_by_id(
+        self, image_id: int, user: User | None = None
+    ) -> GeneratedImage | None:
         stmt = select(GeneratedImage).where(GeneratedImage.id == image_id)
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        image = result.scalar_one_or_none()
+        if image and not _is_admin(user):
+            character = await self.session.get(Character, image.character_id)
+            if not character or character.user_id != user.id:
+                raise PermissionError("forbidden")
+        return image
 
     async def list_images(
         self,
@@ -165,6 +213,7 @@ class GeneratedImageRepository:
         character_id: int | None = None,
         image_type: str | None = None,
         source: str | None = None,
+        user: User | None = None,
     ) -> list[GeneratedImage]:
         stmt = select(GeneratedImage).order_by(GeneratedImage.created_at.desc())
         if character_id is not None:
@@ -173,6 +222,11 @@ class GeneratedImageRepository:
             stmt = stmt.where(GeneratedImage.image_type == image_type)
         if source:
             stmt = stmt.where(GeneratedImage.source == source)
+        # Tenant filtering: join Character to filter by user_id
+        if not _is_admin(user):
+            stmt = stmt.join(
+                Character, GeneratedImage.character_id == Character.id
+            ).where(Character.user_id == user.id)
         stmt = stmt.offset(offset).limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
@@ -183,9 +237,17 @@ class GeneratedImageRepository:
         await self.session.flush()
         return image
 
-    async def count(self, character_id: int | None = None) -> int:
+    async def count(
+        self,
+        character_id: int | None = None,
+        user: User | None = None,
+    ) -> int:
         stmt = select(func.count()).select_from(GeneratedImage)
         if character_id is not None:
             stmt = stmt.where(GeneratedImage.character_id == character_id)
+        if not _is_admin(user):
+            stmt = stmt.join(
+                Character, GeneratedImage.character_id == Character.id
+            ).where(Character.user_id == user.id)
         result = await self.session.execute(stmt)
         return result.scalar_one()
