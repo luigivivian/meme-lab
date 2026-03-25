@@ -27,7 +27,7 @@ class PipelineRunRepository:
         stmt = select(PipelineRun).where(PipelineRun.run_id == run_id)
         result = await self.session.execute(stmt)
         run = result.scalar_one_or_none()
-        if run and not _is_admin(user):
+        if run and run.character_id and not _is_admin(user):
             character = await self.session.get(Character, run.character_id)
             if not character or character.user_id != user.id:
                 raise PermissionError("forbidden")
@@ -48,7 +48,7 @@ class PipelineRunRepository:
         )
         result = await self.session.execute(stmt)
         run = result.scalar_one_or_none()
-        if run and not _is_admin(user):
+        if run and run.character_id and not _is_admin(user):
             character = await self.session.get(Character, run.character_id)
             if not character or character.user_id != user.id:
                 raise PermissionError("forbidden")

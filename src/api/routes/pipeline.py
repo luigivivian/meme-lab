@@ -528,6 +528,16 @@ async def manual_run(
     from src.database.repositories.pipeline_repo import PipelineRunRepository
 
     run_id = uuid.uuid4().hex[:8]
+
+    # Resolve character_id from slug (if provided)
+    character_id = None
+    if request.character_slug:
+        from src.database.repositories.character_repo import CharacterRepository
+        char_repo = CharacterRepository(session)
+        char = await char_repo.get_by_slug(request.character_slug)
+        if char:
+            character_id = char.id
+
     repo = PipelineRunRepository(session)
     run = await repo.create_run({
         "run_id": run_id,
@@ -536,6 +546,7 @@ async def manual_run(
         "requested_count": request.count,
         "use_gemini_image": False,
         "theme_tags": [request.theme_key] if request.theme_key else [],
+        "character_id": character_id,
     })
     await session.commit()
 
