@@ -58,6 +58,7 @@ import {
   listBackgrounds,
   uploadBackground,
   deleteBackground,
+  backgroundImageUrl,
   type ContentPackage,
   type ThemeWithColors,
   type BackgroundFile,
@@ -819,7 +820,7 @@ function ManualRunForm({
                       }`}
                     >
                       <img
-                        src={imageUrl(bg.filename)}
+                        src={backgroundImageUrl(bg.filename, characterSlug)}
                         alt={bg.filename}
                         className="w-16 h-20 object-cover"
                       />

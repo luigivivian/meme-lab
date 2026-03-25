@@ -550,6 +550,9 @@ export const deleteBackground = (filename: string, characterSlug: string) =>
     { method: "DELETE" }
   );
 
+export const backgroundImageUrl = (filename: string, characterSlug: string) =>
+  `${BASE}/pipeline/backgrounds/${encodeURIComponent(characterSlug)}/image/${encodeURIComponent(filename)}`;
+
 export const getThemesWithColors = () =>
   request<{ themes: ThemeWithColors[] }>("/pipeline/themes");
 

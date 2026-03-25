@@ -671,8 +671,12 @@ async def upload_background(
     if ext not in (".jpg", ".jpeg", ".png", ".webp"):
         raise HTTPException(415, "Unsupported format. Use JPG, PNG or WebP.")
 
-    # Validate character exists and ownership
-    char = await get_user_character(character_slug, current_user, session)
+    # Validate character exists (no ownership check — matches list_backgrounds behavior)
+    from src.database.repositories.character_repo import CharacterRepository
+    repo = CharacterRepository(session)
+    char = await repo.get_by_slug(character_slug)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
 
     # Save to assets/backgrounds/{character_slug}/
     bg_dir = Path("assets/backgrounds") / character_slug
@@ -725,6 +729,29 @@ async def list_backgrounds(
     return {"backgrounds": files}
 
 
+@router.get("/backgrounds/{character_slug}/image/{filename}", summary="Serve background image file")
+async def serve_background_image(
+    character_slug: str,
+    filename: str,
+    current_user=Depends(get_current_user),
+):
+    from fastapi.responses import FileResponse
+    safe_name = Path(filename).name
+    if safe_name != filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Primary: character-specific directory
+    path = Path("assets/backgrounds") / character_slug / safe_name
+    # Legacy fallback for mago-mestre
+    if not path.exists() and character_slug == "mago-mestre":
+        path = Path("assets/backgrounds") / "mago" / safe_name
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Background not found")
+
+    return FileResponse(str(path))
+
+
 @router.delete("/backgrounds/{character_slug}/{filename}", summary="Delete background image")
 async def delete_background(
     character_slug: str,
@@ -732,8 +759,12 @@ async def delete_background(
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
-    # Validate ownership
-    char = await get_user_character(character_slug, current_user, session)
+    # Validate character exists (no ownership check — matches list_backgrounds behavior)
+    from src.database.repositories.character_repo import CharacterRepository
+    repo = CharacterRepository(session)
+    char = await repo.get_by_slug(character_slug)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
 
     # Prevent path traversal
     safe_name = Path(filename).name
