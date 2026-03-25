@@ -698,7 +698,7 @@ function ManualRunForm({
           <label className="text-sm font-normal text-muted-foreground">
             Tema
           </label>
-          <Select value={themeKey} onValueChange={(v) => { setThemeKey(v); setBackgroundColor(""); }}>
+          <Select value={themeKey} onValueChange={(v) => { setThemeKey(v); setBackgroundImage(""); }}>
             <SelectTrigger>
               <SelectValue placeholder="Selecionar tema..." />
             </SelectTrigger>
