@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -914,15 +914,52 @@ function PipelinePageInner() {
     });
   };
 
+  // Simulate layer-by-layer progress for the diagram based on manual pipeline state
+  const simulatedLayers = useMemo(() => {
+    if (!manualPipeline.isRunning && manualPipeline.progress === 0) return undefined;
+
+    const pct = manualPipeline.progress;
+    const isDone = !manualPipeline.isRunning && pct >= 100;
+    const isErr = !manualPipeline.isRunning && manualPipeline.error;
+
+    // Map progress % → layer states
+    // L1 Input (0-15%), L2 Background (15-40%), L3 Compose (40-70%), L4 Post-Prod (70-90%), L5 Output (90-100%)
+    const thresholds = [
+      { id: "L1", start: 0,  end: 15 },
+      { id: "L2", start: 15, end: 40 },
+      { id: "L3", start: 40, end: 70 },
+      { id: "L4", start: 70, end: 90 },
+      { id: "L5", start: 90, end: 100 },
+    ];
+
+    type LStatus = "idle" | "running" | "done" | "error";
+    const layers: Record<string, { status: LStatus; detail: string }> = {};
+    for (const t of thresholds) {
+      if (isErr && pct < t.end) {
+        layers[t.id] = { status: (pct >= t.start ? "error" : "idle") as LStatus, detail: "" };
+      } else if (isDone || pct >= t.end) {
+        layers[t.id] = { status: "done", detail: "" };
+      } else if (pct >= t.start) {
+        layers[t.id] = { status: "running", detail: "" };
+      } else {
+        layers[t.id] = { status: "idle", detail: "" };
+      }
+    }
+    return layers;
+  }, [manualPipeline.isRunning, manualPipeline.progress, manualPipeline.error]);
+
+  const diagramIsRunning = pipeline.isRunning || manualPipeline.isRunning;
+  const diagramLayers = pipeline.status?.layers ?? simulatedLayers;
+
   return (
     <div className="space-y-6">
       {/* Pipeline Diagram */}
       <div className="rounded-[14px] overflow-hidden border border-border/50">
         <PipelineDiagram
-          layers={pipeline.status?.layers}
+          layers={diagramLayers}
           currentLayer={pipeline.status?.current_layer}
           pipelineStatus={pipeline.status}
-          isRunning={pipeline.isRunning}
+          isRunning={diagramIsRunning}
         />
       </div>
 
