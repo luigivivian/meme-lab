@@ -34,11 +34,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. User can select a theme and background style before running the pipeline
   3. User can preview composed memes in a gallery and approve or reject each one before they move downstream
   4. Pipeline output images are visually correct compositions (background + phrase text rendered by Pillow)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 12-01: TBD
-- [ ] 12-02: TBD
+- [ ] 12-01-PLAN.md — Backend: DB migration, image_maker hex colors, themes.yaml palettes, API endpoints
+- [ ] 12-02-PLAN.md — Frontend: API client, hooks, Pipeline page rewrite per UI-SPEC
+- [ ] 12-03-PLAN.md — Integration: migration + servers + human verification checkpoint
 
 ### Phase 13: Tenant Isolation
 **Goal**: Every user sees only their own data across all resources, with admin users able to bypass isolation
@@ -126,7 +127,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 12. Pipeline Simplification | 0/? | Not started | - |
+| 12. Pipeline Simplification | 0/3 | Planning complete | - |
 | 13. Tenant Isolation | 0/? | Not started | - |
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
