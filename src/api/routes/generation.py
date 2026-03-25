@@ -41,13 +41,14 @@ async def _resolve_key(
     return resolution
 
 
-async def _increment_usage(session: AsyncSession, user_id: int, tier: str):
+async def _increment_usage(session: AsyncSession, user_id: int, tier: str, cost_usd: float = 0.0):
     """Increment usage counter after successful generation."""
     repo = UsageRepository(session)
     await repo.increment(
         user_id=user_id,
         service="gemini_image",
         tier=tier.replace("gemini_", ""),  # "free" or "paid"
+        cost_usd=cost_usd,
     )
     await session.commit()
 
@@ -113,9 +114,13 @@ async def generate_single(
         _log.error(f"[single] generation failed: {type(e).__name__}: {e}")
         raise HTTPException(status_code=502, detail=f"Gemini generation failed: {e}")
 
+    cost = 0.0
+    if not req.auto_refine and result:
+        cost = result.estimated_cost_usd
+
     if path:
         _log.info(f"[single] success: {path}")
-        await _increment_usage(session, current_user.id, resolution.tier)
+        await _increment_usage(session, current_user.id, resolution.tier, cost_usd=cost)
     else:
         _log.warning(f"[single] all models failed, no image generated")
 
@@ -128,6 +133,7 @@ async def generate_single(
         "refinement_passes": req.refinement_passes if req.auto_refine else 0,
         "tier": resolution.tier,
         "key_mode": resolution.mode,
+        "estimated_cost_usd": cost,
     }
 
 
@@ -177,8 +183,12 @@ async def refine_existing(
         else:
             break
 
+    # Estimate cost for refine passes (output-only estimate since we lack ref dims)
+    refine_cost = 0.0
     if resultados:
-        await _increment_usage(session, current_user.id, resolution.tier)
+        from src.image_gen.gemini_client import estimate_generation_cost
+        refine_cost = estimate_generation_cost([], 0)["estimated_cost_usd"] * len(resultados)
+        await _increment_usage(session, current_user.id, resolution.tier, cost_usd=refine_cost)
 
     return {
         "success": len(resultados) > 0,
@@ -189,6 +199,7 @@ async def refine_existing(
         "final_file": resultados[-1]["file"] if resultados else None,
         "tier": resolution.tier,
         "key_mode": resolution.mode,
+        "estimated_cost_usd": refine_cost,
     }
 
 
@@ -206,6 +217,7 @@ async def compose_image(
     resolution = await _resolve_key(force_tier, current_user, session)
 
     bg_path = None
+    bg_result = None
     generated_bg = False
 
     if req.background_filename:
@@ -253,8 +265,12 @@ async def compose_image(
 
     image_path = await asyncio.to_thread(create_image, req.phrase, bg_path)
 
+    compose_cost = 0.0
+    if generated_bg and not req.auto_refine and bg_result:
+        compose_cost = bg_result.estimated_cost_usd
+
     if generated_bg:
-        await _increment_usage(session, current_user.id, resolution.tier)
+        await _increment_usage(session, current_user.id, resolution.tier, cost_usd=compose_cost)
 
     return {
         "success": True,
@@ -263,4 +279,5 @@ async def compose_image(
         "background": bg_path,
         "tier": resolution.tier,
         "key_mode": resolution.mode,
+        "estimated_cost_usd": compose_cost,
     }

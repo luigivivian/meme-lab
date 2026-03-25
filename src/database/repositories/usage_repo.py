@@ -9,7 +9,7 @@ import os
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import DATABASE_URL
@@ -94,6 +94,7 @@ class UsageRepository:
         service: str,
         tier: str,
         status: str = "success",
+        cost_usd: float = 0.0,
     ) -> int:
         """Atomically increment usage counter. Returns new count.
 
@@ -108,6 +109,7 @@ class UsageRepository:
             tier=tier,
             date=today_utc,
             usage_count=1,
+            cost_usd=cost_usd,
             status=status,
         )
 
@@ -117,7 +119,10 @@ class UsageRepository:
             stmt = sqlite_insert(ApiUsage).values(**values)
             stmt = stmt.on_conflict_do_update(
                 index_elements=["user_id", "service", "tier", "date"],
-                set_={"usage_count": ApiUsage.usage_count + 1},
+                set_={
+                    "usage_count": ApiUsage.usage_count + 1,
+                    "cost_usd": ApiUsage.cost_usd + cost_usd,
+                },
             )
         else:
             from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -125,6 +130,7 @@ class UsageRepository:
             stmt = mysql_insert(ApiUsage).values(**values)
             stmt = stmt.on_duplicate_key_update(
                 usage_count=ApiUsage.usage_count + 1,
+                cost_usd=ApiUsage.cost_usd + cost_usd,
             )
 
         await self.session.execute(stmt)
@@ -259,3 +265,31 @@ class UsageRepository:
                 })
 
         return {"services": services, "resets_at": resets_at}
+
+    async def get_cost_stats(self, user_id: int) -> dict:
+        """Get cumulative Gemini Image cost statistics for a user.
+
+        Returns dict with total_cost_usd, total_images, avg_cost_per_image, days_tracked.
+        """
+        result = await self.session.execute(
+            select(
+                func.sum(ApiUsage.cost_usd),
+                func.sum(ApiUsage.usage_count),
+                func.count(),
+            ).where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.service == "gemini_image",
+                ApiUsage.status == "success",
+            )
+        )
+        row = result.one()
+        total_cost = row[0] or 0.0
+        total_images = row[1] or 0
+        days_tracked = row[2] or 0
+        avg_cost = total_cost / total_images if total_images > 0 else 0.0
+        return {
+            "total_cost_usd": round(total_cost, 6),
+            "total_images": total_images,
+            "avg_cost_per_image": round(avg_cost, 6),
+            "days_tracked": days_tracked,
+        }
