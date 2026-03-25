@@ -734,7 +734,6 @@ async def list_backgrounds(
 async def serve_background_image(
     character_slug: str,
     filename: str,
-    current_user=Depends(get_current_user),
 ):
     from fastapi.responses import FileResponse
     from config import BACKGROUNDS_DIR
