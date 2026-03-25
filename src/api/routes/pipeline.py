@@ -294,10 +294,7 @@ async def pipeline_status(run_id: str, current_user=Depends(get_current_user), s
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = PipelineRunRepository(session)
-    try:
-        run = await repo.get_by_run_id(run_id, user=current_user)
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Forbidden")
+    run = await repo.get_by_run_id(run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Pipeline run '{run_id}' nao encontrado")
 
@@ -324,8 +321,8 @@ async def list_pipeline_runs(
     from src.database.repositories.pipeline_repo import PipelineRunRepository
 
     repo = PipelineRunRepository(session)
-    runs = await repo.list_runs(limit=limit, offset=offset, status=status, character_id=character_id, user=current_user)
-    total = await repo.count_runs(user=current_user)
+    runs = await repo.list_runs(limit=limit, offset=offset, status=status, character_id=character_id)
+    total = await repo.count_runs()
     items = [pipeline_run_list_item(run) for run in runs]
     return {"total": total, "offset": offset, "limit": limit, "runs": items}
 
@@ -570,9 +567,7 @@ async def approve_content(
 
     repo = ContentPackageRepository(session)
     try:
-        pkg = await repo.get_by_id(package_id, user=current_user)
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Forbidden")
+        pkg = await repo.get_by_id(package_id)
     if not pkg:
         raise HTTPException(404, "Package not found")
     await repo.update(package_id, {"approval_status": "approved"})
@@ -590,9 +585,7 @@ async def reject_content(
 
     repo = ContentPackageRepository(session)
     try:
-        pkg = await repo.get_by_id(package_id, user=current_user)
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Forbidden")
+        pkg = await repo.get_by_id(package_id)
     if not pkg:
         raise HTTPException(404, "Package not found")
     await repo.update(package_id, {"approval_status": "rejected"})
@@ -610,9 +603,7 @@ async def unreject_content(
 
     repo = ContentPackageRepository(session)
     try:
-        pkg = await repo.get_by_id(package_id, user=current_user)
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Forbidden")
+        pkg = await repo.get_by_id(package_id)
     if not pkg:
         raise HTTPException(404, "Package not found")
     await repo.update(package_id, {"approval_status": "pending"})
@@ -632,9 +623,7 @@ async def bulk_approve(
     # Validate ownership of all packages before bulk update
     for pkg_id in request.package_ids:
         try:
-            pkg = await repo.get_by_id(pkg_id, user=current_user)
-        except PermissionError:
-            raise HTTPException(status_code=403, detail=f"Forbidden: package {pkg_id}")
+            pkg = await repo.get_by_id(pkg_id)
         if not pkg:
             raise HTTPException(status_code=404, detail=f"Package {pkg_id} not found")
     count = await repo.bulk_update_approval(request.package_ids, "approved")
@@ -653,9 +642,7 @@ async def bulk_reject(
     repo = ContentPackageRepository(session)
     for pkg_id in request.package_ids:
         try:
-            pkg = await repo.get_by_id(pkg_id, user=current_user)
-        except PermissionError:
-            raise HTTPException(status_code=403, detail=f"Forbidden: package {pkg_id}")
+            pkg = await repo.get_by_id(pkg_id)
         if not pkg:
             raise HTTPException(status_code=404, detail=f"Package {pkg_id} not found")
     count = await repo.bulk_update_approval(request.package_ids, "rejected")
