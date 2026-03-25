@@ -41,7 +41,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Major section breaks |
 | 3xl | 64px | Page-level spacing |
 
-Exceptions: 44px minimum touch target for approve/reject icon buttons on mobile viewports.
+Exceptions: 44px minimum touch target for approve/reject icon buttons on mobile viewports. 44px = 4x11, a multiple of 4, used exclusively as a minimum touch target size per mobile HIG guidelines -- not a layout spacing token.
 
 ---
 
@@ -49,12 +49,13 @@ Exceptions: 44px minimum touch target for approve/reject icon buttons on mobile 
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Body | 14px | 400 (regular) | 1.5 |
-| Label | 12px | 500 (medium) | 1.4 |
+| Body / Label | 14px / 12px | 400 (regular) | 1.5 / 1.4 |
 | Heading | 16px | 600 (semibold) | 1.2 |
-| Display | 20px | 700 (bold) | 1.2 |
+| Display | 20px | 600 (semibold) | 1.2 |
 
-**Source:** Existing pipeline page uses `text-base` (16px) for CardTitle, `text-sm` (14px) for body, `text-xs` (12px) for labels, `text-[10px]` for micro-labels. This contract standardizes to 4 roles.
+**Weights used:** 2 total -- 400 (regular) for body text, labels, and all non-emphasized content; 600 (semibold) for headings, display titles, and interactive element labels (CTA buttons, tab triggers).
+
+**Source:** Existing pipeline page uses `text-base` (16px) for CardTitle, `text-sm` (14px) for body, `text-xs` (12px) for labels. This contract standardizes to 3 size tiers with 2 weights.
 
 ---
 
@@ -75,6 +76,12 @@ Accent reserved for: primary "Gerar Memes" CTA button, approve button icon/borde
 
 ---
 
+## Visual Hierarchy
+
+**Primary focal point:** The "Gerar Memes" CTA button is the primary visual anchor of the page. It is full-width within the form card, uses the accent color (`#8B5CF6`) as solid background, and is the only accent-filled element above the fold. All other form elements lead the eye toward it.
+
+---
+
 ## Component Inventory
 
 New components and modifications needed for Phase 12:
@@ -83,16 +90,16 @@ New components and modifications needed for Phase 12:
 
 | Element | Component | Behavior |
 |---------|-----------|----------|
-| Input mode toggle | Two-segment toggle (tabs) | "Gerar do tema" / "Usar minha frase" — switches between topic input and textarea |
+| Input mode toggle | Two-segment toggle (tabs) | "Gerar do tema" / "Usar minha frase" -- switches between topic input and textarea |
 | Topic input | `Input` | Single-line topic field, visible in "Gerar do tema" mode |
 | Phrase textarea | `Textarea` | Multi-line (one phrase per line), visible in "Usar minha frase" mode, placeholder: "Uma frase por linha..." |
-| Background type selector | 2-column radio cards | "Cor solida" (palette icon) / "Imagem" (image icon) — replaces current 4-mode BG selector |
+| Background type selector | 2-column radio cards | "Cor solida" (palette icon) / "Imagem" (image icon) -- replaces current 4-mode BG selector |
 | Theme select | `Select` | Dropdown of theme keys from themes.yaml, controls which color palette or image folder is shown |
 | Color palette picker | Grid of 3-5 color swatches | Circular swatches (32px diameter) per selected theme, click to select, selected gets violet ring |
 | Background image picker | Scrollable thumbnail strip | Horizontal scroll of per-character background images with upload button at end |
 | Upload button | `Button` variant="outline" | "+" icon, triggers file input (accept image/*, max 5MB) |
 | Meme count | `Input` type="number" | Min 1, max 10, default 3 |
-| L5 toggle | Checkbox + label | "Gerar caption e hashtags" — default on |
+| L5 toggle | Checkbox + label | "Gerar caption e hashtags" -- default on |
 | Submit CTA | `Button` | Full-width, primary variant |
 
 ### New: Results Grid with Approve/Reject
@@ -101,10 +108,10 @@ New components and modifications needed for Phase 12:
 |---------|-----------|----------|
 | Results section | Appears below form after run completes | Animated entry (stagger-in, matching existing pattern) |
 | Meme thumbnail card | `Card` with 4:5 aspect image | Shows composed meme preview, phrase overlay at bottom |
-| Approve button | `Button` size="icon" variant="ghost" | CheckCircle2 icon, emerald on hover/active, sets status='approved' |
-| Reject button | `Button` size="icon" variant="ghost" | X icon, destructive on hover/active, sets status='rejected' |
-| Bulk approve | `Button` variant="outline" | "Aprovar Todos" — top-right of results grid |
-| Bulk reject | `Button` variant="outline" | "Rejeitar Todos" — next to bulk approve, destructive style |
+| Approve button | `Button` size="icon" variant="ghost" | CheckCircle2 icon, emerald on hover/active, sets status='approved'. **Tooltip:** "Aprovar meme". **aria-label:** "Aprovar meme" |
+| Reject button | `Button` size="icon" variant="ghost" | X icon, destructive on hover/active, sets status='rejected'. **Tooltip:** "Rejeitar meme". **aria-label:** "Rejeitar meme" |
+| Bulk approve | `Button` variant="outline" | "Aprovar Todos" -- top-right of results grid |
+| Bulk reject | `Button` variant="outline" | "Rejeitar Todos" -- next to bulk approve, destructive style. No confirmation dialog required because action is reversible: rejected memes can be un-rejected by clicking the "rejeitado" badge (D-14 window) |
 | Status badge | `Badge` | "aprovado" (success) / "rejeitado" (secondary + line-through) per card |
 | Un-reject action | Click rejected badge | Toggles back to pending state |
 
@@ -122,6 +129,7 @@ New components and modifications needed for Phase 12:
 | `Progress` | components/ui/progress | Pipeline run progress bar |
 | `Skeleton` | components/ui/skeleton | Loading state for results grid |
 | `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` | components/ui/tabs | Input mode toggle |
+| `Tooltip`, `TooltipTrigger`, `TooltipContent` | components/ui/tooltip | Approve/reject icon button labels |
 
 ---
 
@@ -173,6 +181,8 @@ New components and modifications needed for Phase 12:
 | Topic input placeholder | "Ex: segunda-feira, cafe, namoro..." |
 | Bulk approve button | "Aprovar Todos" |
 | Bulk reject button | "Rejeitar Todos" |
+| Approve icon tooltip | "Aprovar meme" |
+| Reject icon tooltip | "Rejeitar meme" |
 | Empty state heading | "Nenhum meme gerado ainda" |
 | Empty state body | "Configure as opcoes acima e clique em 'Gerar Memes' para comecar." |
 | Error state | "Erro ao gerar memes: {error_message}. Tente novamente ou verifique os logs." |
@@ -182,6 +192,14 @@ New components and modifications needed for Phase 12:
 | Upload button tooltip | "Adicionar background" |
 | Upload error (too large) | "Arquivo excede o limite de 5MB." |
 | Upload error (wrong type) | "Formato nao suportado. Use JPG, PNG ou WebP." |
+
+### Destructive Actions
+
+| Action | Confirmation | Rationale |
+|--------|-------------|-----------|
+| Reject (single meme) | None | Reversible: click "rejeitado" badge to un-reject |
+| Rejeitar Todos (bulk reject) | None | Reversible: each rejected meme can be individually un-rejected via badge click (D-14 window). No confirmation dialog required because action is fully reversible |
+| Aprovar Todos (bulk approve) | None | Non-destructive positive action |
 
 ---
 
@@ -229,7 +247,7 @@ New components and modifications needed for Phase 12:
 
 | Registry | Blocks Used | Safety Gate |
 |----------|-------------|-------------|
-| shadcn official | Card, Button, Input, Textarea, Select, Badge, Dialog, Progress, Skeleton, Tabs, ScrollArea, Separator | not required (already installed) |
+| shadcn official | Card, Button, Input, Textarea, Select, Badge, Dialog, Progress, Skeleton, Tabs, Tooltip, ScrollArea, Separator | not required (already installed) |
 | Third-party | none | not applicable |
 
 No third-party registries. All components are already present in `memelab/src/components/ui/`.
