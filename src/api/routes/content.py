@@ -38,9 +38,9 @@ async def list_content_packages(
     packages = await repo.list_packages(
         limit=limit, offset=offset, character_id=character_id,
         pipeline_run_id=pipeline_run_id, min_quality=min_quality,
-        is_published=is_published,
+        is_published=is_published, user=current_user,
     )
-    total = await repo.count(character_id=character_id)
+    total = await repo.count(character_id=character_id, user=current_user)
     items = [content_package_to_dict(pkg) for pkg in packages]
     return {"total": total, "offset": offset, "limit": limit, "packages": items}
 
@@ -50,7 +50,10 @@ async def get_content_package(package_id: int, current_user=Depends(get_current_
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    pkg = await repo.get_by_id(package_id)
+    try:
+        pkg = await repo.get_by_id(package_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not pkg:
         raise HTTPException(status_code=404, detail=f"Content package {package_id} nao encontrado")
     return content_package_to_dict(pkg)
@@ -61,9 +64,13 @@ async def publish_content_package(package_id: int, current_user=Depends(get_curr
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    pkg = await repo.mark_published(package_id)
+    try:
+        pkg = await repo.get_by_id(package_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not pkg:
         raise HTTPException(status_code=404, detail=f"Content package {package_id} nao encontrado")
+    pkg = await repo.mark_published(package_id)
     return {"id": pkg.id, "is_published": True, "published_at": pkg.published_at.isoformat()}
 
 
@@ -152,6 +159,10 @@ async def export_content_package(package_id: int, current_user=Depends(get_curre
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
+    try:
+        await repo.get_by_id(package_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     pkg = await repo.get_by_id_with_character(package_id)
     if not pkg:
         raise HTTPException(status_code=404, detail=f"Content package {package_id} nao encontrado")
@@ -238,7 +249,10 @@ async def swap_phrase(
     from src.image_maker import create_image
 
     repo = ContentPackageRepository(session)
-    pkg = await repo.get_by_id(package_id)
+    try:
+        pkg = await repo.get_by_id(package_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not pkg:
         raise HTTPException(status_code=404, detail=f"Content package {package_id} nao encontrado")
 
@@ -295,9 +309,9 @@ async def list_generated_images(
     repo = GeneratedImageRepository(session)
     images = await repo.list_images(
         limit=limit, offset=offset, character_id=character_id,
-        image_type=image_type, source=source,
+        image_type=image_type, source=source, user=current_user,
     )
-    total = await repo.count(character_id=character_id)
+    total = await repo.count(character_id=character_id, user=current_user)
     items = [generated_image_to_dict(img) for img in images]
     return {"total": total, "offset": offset, "limit": limit, "images": items}
 
@@ -307,7 +321,10 @@ async def get_generated_image(image_id: int, current_user=Depends(get_current_us
     from src.database.repositories.content_repo import GeneratedImageRepository
 
     repo = GeneratedImageRepository(session)
-    img = await repo.get_by_id(image_id)
+    try:
+        img = await repo.get_by_id(image_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not img:
         raise HTTPException(status_code=404, detail=f"Imagem {image_id} nao encontrada")
     return generated_image_to_dict(img)
@@ -318,7 +335,10 @@ async def serve_generated_image(image_id: int, current_user=Depends(get_current_
     from src.database.repositories.content_repo import GeneratedImageRepository
 
     repo = GeneratedImageRepository(session)
-    img = await repo.get_by_id(image_id)
+    try:
+        img = await repo.get_by_id(image_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not img:
         raise HTTPException(status_code=404, detail=f"Imagem {image_id} nao encontrada")
 

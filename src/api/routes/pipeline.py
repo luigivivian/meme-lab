@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import db_session, get_current_user
+from src.api.deps import db_session, get_current_user, get_user_character
 from src.api.models import PipelineRunRequest, ManualRunRequest, ApprovalRequest
 from src.api.serializers import pipeline_run_to_dict, pipeline_run_list_item, content_package_summary
 
@@ -293,7 +293,10 @@ async def pipeline_status(run_id: str, current_user=Depends(get_current_user), s
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = PipelineRunRepository(session)
-    run = await repo.get_by_run_id(run_id)
+    try:
+        run = await repo.get_by_run_id(run_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not run:
         raise HTTPException(status_code=404, detail=f"Pipeline run '{run_id}' nao encontrado")
 
@@ -320,8 +323,8 @@ async def list_pipeline_runs(
     from src.database.repositories.pipeline_repo import PipelineRunRepository
 
     repo = PipelineRunRepository(session)
-    runs = await repo.list_runs(limit=limit, offset=offset, status=status, character_id=character_id)
-    total = await repo.count_runs()
+    runs = await repo.list_runs(limit=limit, offset=offset, status=status, character_id=character_id, user=current_user)
+    total = await repo.count_runs(user=current_user)
     items = [pipeline_run_list_item(run) for run in runs]
     return {"total": total, "offset": offset, "limit": limit, "runs": items}
 
@@ -548,9 +551,13 @@ async def approve_content(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    pkg = await repo.update(package_id, {"approval_status": "approved"})
+    try:
+        pkg = await repo.get_by_id(package_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not pkg:
         raise HTTPException(404, "Package not found")
+    await repo.update(package_id, {"approval_status": "approved"})
     await session.commit()
     return {"id": package_id, "approval_status": "approved"}
 
@@ -564,9 +571,13 @@ async def reject_content(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    pkg = await repo.update(package_id, {"approval_status": "rejected"})
+    try:
+        pkg = await repo.get_by_id(package_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not pkg:
         raise HTTPException(404, "Package not found")
+    await repo.update(package_id, {"approval_status": "rejected"})
     await session.commit()
     return {"id": package_id, "approval_status": "rejected"}
 
@@ -580,9 +591,13 @@ async def unreject_content(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    pkg = await repo.update(package_id, {"approval_status": "pending"})
+    try:
+        pkg = await repo.get_by_id(package_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not pkg:
         raise HTTPException(404, "Package not found")
+    await repo.update(package_id, {"approval_status": "pending"})
     await session.commit()
     return {"id": package_id, "approval_status": "pending"}
 
@@ -596,6 +611,14 @@ async def bulk_approve(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
+    # Validate ownership of all packages before bulk update
+    for pkg_id in request.package_ids:
+        try:
+            pkg = await repo.get_by_id(pkg_id, user=current_user)
+        except PermissionError:
+            raise HTTPException(status_code=403, detail=f"Forbidden: package {pkg_id}")
+        if not pkg:
+            raise HTTPException(status_code=404, detail=f"Package {pkg_id} not found")
     count = await repo.bulk_update_approval(request.package_ids, "approved")
     await session.commit()
     return {"updated": count, "approval_status": "approved"}
@@ -610,6 +633,13 @@ async def bulk_reject(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
+    for pkg_id in request.package_ids:
+        try:
+            pkg = await repo.get_by_id(pkg_id, user=current_user)
+        except PermissionError:
+            raise HTTPException(status_code=403, detail=f"Forbidden: package {pkg_id}")
+        if not pkg:
+            raise HTTPException(status_code=404, detail=f"Package {pkg_id} not found")
     count = await repo.bulk_update_approval(request.package_ids, "rejected")
     await session.commit()
     return {"updated": count, "approval_status": "rejected"}
@@ -634,12 +664,8 @@ async def upload_background(
     if ext not in (".jpg", ".jpeg", ".png", ".webp"):
         raise HTTPException(415, "Unsupported format. Use JPG, PNG or WebP.")
 
-    # Validate character exists
-    from src.database.repositories.character_repo import CharacterRepository
-    char_repo = CharacterRepository(session)
-    char = await char_repo.get_by_slug(character_slug)
-    if not char:
-        raise HTTPException(404, f"Character not found: {character_slug}")
+    # Validate character exists and ownership
+    char = await get_user_character(character_slug, current_user, session)
 
     # Save to assets/backgrounds/{character_slug}/
     bg_dir = Path("assets/backgrounds") / character_slug
@@ -661,7 +687,9 @@ async def upload_background(
 async def list_backgrounds(
     character_slug: str,
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
 ):
+    await get_user_character(character_slug, current_user, session)
     bg_dir = Path("assets/backgrounds") / character_slug
     if not bg_dir.exists():
         return {"backgrounds": []}
