@@ -55,8 +55,9 @@ async def list_queue(
     posts = await repo.list_posts(
         limit=limit, offset=offset,
         status=status, platform=platform, character_id=character_id,
+        user=current_user,
     )
-    total = await repo.count(status=status, platform=platform)
+    total = await repo.count(status=status, platform=platform, user=current_user)
     items = [scheduled_post_to_dict(p) for p in posts]
     return {"total": total, "offset": offset, "limit": limit, "items": items}
 
@@ -92,7 +93,10 @@ async def get_scheduled_post(post_id: int, current_user=Depends(get_current_user
     from src.database.repositories.schedule_repo import ScheduledPostRepository
 
     repo = ScheduledPostRepository(session)
-    post = await repo.get_by_id(post_id)
+    try:
+        post = await repo.get_by_id(post_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not post:
         raise HTTPException(status_code=404, detail=f"Post agendado {post_id} nao encontrado")
     return scheduled_post_to_dict(post)
@@ -147,7 +151,7 @@ async def publishing_calendar(
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
 
-    posts = await repo.get_posts_by_date_range(start_dt, end_dt)
+    posts = await repo.get_posts_by_date_range(start_dt, end_dt, user=current_user)
 
     # Agrupar por data
     dates: dict[str, list] = defaultdict(list)

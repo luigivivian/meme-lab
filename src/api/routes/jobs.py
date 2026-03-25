@@ -203,7 +203,10 @@ async def get_job(job_id: str, current_user=Depends(get_current_user), session: 
 
     from src.database.repositories.job_repo import BatchJobRepository
     repo = BatchJobRepository(session)
-    db_job = await repo.get_by_job_id(job_id)
+    try:
+        db_job = await repo.get_by_job_id(job_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not db_job:
         raise HTTPException(status_code=404, detail="Job nao encontrado")
     return job_to_dict(db_job)
@@ -220,8 +223,8 @@ async def list_jobs(
     from src.database.repositories.job_repo import BatchJobRepository
 
     repo = BatchJobRepository(session)
-    db_jobs = await repo.list_jobs(limit=limit + offset, status=status)
-    total_count = await repo.count()
+    db_jobs = await repo.list_jobs(limit=limit + offset, status=status, user=current_user)
+    total_count = await repo.count(user=current_user)
     jobs = []
     for j in db_jobs:
         if j.job_id in JOBS:

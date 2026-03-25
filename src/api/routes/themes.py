@@ -62,7 +62,7 @@ async def list_themes(
 
     repo = ThemeRepository(session)
     if character_id is not None:
-        themes = await repo.list_effective(character_id)
+        themes = await repo.list_effective(character_id, user=current_user)
     else:
         themes = await repo.list_global(include_builtin=include_builtin)
 
@@ -107,6 +107,7 @@ async def add_theme(
         "key": theme.key, "label": theme.label, "acao": theme.acao,
         "cenario": theme.cenario, "count": theme.count,
         "character_id": character_id, "is_builtin": False,
+        "user_id": current_user.id,
     })
     return {"added": theme.key, "id": new_theme.id}
 
@@ -121,6 +122,12 @@ async def delete_theme(
     from src.database.repositories.theme_repo import ThemeRepository
 
     repo = ThemeRepository(session)
+    # Check ownership before deleting
+    existing = await repo.get_by_key(key, character_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail=f"Tema nao encontrado: {key}")
+    if existing.user_id and existing.user_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
     deleted = await repo.delete_by_key(key, character_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Tema nao encontrado: {key}")
