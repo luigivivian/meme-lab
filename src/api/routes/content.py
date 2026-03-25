@@ -189,7 +189,7 @@ async def export_content_batch(req: BatchExportRequest, current_user=Depends(get
         raise HTTPException(status_code=400, detail="Maximo de 50 packages por export")
 
     repo = ContentPackageRepository(session)
-    packages = await repo.get_by_ids(req.package_ids, load_character=True)
+    packages = await repo.get_by_ids(req.package_ids, load_character=True, user=current_user)
 
     if not packages:
         raise HTTPException(status_code=404, detail="Nenhum content package encontrado para os IDs informados")

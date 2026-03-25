@@ -106,14 +106,23 @@ async def get_scheduled_post(post_id: int, current_user=Depends(get_current_user
 
 @router.post("/queue/{post_id}/cancel", summary="Cancelar post agendado")
 async def cancel_scheduled_post(post_id: int, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
+    from src.database.repositories.schedule_repo import ScheduledPostRepository
     from src.services.publisher import PublishingService
+
+    repo = ScheduledPostRepository(session)
+    try:
+        post = await repo.get_by_id(post_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not post:
+        raise HTTPException(status_code=404, detail=f"Post agendado {post_id} nao encontrado")
 
     service = PublishingService(session)
     post = await service.cancel_scheduled(post_id)
     if not post:
         raise HTTPException(
             status_code=400,
-            detail=f"Post {post_id} nao encontrado ou nao pode ser cancelado (status deve ser queued ou failed)",
+            detail=f"Post {post_id} nao pode ser cancelado (status deve ser queued ou failed)",
         )
     return scheduled_post_to_dict(post)
 
@@ -122,14 +131,23 @@ async def cancel_scheduled_post(post_id: int, current_user=Depends(get_current_u
 
 @router.post("/queue/{post_id}/retry", summary="Recolocar post falho na fila")
 async def retry_scheduled_post(post_id: int, current_user=Depends(get_current_user), session: AsyncSession = Depends(db_session)):
+    from src.database.repositories.schedule_repo import ScheduledPostRepository
     from src.services.publisher import PublishingService
+
+    repo = ScheduledPostRepository(session)
+    try:
+        post = await repo.get_by_id(post_id, user=current_user)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not post:
+        raise HTTPException(status_code=404, detail=f"Post agendado {post_id} nao encontrado")
 
     service = PublishingService(session)
     post = await service.retry_post(post_id)
     if not post:
         raise HTTPException(
             status_code=400,
-            detail=f"Post {post_id} nao encontrado ou nao esta com status 'failed'",
+            detail=f"Post {post_id} nao esta com status 'failed'",
         )
     return scheduled_post_to_dict(post)
 
