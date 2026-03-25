@@ -6,11 +6,11 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import db_session, get_current_user
-from src.api.models import PipelineRunRequest
+from src.api.models import PipelineRunRequest, ManualRunRequest, ApprovalRequest
 from src.api.serializers import pipeline_run_to_dict, pipeline_run_list_item, content_package_summary
 
 logger = logging.getLogger("clip-flow.api")
@@ -324,3 +324,364 @@ async def list_pipeline_runs(
     total = await repo.count_runs()
     items = [pipeline_run_list_item(run) for run in runs]
     return {"total": total, "offset": offset, "limit": limit, "runs": items}
+
+
+# ============================================================
+# Manual Pipeline (Phase 12 — zero Gemini Image calls)
+# ============================================================
+
+async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
+    """Execute manual pipeline in background: compose memes with static backgrounds."""
+    from src.database.session import get_session_factory
+    from src.database.repositories.pipeline_repo import PipelineRunRepository
+    from src.database.repositories.content_repo import ContentPackageRepository
+    from src.database.models import GeneratedImage as GeneratedImageModel
+    from src.image_maker import create_image
+    import config as _cfg
+
+    factory = get_session_factory()
+
+    async with factory() as session:
+        repo = PipelineRunRepository(session)
+        await repo.update_run(run_id, {"status": "running", "started_at": datetime.now()})
+        await session.commit()
+
+    try:
+        # Resolve character info
+        char_id = None
+        character_watermark = _cfg.WATERMARK_TEXT
+        character_slug = request.character_slug or "mago-mestre"
+
+        if request.character_slug:
+            try:
+                from src.database.repositories.character_repo import CharacterRepository
+                async with factory() as session:
+                    char_repo = CharacterRepository(session)
+                    char = await char_repo.get_by_slug(request.character_slug)
+                    if char:
+                        char_id = char.id
+                        character_watermark = char.watermark or char.handle or _cfg.WATERMARK_TEXT
+            except Exception as e:
+                logger.warning(f"Manual pipeline: failed to load character: {e}")
+
+        # Resolve phrases
+        if request.input_mode == "phrase":
+            phrases = request.phrases[:request.count] if request.phrases else [""]
+        else:
+            # topic mode: use PhraseWorker to generate phrases from Gemini text
+            try:
+                from src.pipeline.workers.phrase_worker import PhraseWorker
+                pw = PhraseWorker()
+                generated = await asyncio.to_thread(
+                    pw.generate_phrases, request.topic, count=request.count
+                )
+                phrases = generated if generated else [request.topic]
+            except Exception as e:
+                logger.warning(f"Manual pipeline: phrase generation failed: {e}, using topic as phrase")
+                phrases = [request.topic] * request.count
+
+        # Resolve background_path
+        if request.background_type == "solid" and request.background_color:
+            bg_path = request.background_color  # Hex string like "#1A1A3E"
+        elif request.background_type == "image" and request.background_image:
+            bg_path = str(Path("assets/backgrounds") / character_slug / request.background_image)
+        else:
+            # Fallback: use first color from theme
+            try:
+                import yaml
+                themes_path = Path("config/themes.yaml")
+                with open(themes_path, encoding="utf-8") as f:
+                    themes = yaml.safe_load(f)
+                theme_colors = None
+                for t in themes:
+                    if t.get("key") == request.theme_key:
+                        theme_colors = t.get("colors", [])
+                        break
+                bg_path = theme_colors[0] if theme_colors else "#1A1A3E"
+            except Exception:
+                bg_path = "#1A1A3E"
+
+        # Compose memes
+        _cfg.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        results = []
+        for i, phrase in enumerate(phrases):
+            try:
+                output_path = str(_cfg.OUTPUT_DIR / f"manual_{run_id}_{i}.png")
+                image_path = await asyncio.to_thread(
+                    create_image,
+                    text=phrase,
+                    background_path=bg_path,
+                    output_path=output_path,
+                    watermark_text=character_watermark,
+                    layout=request.layout,
+                )
+                results.append({
+                    "phrase": phrase,
+                    "image_path": image_path,
+                    "background_path": bg_path,
+                })
+            except Exception as e:
+                logger.error(f"Manual pipeline: failed to compose image {i}: {e}")
+
+        # L5 post-production (caption/hashtags)
+        captions_and_tags = []
+        if request.enable_l5 and results:
+            try:
+                from src.pipeline.workers.post_production_worker import PostProductionWorker
+                pp = PostProductionWorker()
+                for r in results:
+                    try:
+                        result_l5 = await asyncio.to_thread(
+                            pp.generate_caption_and_hashtags, r["phrase"]
+                        )
+                        captions_and_tags.append(result_l5)
+                    except Exception:
+                        captions_and_tags.append({"caption": "", "hashtags": []})
+            except ImportError:
+                captions_and_tags = [{"caption": "", "hashtags": []} for _ in results]
+        else:
+            captions_and_tags = [{"caption": "", "hashtags": []} for _ in results]
+
+        # Persist to DB
+        async with factory() as session:
+            repo = PipelineRunRepository(session)
+            content_repo = ContentPackageRepository(session)
+
+            run_obj = await repo.get_by_run_id(run_id)
+            for i, r in enumerate(results):
+                l5_data = captions_and_tags[i] if i < len(captions_and_tags) else {}
+                pkg_data = {
+                    "pipeline_run_id": run_obj.id,
+                    "phrase": r["phrase"],
+                    "topic": request.topic if request.input_mode == "topic" else "",
+                    "source": "manual",
+                    "image_path": r["image_path"],
+                    "background_path": r["background_path"],
+                    "background_source": "solid" if request.background_type == "solid" else "static",
+                    "caption": l5_data.get("caption", ""),
+                    "hashtags": l5_data.get("hashtags", []),
+                    "approval_status": "pending",
+                }
+                if char_id:
+                    pkg_data["character_id"] = char_id
+
+                content_pkg = await content_repo.create(pkg_data)
+
+                img_record = GeneratedImageModel(
+                    character_id=char_id,
+                    content_package_id=content_pkg.id,
+                    filename=Path(r["image_path"]).name,
+                    file_path=r["image_path"],
+                    image_type="composed",
+                    source="solid" if request.background_type == "solid" else "static",
+                    width=1080, height=1350,
+                    theme_key=request.theme_key,
+                )
+                session.add(img_record)
+
+            await repo.finish_run(run_id, status="completed", results={
+                "packages_produced": len(results),
+                "images_generated": len(results),
+                "errors": [],
+            })
+            await session.commit()
+
+        logger.info(f"Manual pipeline {run_id} completed: {len(results)} packages")
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        try:
+            async with factory() as session:
+                repo = PipelineRunRepository(session)
+                await repo.finish_run(run_id, status="failed", results={
+                    "errors": [str(e)],
+                    "traceback": tb,
+                })
+                await session.commit()
+        except Exception:
+            pass
+        logger.error(f"Manual pipeline {run_id} failed: {e}")
+
+
+@router.post("/manual-run", summary="Manual pipeline run (zero Gemini Image)")
+async def manual_run(
+    request: ManualRunRequest,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Run manual pipeline: compose memes with solid-color or existing backgrounds.
+
+    FORCE background_mode='static' and use_gemini_image=False.
+    """
+    from src.database.repositories.pipeline_repo import PipelineRunRepository
+
+    run_id = uuid.uuid4().hex[:8]
+    repo = PipelineRunRepository(session)
+    run = await repo.create_run({
+        "run_id": run_id,
+        "status": "queued",
+        "mode": "manual",
+        "requested_count": request.count,
+        "use_gemini_image": False,
+        "theme_tags": [request.theme_key] if request.theme_key else [],
+    })
+    await session.commit()
+
+    # FORCE static mode -- NEVER allow Gemini Image in manual pipeline
+    background_mode = "static"
+    use_gemini_image = False
+
+    background_tasks.add_task(_run_manual_pipeline_task, run_id, request)
+    return pipeline_run_to_dict(run)
+
+
+# ── Approve / Reject / Unreject ──────────────────────────────────────────────
+
+@router.patch("/content/{package_id}/approve", summary="Approve content package")
+async def approve_content(
+    package_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    from src.database.repositories.content_repo import ContentPackageRepository
+
+    repo = ContentPackageRepository(session)
+    pkg = await repo.update(package_id, {"approval_status": "approved"})
+    if not pkg:
+        raise HTTPException(404, "Package not found")
+    await session.commit()
+    return {"id": package_id, "approval_status": "approved"}
+
+
+@router.patch("/content/{package_id}/reject", summary="Reject content package")
+async def reject_content(
+    package_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    from src.database.repositories.content_repo import ContentPackageRepository
+
+    repo = ContentPackageRepository(session)
+    pkg = await repo.update(package_id, {"approval_status": "rejected"})
+    if not pkg:
+        raise HTTPException(404, "Package not found")
+    await session.commit()
+    return {"id": package_id, "approval_status": "rejected"}
+
+
+@router.patch("/content/{package_id}/unreject", summary="Un-reject content package (back to pending) per D-14")
+async def unreject_content(
+    package_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    from src.database.repositories.content_repo import ContentPackageRepository
+
+    repo = ContentPackageRepository(session)
+    pkg = await repo.update(package_id, {"approval_status": "pending"})
+    if not pkg:
+        raise HTTPException(404, "Package not found")
+    await session.commit()
+    return {"id": package_id, "approval_status": "pending"}
+
+
+@router.patch("/content/bulk-approve", summary="Bulk approve packages per D-13")
+async def bulk_approve(
+    request: ApprovalRequest,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    from src.database.repositories.content_repo import ContentPackageRepository
+
+    repo = ContentPackageRepository(session)
+    count = await repo.bulk_update_approval(request.package_ids, "approved")
+    await session.commit()
+    return {"updated": count, "approval_status": "approved"}
+
+
+@router.patch("/content/bulk-reject", summary="Bulk reject packages per D-13")
+async def bulk_reject(
+    request: ApprovalRequest,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    from src.database.repositories.content_repo import ContentPackageRepository
+
+    repo = ContentPackageRepository(session)
+    count = await repo.bulk_update_approval(request.package_ids, "rejected")
+    await session.commit()
+    return {"updated": count, "approval_status": "rejected"}
+
+
+# ── Background image upload / listing ────────────────────────────────────────
+
+@router.post("/backgrounds/upload", summary="Upload background image per D-05")
+async def upload_background(
+    file: UploadFile,
+    character_slug: str = Query(...),
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    # Validate file size: max 5MB
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(413, "File exceeds 5MB limit")
+
+    # Validate file type
+    ext = Path(file.filename).suffix.lower() if file.filename else ""
+    if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+        raise HTTPException(415, "Unsupported format. Use JPG, PNG or WebP.")
+
+    # Validate character exists
+    from src.database.repositories.character_repo import CharacterRepository
+    char_repo = CharacterRepository(session)
+    char = await char_repo.get_by_slug(character_slug)
+    if not char:
+        raise HTTPException(404, f"Character not found: {character_slug}")
+
+    # Save to assets/backgrounds/{character_slug}/
+    bg_dir = Path("assets/backgrounds") / character_slug
+    bg_dir.mkdir(parents=True, exist_ok=True)
+    dest = bg_dir / file.filename
+
+    # Use asyncio.to_thread for file write (per Pitfall 5)
+    await asyncio.to_thread(dest.write_bytes, content)
+
+    # Get dimensions
+    from PIL import Image as PILImage
+    img = await asyncio.to_thread(PILImage.open, dest)
+    w, h = img.size
+
+    return {"filename": file.filename, "path": str(dest), "width": w, "height": h}
+
+
+@router.get("/backgrounds/{character_slug}", summary="List backgrounds per D-04")
+async def list_backgrounds(
+    character_slug: str,
+    current_user=Depends(get_current_user),
+):
+    bg_dir = Path("assets/backgrounds") / character_slug
+    if not bg_dir.exists():
+        return {"backgrounds": []}
+    files = []
+    for f in sorted(bg_dir.iterdir()):
+        if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
+            files.append({"filename": f.name, "path": str(f)})
+    return {"backgrounds": files}
+
+
+# ── Themes with colors ──────────────────────────────────────────────────────
+
+@router.get("/themes", summary="List themes with color palettes per D-02")
+async def list_themes_with_colors(current_user=Depends(get_current_user)):
+    import yaml
+
+    themes_path = Path("config/themes.yaml")
+    with open(themes_path, encoding="utf-8") as f:
+        themes = yaml.safe_load(f)
+    return {"themes": [
+        {"key": t["key"], "label": t.get("label", t["key"]), "colors": t.get("colors", [])}
+        for t in themes
+    ]}

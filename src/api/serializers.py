@@ -17,6 +17,7 @@ def content_package_to_dict(pkg) -> dict:
         "hashtags": pkg.hashtags or [],
         "quality_score": pkg.quality_score,
         "image_metadata": getattr(pkg, "image_metadata", None) or {},
+        "approval_status": getattr(pkg, "approval_status", "pending"),
         "is_published": pkg.is_published,
         "published_at": pkg.published_at.isoformat() if pkg.published_at else None,
         "created_at": pkg.created_at.isoformat() if pkg.created_at else None,
@@ -40,6 +41,7 @@ def content_package_summary(pkg) -> dict:
         "quality_score": pkg.quality_score,
         "background_path": pkg.background_path,
         "background_source": pkg.background_source,
+        "approval_status": getattr(pkg, "approval_status", "pending"),
         "image_metadata": getattr(pkg, "image_metadata", None) or {},
         "character_id": pkg.character_id,
     }
