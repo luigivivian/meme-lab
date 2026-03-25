@@ -53,8 +53,9 @@ def discover_image_models() -> list[str]:
             # Strip 'models/' prefix if present (Pitfall 5 from RESEARCH)
             if name.startswith("models/"):
                 name = name[len("models/"):]
-            # Filter: only models with "image" in their name
-            if "image" in name.lower():
+            # Filter: only gemini models with "image" in name
+            # Exclude imagen-* (different API — predict, not generateContent)
+            if "image" in name.lower() and not name.startswith("imagen-"):
                 image_models.append(name)
         if image_models:
             logger.info(f"Modelos de imagem descobertos: {image_models}")
@@ -815,31 +816,37 @@ class GeminiImageClient:
         return None
 
     def _tentar_modelos(self, partes: list, temperatura: float, api_key: str | None = None) -> PIL.Image.Image | None:
-        """Tenta todos os modelos em ordem com retry para 429."""
+        """Tenta modelos em ordem. No 429, pula pro proximo imediatamente."""
         key_hint = f"...{api_key[-6:]}" if api_key else "default(_get_client)"
-        logger.info(f"_tentar_modelos: key={key_hint}, modelos={MODELOS_IMAGEM}")
-        for modelo in MODELOS_IMAGEM:
-            for tentativa in range(self.max_retries_429):
-                try:
-                    imagem = self._tentar_gerar(modelo, partes, temperatura, api_key=api_key)
-                    if imagem is None:
-                        logger.warning(f"{modelo}: resposta sem imagem")
-                        break
-                    logger.info(f"{modelo} -> {imagem.size[0]}x{imagem.size[1]}")
-                    return imagem
-                except Exception as e:
-                    msg = str(e)
-                    if "404" in msg or "NOT_FOUND" in msg:
-                        logger.warning(f"{modelo}: nao disponivel (404)")
-                        break
-                    elif "429" in msg or "RESOURCE_EXHAUSTED" in msg:
-                        espera = self.wait_base_429 * (2 ** tentativa)
-                        logger.warning(f"{modelo}: 429, aguardando {espera}s")
-                        time.sleep(espera)
-                        break
-                    else:
-                        logger.error(f"{modelo}: {type(e).__name__}: {msg[:140]}")
-                        break
+        # Filtrar modelos imagen-* (usam API diferente — Imagen, nao generateContent)
+        modelos = [m for m in MODELOS_IMAGEM if not m.startswith("imagen-")]
+        logger.info(f"_tentar_modelos: key={key_hint}, modelos={modelos}")
+        rate_limited_count = 0
+
+        for modelo in modelos:
+            try:
+                imagem = self._tentar_gerar(modelo, partes, temperatura, api_key=api_key)
+                if imagem is None:
+                    logger.warning(f"{modelo}: resposta sem imagem, tentando proximo")
+                    continue
+                logger.info(f"{modelo} -> {imagem.size[0]}x{imagem.size[1]}")
+                return imagem
+            except Exception as e:
+                msg = str(e)
+                if "404" in msg or "NOT_FOUND" in msg:
+                    logger.warning(f"{modelo}: nao disponivel (404), tentando proximo")
+                elif "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+                    rate_limited_count += 1
+                    logger.warning(f"{modelo}: 429 rate limited, tentando proximo modelo")
+                else:
+                    logger.error(f"{modelo}: {type(e).__name__}: {msg[:200]}")
+
+        if rate_limited_count == len(modelos):
+            logger.error(
+                f"Todos os {len(modelos)} modelos retornaram 429. "
+                f"Cota free provavelmente excedida (15 RPM / 500 RPD). "
+                f"Aguarde 1 min ou configure billing no Google AI Studio."
+            )
         return None
 
     def _salvar(self, imagem: PIL.Image.Image, nome: str) -> str:
