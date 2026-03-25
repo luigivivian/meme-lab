@@ -57,6 +57,7 @@ import {
   getThemesWithColors,
   listBackgrounds,
   uploadBackground,
+  deleteBackground,
   type ContentPackage,
   type ThemeWithColors,
   type BackgroundFile,
@@ -583,7 +584,7 @@ function ManualRunForm({
   const [count, setCount] = useState(3);
   const [themeKey, setThemeKey] = useState("sabedoria");
   const [backgroundType, setBackgroundType] = useState<"solid" | "image">(
-    "solid"
+    "image"
   );
   const [backgroundColor, setBackgroundColor] = useState("");
   const [backgroundImage, setBackgroundImage] = useState("");
@@ -634,6 +635,17 @@ function ManualRunForm({
     try {
       await uploadBackground(file, characterSlug);
       // Refresh backgrounds list
+      const r = await listBackgrounds(characterSlug);
+      setBackgrounds(r.backgrounds);
+    } catch {
+      // Silently handle
+    }
+  };
+
+  const handleRemoveBackground = async (filename: string) => {
+    try {
+      await deleteBackground(filename, characterSlug);
+      if (backgroundImage === filename) setBackgroundImage("");
       const r = await listBackgrounds(characterSlug);
       setBackgrounds(r.backgrounds);
     } catch {
@@ -796,22 +808,30 @@ function ManualRunForm({
             <ScrollArea className="w-full whitespace-nowrap">
               <div className="flex gap-2 pb-2">
                 {backgrounds.map((bg) => (
-                  <button
-                    key={bg.filename}
-                    type="button"
-                    onClick={() => setBackgroundImage(bg.filename)}
-                    className={`shrink-0 rounded overflow-hidden transition-all ${
-                      backgroundImage === bg.filename
-                        ? "border-2 border-[#8B5CF6] scale-105"
-                        : "border border-white/10 hover:border-white/20"
-                    }`}
-                  >
-                    <img
-                      src={imageUrl(bg.filename)}
-                      alt={bg.filename}
-                      className="w-16 h-20 object-cover"
-                    />
-                  </button>
+                  <div key={bg.filename} className="relative shrink-0 group">
+                    <button
+                      type="button"
+                      onClick={() => setBackgroundImage(bg.filename)}
+                      className={`block rounded overflow-hidden transition-all ${
+                        backgroundImage === bg.filename
+                          ? "border-2 border-[#8B5CF6] scale-105"
+                          : "border border-white/10 hover:border-white/20"
+                      }`}
+                    >
+                      <img
+                        src={imageUrl(bg.filename)}
+                        alt={bg.filename}
+                        className="w-16 h-20 object-cover"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleRemoveBackground(bg.filename); }}
+                      className="absolute top-0.5 right-0.5 hidden group-hover:flex items-center justify-center w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 transition-colors"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
                 ))}
                 {/* Upload button */}
                 <TooltipProvider>
