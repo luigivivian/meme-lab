@@ -53,7 +53,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 13-01-PLAN.md — Foundation: migration (backfill + NOT NULL + Theme.user_id), CharacterRepo tenant filtering, deps.py helper, test scaffold
+- [x] 13-01-PLAN.md — Foundation: migration (backfill + NOT NULL + Theme.user_id), CharacterRepo tenant filtering, deps.py helper, test scaffold
 - [ ] 13-02-PLAN.md — Remaining repos: pipeline, content, job, theme, schedule repos with tenant filtering
 - [ ] 13-03-PLAN.md — Route wiring: all 9 route files pass current_user to repos, catch PermissionError as 403
 
@@ -129,7 +129,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 12. Pipeline Simplification | 2/3 | In Progress|  |
-| 13. Tenant Isolation | 0/3 | Not started | - |
+| 13. Tenant Isolation | 1/3 | In Progress|  |
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
