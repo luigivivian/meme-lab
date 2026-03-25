@@ -2,14 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to plan
-stopped_at: "Roadmap created for v2.0 — 6 phases, 24 requirements mapped"
-last_updated: "2026-03-24"
+status: planning
+stopped_at: Phase 12 context gathered
+last_updated: "2026-03-25T00:41:10.795Z"
+last_activity: 2026-03-24 — Roadmap created for v2.0 milestone
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -33,6 +35,7 @@ Progress: [░░░░░░░░░░] 0%
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0 (v2.0)
 - Average duration: -
 - Total execution time: 0 hours
@@ -44,6 +47,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: -
 - Trend: -
 
@@ -74,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24
-Stopped at: Roadmap created for v2.0 milestone (6 phases, 24 requirements mapped)
-Resume file: None
+Last session: 2026-03-25T00:41:10.793Z
+Stopped at: Phase 12 context gathered
+Resume file: .planning/phases/12-pipeline-simplification/12-CONTEXT.md
