@@ -67,14 +67,14 @@ def test_users_columns():
 
 
 def test_character_user_id_column():
-    """Character model has user_id column (Integer, nullable, FK to users.id)."""
+    """Character model has user_id column (Integer, NOT NULL, FK to users.id) — Phase 13 tenant isolation."""
     from src.database.models import Character
 
     table = Character.__table__
     cols = {c.name: c for c in table.columns}
 
     assert "user_id" in cols
-    assert cols["user_id"].nullable is True
+    assert cols["user_id"].nullable is False
 
     # Check FK
     fks = [fk.target_fullname for fk in cols["user_id"].foreign_keys]
