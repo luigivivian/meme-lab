@@ -1,432 +1,671 @@
-# Architecture Patterns: Auth + Rate Limiting Integration
+# Architecture Patterns
 
-**Domain:** Adding auth, rate limiting, and usage control to an existing FastAPI + Next.js pipeline
-**Researched:** 2026-03-23
-**Confidence:** HIGH — based on direct codebase analysis + established FastAPI/Next.js patterns
+**Domain:** SaaS meme generation platform -- auto-publishing, advanced auth, multi-tenant, billing, analytics
+**Researched:** 2026-03-24
+**Overall confidence:** MEDIUM (codebase analysis verified, web research unavailable)
 
----
-
-## Recommended Architecture
-
-### Component Overview
+## Current Architecture Snapshot
 
 ```
-Browser
-  └── Next.js 15 (memelab/)
-        ├── /login page          ← NEW: form → POST /api/auth/login
-        ├── middleware.ts         ← NEW: protects all non-auth routes client-side
-        ├── AuthContext           ← NEW: global JWT state (localStorage or httpOnly cookie)
-        └── api.ts (existing)    ← MODIFY: inject Authorization header on every request
-
-FastAPI (src/api/)
-  ├── app.py                     ← MODIFY: add auth + rate limit middleware, protect routes
-  ├── routes/auth.py             ← NEW: /auth/login, /auth/register, /auth/refresh, /auth/me
-  ├── deps.py                    ← MODIFY: add get_current_user, get_usage_stats dependencies
-  ├── middleware/auth_middleware.py   ← NEW: JWT validation on incoming requests
-  ├── middleware/rate_limiter.py      ← NEW: per-user daily limit check
-  └── routes/ (all existing)    ← MODIFY: add Depends(get_current_user) to protected routes
-
-MySQL (memelab DB)
-  ├── users (NEW table)
-  ├── api_usage (NEW table)      ← tracks per-user per-day Gemini API calls
-  └── (all 11 existing tables, unchanged schema)
-
-Gemini API Layer (src/image_gen/gemini_client.py)
-  └── GeminiImageClient         ← MODIFY: accept api_key param, track usage, fallback logic
+[Next.js 15 Frontend]  --(JWT Bearer)-->  [FastAPI Backend]
+     13 app pages                            11 route modules
+     AuthContext.tsx                          src/api/deps.py (get_current_user)
+                                                |
+                           +--------------------+-------------------+
+                           |                    |                   |
+                      [Auth Service        [APScheduler        [Pipeline
+                       register/login       singleton            Orchestrator
+                       refresh/logout       60s interval]        5 layers]
+                       JWT HS256]               |                   |
+                           |                    |                   |
+                      [SQLAlchemy 2.0 async + MySQL (aiomysql)]
+                      [14 tables, 8 repos, 8 migrations]
 ```
 
----
+### Critical Gap Identified: Zero Tenant Isolation
 
-## Component Boundaries
+The `get_current_user` dependency authenticates requests but **no repository filters data by user_id**. Verified by grep:
+
+- `publishing.py` routes: `current_user` received but never used for filtering
+- `ScheduledPostRepository.list_posts()`: no user_id parameter
+- `ContentPackageRepository`: no user_id filtering
+- `pipeline.py` routes: pipeline runs visible to all users
+
+Only usage tracking (`UsageRepository.get_user_usage(user_id)`) and key resolution (`UsageAwareKeySelector.resolve(user_id)`) are user-scoped. The `Character.user_id` FK exists but is nullable and not enforced in queries.
+
+This is the single biggest architectural change needed.
+
+## Recommended Architecture (v2.0)
+
+### Design Principle: Dependency Injection Over Middleware
+
+Use FastAPI's `Depends()` chain for tenant context rather than ASGI middleware. This keeps the pattern consistent with existing `get_current_user` and allows granular control (some endpoints like Stripe webhooks must bypass auth).
+
+### Component Boundary Map
+
+```
+                    FRONTEND (Next.js 15)
+    +--------------------------------------------------+
+    | (app)/dashboard/   -- Dashboard v2 (charts, cost) |
+    | (app)/publishing/  -- Calendar + queue + IG setup  |
+    | (app)/settings/    -- 2FA, OAuth, API keys         |
+    | (app)/billing/     -- Plans, checkout, invoices     |
+    | auth/forgot-password/ -- Password reset             |
+    | auth/reset-password/  -- New password form          |
+    +--------------------------------------------------+
+                          |  JWT Bearer
+                          v
+                    BACKEND (FastAPI)
+    +--------------------------------------------------+
+    | src/api/deps.py     -- MODIFY: add TenantContext   |
+    |                                                    |
+    | src/api/routes/                                    |
+    |   auth.py           -- MODIFY: +reset, +2fa,      |
+    |                        +oauth endpoints             |
+    |   publishing.py     -- MODIFY: +user_id scoping    |
+    |   [all 11 modules]  -- MODIFY: pass TenantContext  |
+    |   dashboard.py      -- NEW: analytics endpoints    |
+    |   billing.py        -- NEW: Stripe endpoints       |
+    +--------------------------------------------------+
+    | src/auth/                                          |
+    |   service.py        -- MODIFY: +reset, +2fa,      |
+    |                        +oauth methods               |
+    |   jwt.py            -- MODIFY: +temp_token for 2FA |
+    |   totp.py           -- NEW: TOTP logic             |
+    |   oauth.py          -- NEW: Google OAuth flow      |
+    |   email.py          -- NEW: reset email dispatch   |
+    +--------------------------------------------------+
+    | src/services/                                      |
+    |   publisher.py      -- MODIFY: wire real IG client |
+    |   instagram_client.py -- MODIFY: per-user tokens   |
+    |   scheduler_worker.py -- MODIFY: load user tokens  |
+    |   stripe_service.py -- NEW: Stripe integration     |
+    |   email_service.py  -- NEW: transactional email    |
+    |   cdn_service.py    -- NEW: image upload for IG    |
+    +--------------------------------------------------+
+    | src/database/                                      |
+    |   models.py         -- MODIFY: new tables+columns  |
+    |   repositories/     -- MODIFY: all add user_id     |
+    |     dashboard_repo.py -- NEW: aggregation queries  |
+    |     billing_repo.py   -- NEW: subscriptions        |
+    +--------------------------------------------------+
+```
+
+### Component Responsibilities
 
 | Component | Responsibility | Communicates With |
 |-----------|---------------|-------------------|
-| `routes/auth.py` | Register/login/refresh JWT tokens, hash passwords | `users` DB table, `deps.py` |
-| `middleware/auth_middleware.py` | Validate JWT on every request except /auth/* and /docs | FastAPI request lifecycle |
-| `middleware/rate_limiter.py` | Check and increment daily Gemini Image usage counter | `api_usage` DB table |
-| `deps.py` get_current_user | Decode JWT, load User from DB, attach to request | `users` table, all protected routes |
-| `deps.py` get_usage_stats | Return today's usage counts for current user | `api_usage` table |
-| `GeminiImageClient` | Route image generation to free key → paid key → static fallback | Gemini API, `api_usage` table |
-| Next.js `middleware.ts` | Redirect unauthenticated users to /login | Next.js route matcher |
-| Next.js `AuthContext` | Store JWT, expose login/logout, auto-refresh | localStorage, api.ts |
-| `api.ts` (frontend) | Inject `Authorization: Bearer <token>` header | All fetch calls |
+| **TenantContext** (deps.py) | Wraps `get_current_user`, provides `user_id` + `role` + `plan` to all downstream | All route handlers, all services |
+| **AuthService (extended)** | Password reset flow, TOTP setup/verify, OAuth code exchange | UserRepo, EmailService, JWT module |
+| **TOTPModule** (totp.py) | Generate base32 secrets, produce provisioning URIs, verify 6-digit codes, manage backup codes | AuthService, User model |
+| **OAuthModule** (oauth.py) | Google OAuth authorization URL generation, code-to-token exchange, account linking/creation | AuthService, User model |
+| **EmailService** | Send password reset links, 2FA backup codes, alert notifications | AuthService, DashboardService |
+| **StripeService** | Create Checkout Sessions, handle webhook events, manage plan enforcement | BillingRoutes, Subscription model |
+| **DashboardRepo** | 30-day aggregation queries on api_usage, pipeline_runs, scheduled_posts | DashboardRoutes |
+| **PublishingService (extended)** | Per-user Instagram tokens, CDN upload, real Graph API publish calls | InstagramClient, CDNService, ScheduledPostRepo |
+| **CDNService** | Upload local images to S3/R2, return public URLs for Instagram Graph API | PublishingService |
 
----
+## Integration Analysis by Feature
 
-## Data Flow
+### 1. Auto-Publishing Instagram
 
-### Authentication Flow (Login)
+**Current state:** 90% infrastructure exists. `PublishingService`, `SchedulerWorker`, `InstagramClient`, `ScheduledPost` model, publishing routes, calendar endpoint -- all built. The only placeholder is `_publish_instagram()` (returns fake success).
 
-```
-User fills /login form
-  → POST /api/auth/login {email, password}
-  → Next.js rewrites to FastAPI POST /auth/login
-  → FastAPI: hash verify bcrypt, query users table
-  → Return {access_token, refresh_token, expires_in}
-  → AuthContext stores token in localStorage (or httpOnly cookie)
-  → api.ts injects header on all subsequent requests
-```
-
-### Per-Request Auth Check
+**Integration points to wire:**
 
 ```
-Browser request → Next.js rewrite → FastAPI
-  → auth_middleware.py intercepts
-  → Extract Bearer token from Authorization header
-  → Verify JWT signature + expiry (python-jose or PyJWT)
-  → Decode user_id from payload
-  → Attach user to request.state.user
-  → Route handler calls Depends(get_current_user) → loads full User from DB
-  → Handler executes normally
+publisher.py._publish_instagram(post)
+    |
+    +--> Load content_package (image_path, caption, hashtags)
+    +--> CDNService.upload(image_path) -> public_url
+    +--> Load user's Instagram token (encrypted in DB)
+    +--> InstagramClient(access_token=user_token, business_id=user_biz_id)
+    +--> client.publish_image(public_url, caption)
+         OR client.publish_carousel(urls, caption)
+    +--> Store publish_result (permalink, media_id)
 ```
 
-### Rate Limiting Flow (Gemini Image)
+**What changes:**
 
-```
-POST /pipeline/run or /generate/* arrives
-  → rate_limiter.py checks api_usage table:
-      SELECT usage_count FROM api_usage
-      WHERE user_id = ? AND date = TODAY() AND api_key_tier = 'free'
-  → If usage_count < FREE_DAILY_LIMIT (e.g. 500):
-      → Increment counter
-      → Use free API key
-  → Elif paid key configured AND usage_count < PAID_DAILY_LIMIT:
-      → Increment paid counter
-      → Use paid API key
-  → Else:
-      → background_mode = "static" (graceful degradation)
-  → GeminiImageClient receives (api_key, tier) as parameters
-```
+| File | Change | Risk |
+|------|--------|------|
+| `publisher.py` lines 146-162 | Replace placeholder with real InstagramClient call | MEDIUM |
+| `instagram_client.py` | Already complete, no changes needed | -- |
+| `scheduler_worker.py` | Must load per-user IG tokens when processing due posts | MEDIUM |
+| NEW `cdn_service.py` | Upload local images to public URL (S3/R2/serve) | LOW |
+| NEW `user_instagram_accounts` table | Per-user IG credentials (encrypted) | LOW |
 
-### Usage Dashboard Flow
+**Image URL problem:** Instagram Graph API requires publicly accessible URLs. The existing `InstagramClient.get_public_image_url()` already handles CDN vs local fallback. For production, use Cloudflare R2 (free egress, S3-compatible API) because images need to persist beyond request lifetime.
 
+**What stays unchanged:** All 8 publishing routes, ScheduledPost model, ScheduledPostRepository, scheduler_worker tick interval, APScheduler singleton pattern.
+
+### 2. Two-Factor Authentication (TOTP)
+
+**Current auth flow:**
 ```
-GET /auth/me/usage → returns today's counts per tier
-  ← {free_used: 127, free_limit: 500, paid_used: 0, paid_limit: 1000}
-Next.js dashboard renders progress bars
+POST /auth/login {email, password}
+  -> verify password
+  -> create_access_token + create_refresh_token
+  -> return {access_token, refresh_token}
 ```
 
----
+**New 2FA flow (two-phase login):**
+```
+POST /auth/login {email, password}
+  -> verify password
+  -> IF user.totp_enabled:
+       create_temp_token(user_id, purpose="2fa", ttl=5min)
+       return {requires_2fa: true, temp_token: "..."}
+     ELSE:
+       return {access_token, refresh_token}  (unchanged)
 
-## New Database Tables
+POST /auth/login/2fa {temp_token, totp_code}
+  -> verify temp_token (not expired, purpose="2fa")
+  -> verify TOTP code against user.totp_secret
+  -> create_access_token + create_refresh_token
+  -> return {access_token, refresh_token}
+```
 
-### `users` table
+**Implementation details:**
 
 ```python
-class User(TimestampMixin, Base):
-    __tablename__ = "users"
+# src/auth/totp.py
+import pyotp
+import qrcode
+from cryptography.fernet import Fernet
 
-    id: int (PK)
-    email: str (unique, indexed)
-    hashed_password: str
-    role: str  # "admin" | "user"
-    is_active: bool
-    # Future multi-tenant: owns characters, pipeline runs
+def generate_totp_secret() -> str:
+    """Generate base32 secret for TOTP."""
+    return pyotp.random_base32()
+
+def get_provisioning_uri(secret: str, email: str) -> str:
+    """Generate otpauth:// URI for QR code scanning."""
+    totp = pyotp.TOTP(secret)
+    return totp.provisioning_uri(name=email, issuer_name="MemeLab")
+
+def verify_totp(secret: str, code: str) -> bool:
+    """Verify a 6-digit TOTP code. Allows 1 window of tolerance."""
+    totp = pyotp.TOTP(secret)
+    return totp.verify(code, valid_window=1)
+
+def generate_backup_codes(count: int = 8) -> list[str]:
+    """Generate one-time-use backup codes."""
+    import secrets
+    return [secrets.token_hex(4).upper() for _ in range(count)]
 ```
 
-### `api_usage` table
+**What changes:**
 
-```python
-class ApiUsage(Base):
-    __tablename__ = "api_usage"
+| File | Change | Risk |
+|------|--------|------|
+| `auth/service.py` | Add `setup_2fa()`, `verify_2fa_login()`, `disable_2fa()` | MEDIUM |
+| `auth/jwt.py` | Add `create_temp_token()` with purpose claim and short TTL | LOW |
+| `auth/schemas.py` | Add 2FA request/response schemas | LOW |
+| `routes/auth.py` | Add `POST /auth/2fa/setup`, `POST /auth/2fa/verify-setup`, `POST /auth/login/2fa`, `DELETE /auth/2fa` | LOW |
+| `models.py` (User) | Add `totp_secret_encrypted`, `totp_enabled`, `totp_backup_codes` columns | LOW |
+| NEW `auth/totp.py` | TOTP generation/verification | LOW |
 
-    id: int (PK)
-    user_id: int (FK users.id)
-    date: Date (indexed)          # YYYY-MM-DD, resets daily
-    api_type: str                 # "gemini_image" | "gemini_text" | "comfyui"
-    key_tier: str                 # "free" | "paid"
-    usage_count: int              # incremented per call
-    # Composite unique: (user_id, date, api_type, key_tier)
+**Backward compatibility:** Existing login flow unchanged for users without 2FA. The `POST /auth/login` response shape changes (adds optional `requires_2fa` field), which is additive.
+
+### 3. Google OAuth
+
+**Flow:**
+```
+Frontend: "Sign in with Google" button
+  -> redirect to Google OAuth consent screen
+  -> Google redirects to /auth/oauth/google/callback?code=...
+  -> Backend exchanges code for Google tokens
+  -> Extract email + google_id from ID token
+  -> Find or create user
+  -> Issue JWT tokens
+  -> Redirect to frontend with tokens
 ```
 
-Key design choice: `date + usage_count` pair (not timestamps per call) — single row per user per day per api_type. Atomic `UPDATE ... SET usage_count = usage_count + 1` avoids race conditions without transactions. No write on every pipeline step, just one increment.
+**What changes:**
 
----
+| File | Change | Risk |
+|------|--------|------|
+| NEW `auth/oauth.py` | Google OAuth flow (httpx + manual or authlib) | MEDIUM |
+| `auth/service.py` | Add `oauth_login(provider, oauth_id, email)` | LOW |
+| `routes/auth.py` | Add `GET /auth/oauth/google` (redirect), `GET /auth/oauth/google/callback` | LOW |
+| `models.py` (User) | Add `google_oauth_id` column | LOW |
 
-## Integration Patterns
+**Design decision:** Use raw httpx for Google OAuth rather than authlib/httpx-oauth. Google's OAuth flow is simple (exchange code at token endpoint, decode ID token), and adding a large dependency for one provider is unnecessary. The existing httpx dependency (used in InstagramClient) suffices.
 
-### Pattern 1: FastAPI Dependency Injection for Auth (do not use middleware alone)
+**Account linking:** If OAuth email matches existing user, link accounts. If new email, create user with `hashed_password=""` (OAuth-only user cannot use password login).
 
-FastAPI's `Depends()` system is the correct integration point, not a global middleware. Middleware runs on every request (including /docs, /openapi.json, health checks), causes friction in development, and doesn't integrate with Pydantic/response models cleanly.
+### 4. Password Reset
 
-**Recommended approach:** Global middleware does JWT decode + attach to `request.state`. Route-level `Depends(get_current_user)` does the final DB lookup and returns a typed `User` object. This gives:
-- Opt-in auth: some routes (e.g. `/status`, `/drive/health`) can remain unauthenticated
-- Typed user in route handlers (no manual request.state access)
-- Compatible with FastAPI's OpenAPI docs (shows 401 responses automatically)
+**Flow:**
+```
+POST /auth/forgot-password {email}
+  -> Find user by email (return 200 regardless -- prevent enumeration)
+  -> Generate reset token (secrets.token_urlsafe)
+  -> Store hash in password_reset_tokens table (expires 1 hour)
+  -> Send email with reset link (async, non-blocking)
+  -> return {message: "If email exists, reset link sent"}
+
+POST /auth/reset-password {token, new_password}
+  -> Hash token, look up in password_reset_tokens
+  -> Verify not expired, not used
+  -> Update user's hashed_password
+  -> Mark token as used
+  -> Invalidate all refresh tokens for user
+  -> return {message: "Password updated"}
+```
+
+**What changes:**
+
+| File | Change | Risk |
+|------|--------|------|
+| NEW `password_reset_tokens` table | token_hash, user_id, expires_at, used_at | LOW |
+| `auth/service.py` | Add `request_reset(email)`, `reset_password(token, new_pw)` | LOW |
+| `routes/auth.py` | Add `POST /auth/forgot-password`, `POST /auth/reset-password` | LOW |
+| NEW `services/email_service.py` | Send emails via SMTP or Resend API | MEDIUM |
+
+**Email service choice:** Use Resend (simple REST API, generous free tier 100 emails/day) over raw SMTP. Simpler integration, better deliverability. Fallback: `aiosmtplib` for self-hosted SMTP.
+
+### 5. Multi-Tenant Isolation
+
+**This is the most invasive change.** It touches every repository, every route module, and every service.
+
+**Strategy: TenantContext dependency**
 
 ```python
-# deps.py (new additions)
-async def get_current_user(
+# src/api/deps.py
+from dataclasses import dataclass
+
+@dataclass
+class TenantContext:
+    user_id: int
+    role: str
+    plan: str
+    is_admin: bool
+
+    def can_access(self, resource_user_id: int | None) -> bool:
+        """Admin can access all, users only their own."""
+        if self.is_admin:
+            return True
+        return resource_user_id == self.user_id
+
+async def get_tenant(user=Depends(get_current_user)) -> TenantContext:
+    return TenantContext(
+        user_id=user.id,
+        role=user.role,
+        plan=getattr(user, 'plan', 'free'),
+        is_admin=user.role == "admin",
+    )
+```
+
+**Repository changes -- every repo gets user_id filtering:**
+
+| Repository | Current | After |
+|-----------|---------|-------|
+| CharacterRepository | `list_all()` returns all chars | `list_for_user(user_id)` filters by user_id |
+| ContentPackageRepository | No user filtering | Filter via content_package.pipeline_run.user_id OR add direct user_id FK |
+| ScheduledPostRepository | No user filtering | Add user_id FK, filter in all queries |
+| PipelineRunRepository | No user filtering | Add user_id FK, filter in all queries |
+| JobRepository | No user filtering | Filter via character.user_id |
+| ThemeRepository | Global themes + user themes | is_builtin=True visible to all, custom filtered by user |
+
+**Migration strategy (two-step):**
+1. Migration 009a: Add `user_id` columns as NULLABLE + FK
+2. Backfill script: SET user_id = 1 for all existing data (admin/seed user)
+3. Migration 009b: ALTER to NOT NULL (for tables that require it)
+
+**Tables needing user_id FK addition:**
+
+| Table | Has user_id? | Action |
+|-------|-------------|--------|
+| characters | YES (nullable) | Make required for new records |
+| pipeline_runs | NO | ADD user_id FK |
+| scheduled_posts | NO | ADD user_id FK |
+| content_packages | NO (has pipeline_run_id) | ADD user_id FK for direct queries |
+| batch_jobs | NO | ADD user_id FK |
+
+### 6. Stripe Billing
+
+**Webhook endpoint -- unauthenticated, signature-verified:**
+
+```python
+@router.post("/webhook")
+async def stripe_webhook(
     request: Request,
-    session: AsyncSession = Depends(db_session)
-) -> User:
-    token = request.headers.get("Authorization", "").removeprefix("Bearer ")
-    if not token:
-        raise HTTPException(401, "Not authenticated")
-    payload = verify_jwt(token)  # raises on invalid/expired
-    user = await session.get(User, payload["sub"])
-    if not user or not user.is_active:
-        raise HTTPException(401, "User not found or inactive")
-    return user
-
-# In any existing route (minimal change required):
-@router.post("/pipeline/run")
-async def run_pipeline(
-    body: PipelineRunRequest,
-    current_user: User = Depends(get_current_user),  # ← add this line
     session: AsyncSession = Depends(db_session),
 ):
-    ...
+    """Stripe calls this directly. No JWT auth. Verify via signature."""
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig, STRIPE_WEBHOOK_SECRET
+        )
+    except (ValueError, stripe.error.SignatureVerificationError):
+        raise HTTPException(400, "Invalid webhook signature")
+
+    service = StripeService(session)
+    await service.handle_event(event)
+    return {"status": "ok"}
 ```
 
-### Pattern 2: Dual API Key Rotation (Usage-Aware Fallback)
+**Events to handle:**
 
-The existing `GeminiImageClient` in `src/image_gen/gemini_client.py` handles one key from `config.py`. The new pattern adds a selection layer before the client is called.
+| Event | Action |
+|-------|--------|
+| `checkout.session.completed` | Create/activate subscription, set user.plan |
+| `invoice.paid` | Extend subscription period |
+| `invoice.payment_failed` | Mark subscription as past_due |
+| `customer.subscription.updated` | Sync plan changes |
+| `customer.subscription.deleted` | Downgrade to free plan |
 
-```
-UsageAwareKeySelector (new class in image_gen/)
-  → check_and_reserve(user_id, api_type="gemini_image") → KeyResult
-  → KeyResult: {api_key, tier, remaining}
-  → If remaining == 0: KeyResult: {api_key=None, tier="static"}
+**Idempotency:** Store processed `event.id` values. Skip duplicates. Stripe retries failed webhooks.
 
-GeminiImageClient.generate(situacao_key, ..., api_key=key_result.api_key)
-  → If api_key is None: skip generation, return static bg path
-```
-
-The existing fallback chain `Gemini → ComfyUI → static` already exists in `image_worker.py`. The new layer sits above it: it decides whether to even attempt Gemini before the worker tries.
+**New tables:**
 
 ```python
-# Existing flow in image_worker.py (simplified):
-async def _generate_background(...):
-    if self.use_gemini:
-        result = await gemini_client.generate(...)  # may 400/fail
-        if result: return result
-    if self.use_comfyui:
-        result = await comfyui_client.generate(...)
-        if result: return result
-    return static_background()
+class Subscription(TimestampMixin, Base):
+    __tablename__ = "subscriptions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True)
+    stripe_customer_id: Mapped[str] = mapped_column(String(100))
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True)
+    plan: Mapped[str] = mapped_column(String(30), default="free")
+    status: Mapped[str] = mapped_column(String(30), default="active")
+    current_period_end: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
 
-# New flow:
-async def _generate_background(..., user_id: int):
-    key_result = await usage_selector.check_and_reserve(user_id)
-    if key_result.tier == "static":
-        return static_background()  # skip API calls entirely
-    result = await gemini_client.generate(..., api_key=key_result.api_key)
-    if result: return result
-    # fallback chain continues as before
+class StripeEvent(Base):
+    """Idempotency table for processed webhook events."""
+    __tablename__ = "stripe_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(100), unique=True)
+    event_type: Mapped[str] = mapped_column(String(100))
+    processed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 ```
 
-### Pattern 3: Next.js Middleware for Route Protection
+### 7. Dashboard v2 Analytics
 
-Next.js 15 supports `middleware.ts` at the `memelab/src/` level. It runs on the Edge Runtime before any page renders.
+**Pure aggregation -- no new data collection needed.** Existing tables have all required data.
 
-```typescript
-// memelab/src/middleware.ts (new file)
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+**Endpoints:**
 
-const PUBLIC_PATHS = ['/login', '/register']
+| Endpoint | Source Tables | Query Pattern |
+|----------|-------------|---------------|
+| `GET /dashboard/usage-history?days=30` | api_usage | GROUP BY date, SUM(usage_count) WHERE user_id=X |
+| `GET /dashboard/pipeline-stats?days=30` | pipeline_runs | COUNT, AVG(duration), SUM(packages_produced) WHERE user_id=X |
+| `GET /dashboard/publishing-stats?days=30` | scheduled_posts | COUNT by status WHERE user_id=X |
+| `GET /dashboard/cost-report?days=30` | api_usage | usage_count * price_per_unit by service/tier |
+| `GET /dashboard/alerts` | api_usage | Check % of daily limit used |
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get('access_token')?.value
-    || request.headers.get('Authorization')?.replace('Bearer ', '')
+**What stays:** The existing `GET /auth/me/usage` endpoint (today's snapshot) remains. Dashboard adds time-series history.
 
-  const isPublic = PUBLIC_PATHS.some(p => request.nextUrl.pathname.startsWith(p))
+## Data Flow Changes
 
-  if (!isPublic && !token) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-  return NextResponse.next()
-}
-
-export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-}
+### Current Flow (v1.0)
+```
+User -> POST /pipeline/run -> BackgroundTask -> AsyncPipelineOrchestrator
+  L1: 9 agents fetch trends (unscoped)
+  L2: Broker dedup
+  L3: Curator selects topics via LLM
+  L4: PhraseWorker + ImageWorker (Gemini/static) + Pillow compose
+  L5: CaptionWorker + HashtagWorker + QualityWorker
+  -> ContentPackages saved (no user_id)
 ```
 
-Token storage recommendation: **httpOnly cookie** (not localStorage) for the main access token. Eliminates XSS risk. Next.js rewrites already proxy to FastAPI, so the `Set-Cookie` header from FastAPI `/auth/login` flows through to the browser naturally.
+### v2.0 Pipeline Flow
+```
+User -> POST /pipeline/run (manual_topics, background_mode="static")
+  -> TenantContext extracts user_id
+  -> AsyncPipelineOrchestrator(user_id=X, character_id=Y)
+  L1-L3: SKIPPED (manual topics provided)
+  L4: PhraseWorker (Gemini text, user's API key) + ImageWorker (static BG ONLY) + Pillow compose
+  L5: CaptionWorker + HashtagWorker + QualityWorker
+  -> ContentPackages saved WITH user_id
+  -> Optional: auto-schedule for publishing
+```
 
-### Pattern 4: Usage Tracking Without Slowing the Pipeline
+### v2.0 Auto-Publishing Flow
+```
+ContentPackage exists -> User POST /publishing/schedule
+  -> ScheduledPost(user_id=X, status=queued, scheduled_at=T)
+  -> APScheduler tick every 60s
+  -> PublishingService.process_due_posts()
+  -> For each due post:
+      -> Load user's IG credentials (decrypt)
+      -> CDNService.upload(image_path) -> public_url
+      -> InstagramClient(access_token=user_token).publish_image(url, caption)
+      -> Update status=published, store permalink
+```
 
-The key constraint is that the 5-layer async pipeline (L1→L5) must not slow down due to usage accounting. The correct pattern is async DB writes that don't block the critical path.
+### v2.0 Login Flow (with 2FA)
+```
+POST /auth/login {email, password}
+  -> Verify password ✓
+  -> user.totp_enabled == True?
+     YES -> return {requires_2fa: true, temp_token: "eyJ..."}
+     NO  -> return {access_token, refresh_token}
 
-**Approach:** Fire-and-forget for non-critical usage increments using `asyncio.create_task()`.
+POST /auth/login/2fa {temp_token, totp_code}
+  -> Verify temp_token (5min TTL, purpose="2fa")
+  -> Verify TOTP code (pyotp, valid_window=1)
+  -> return {access_token, refresh_token}
+```
+
+## Patterns to Follow
+
+### Pattern 1: Tenant-Scoped Repository
+
+**What:** Every repository method that reads user data filters by `user_id`. Admin bypasses filter.
+**When:** All data-access operations on user-owned resources.
 
 ```python
-# In rate_limiter or image_worker:
-async def record_usage_nonblocking(user_id, api_type, tier, session_factory):
-    """Increment usage counter without blocking caller."""
-    async def _write():
-        async with session_factory() as session:
-            await upsert_usage(session, user_id, api_type, tier)
-    asyncio.create_task(_write())  # fire and forget
+class ScheduledPostRepository:
+    def __init__(self, session: AsyncSession, user_id: int | None = None):
+        self.session = session
+        self.user_id = user_id
 
-# The pipeline continues immediately after this call
+    def _scoped(self, stmt):
+        """Apply tenant filter if user_id is set."""
+        if self.user_id is not None:
+            stmt = stmt.where(ScheduledPost.user_id == self.user_id)
+        return stmt
+
+    async def list_posts(self, limit=50, offset=0, **filters):
+        stmt = select(ScheduledPost).order_by(ScheduledPost.scheduled_at.asc())
+        stmt = self._scoped(stmt)  # tenant filter
+        # ... apply other filters
 ```
 
-For the rate limit check (before making the API call), a single indexed read from `api_usage` by `(user_id, date, api_type)` is O(1) — negligible latency. Composite index on these three columns is required.
+### Pattern 2: Encrypted Secrets at Rest
 
----
+**What:** User tokens (Instagram, TOTP secrets) encrypted with Fernet. Server-side key in env.
+**When:** Storing any credential that must be decrypted (not hashed like passwords).
 
-## Existing Architecture Integration Points
+```python
+from cryptography.fernet import Fernet
 
-### What Changes in `app.py`
+ENCRYPTION_KEY = os.environ["ENCRYPTION_KEY"]  # Fernet.generate_key()
+_fernet = Fernet(ENCRYPTION_KEY)
 
-1. Register new `auth` router: `app.include_router(auth.router, prefix="/auth", tags=["Auth"])`
-2. CORS `allow_origins=["*"]` must change to `allow_credentials=True` with explicit origins when using cookies
+def encrypt_token(plaintext: str) -> str:
+    return _fernet.encrypt(plaintext.encode()).decode()
 
-### What Changes in `deps.py`
-
-Add `get_current_user` and `get_usage_stats` dependencies (see Pattern 1 above). Existing `db_session()` dependency is already the right shape — new auth dependencies build on top of it.
-
-### What Changes in Route Files (9 modules)
-
-Add `Depends(get_current_user)` to each protected route. For this v1 milestone (single-user admin), this is safe to add uniformly. Routes that should remain public:
-- `GET /status` — health check, used by dashboard on load
-- `GET /drive/health` — filesystem health
-- `GET /docs`, `GET /openapi.json` — Swagger UI (FastAPI handles these)
-
-### What Changes in `api.ts` (frontend)
-
-```typescript
-// Add to the request() function:
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = getToken()  // from cookie or localStorage
-  const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-      ...options?.headers
-    },
-    credentials: "include",  // for httpOnly cookies
-    ...options,
-  });
-  if (res.status === 401) {
-    // redirect to login
-    window.location.href = '/login'
-  }
-  ...
-}
+def decrypt_token(ciphertext: str) -> str:
+    return _fernet.decrypt(ciphertext.encode()).decode()
 ```
 
----
+### Pattern 3: Two-Phase Login for 2FA
 
-## Suggested Build Order
+**What:** Login returns temp token if 2FA enabled. Second endpoint exchanges temp + TOTP for real JWT.
+**When:** Users with `totp_enabled = True`.
 
-The components have clear dependencies. Build order must respect them:
+The temp token is a standard JWT with `{"purpose": "2fa", "sub": user_id, "exp": now+5min}`. It cannot be used as a normal access token because `get_current_user` checks `type == "access"`.
 
+### Pattern 4: Webhook Signature Verification
+
+**What:** Stripe webhook endpoint bypasses JWT auth. Verify using HMAC from `stripe-signature` header.
+**When:** `POST /billing/webhook`.
+
+Must be excluded from `get_current_user` dependency. Register the route directly, not under the auth-protected prefix.
+
+### Pattern 5: Gradual Multi-Tenant Migration
+
+**What:** Add user_id columns as nullable first, backfill, then make non-nullable.
+**When:** Retrofitting tenant isolation on existing tables with data.
+
+```python
+# Migration 009a: nullable
+op.add_column("pipeline_runs", sa.Column("user_id", sa.Integer, nullable=True))
+op.create_foreign_key(None, "pipeline_runs", "users", ["user_id"], ["id"])
+
+# Migration 009b: after backfill
+op.alter_column("pipeline_runs", "user_id", nullable=False)
 ```
-1. DB layer (users + api_usage tables + Alembic migration)
-   └── No other dependencies. Foundation for everything.
-
-2. Auth backend (routes/auth.py + get_current_user dep + JWT utils)
-   └── Depends on: users table, bcrypt, python-jose/PyJWT
-
-3. Route protection (add Depends(get_current_user) to all routes)
-   └── Depends on: get_current_user working correctly
-
-4. Usage tracking (api_usage table + write logic)
-   └── Depends on: users table, DB layer
-
-5. Dual key rotation (UsageAwareKeySelector)
-   └── Depends on: usage tracking working, api_usage readable
-
-6. Rate limit check + static fallback trigger
-   └── Depends on: dual key rotation, existing fallback chain
-
-7. Frontend auth (login page + AuthContext + middleware.ts)
-   └── Depends on: auth backend working (/auth/login returning JWT)
-
-8. Frontend usage dashboard
-   └── Depends on: usage tracking, /auth/me/usage endpoint
-```
-
-**Critical dependency:** Steps 1-3 must be complete before testing any protected routes. Steps 4-6 can be built in parallel with Steps 7-8 once Step 1 is done.
-
----
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Global Middleware Instead of Depends()
+### Anti-Pattern 1: Filtering in Routes Instead of Repositories
 
-**What:** Implement auth as pure ASGI middleware (like `app.add_middleware(AuthMiddleware)`)
-**Why bad:** Breaks FastAPI's OpenAPI docs (no 401 response schemas), makes route-level opt-out awkward, can't inject typed `User` objects into route handlers
-**Instead:** Auth middleware only does token extraction → `request.state`. Route-level `Depends()` does the typed lookup.
+**What:** Adding `WHERE user_id = x` in route handlers.
+**Why bad:** Easy to forget in one route = data leak. 11 route files, dozens of endpoints.
+**Instead:** Tenant filtering always in repository layer. Routes pass TenantContext to service/repo. Single audit point.
 
-### Anti-Pattern 2: Write to `api_usage` on Every Gemini API Call Inline
+### Anti-Pattern 2: Synchronous Email in Request Path
 
-**What:** `await session.commit()` inside the generation worker before each Gemini call
-**Why bad:** Adds DB round-trip latency to already-slow image generation (~3-10s). Also couples pipeline correctness to DB write success.
-**Instead:** Fire-and-forget `asyncio.create_task()` for usage writes. Pre-flight read for rate limit check is still synchronous (must happen before the API call).
+**What:** Sending password reset email synchronously during API request.
+**Why bad:** SMTP is slow (2-5s). Also reveals whether email exists (timing side-channel).
+**Instead:** `asyncio.create_task(send_email(...))`. Return 200 immediately. Log failures separately.
 
-### Anti-Pattern 3: Storing JWT in localStorage
+### Anti-Pattern 3: Plaintext TOTP Secrets
 
-**What:** `localStorage.setItem('token', jwt)`
-**Why bad:** XSS-accessible. The memeLab frontend has dynamic content from user-supplied data (phrases, captions) that could contain injected scripts.
-**Instead:** httpOnly cookie. Next.js rewrites proxy the `Set-Cookie` header from FastAPI transparently.
+**What:** Storing TOTP base32 secret directly in DB column.
+**Why bad:** DB breach exposes all 2FA secrets, making 2FA worthless.
+**Instead:** Encrypt with Fernet. Attacker needs both DB dump AND server key.
 
-### Anti-Pattern 4: Two Separate Gemini Client Instances for Free/Paid Keys
+### Anti-Pattern 4: Processing Stripe Webhooks Without Idempotency
 
-**What:** Create `GeminiImageClientFree` and `GeminiImageClientPaid` classes
-**Why bad:** Code duplication, harder to maintain when upstream Gemini API changes
-**Instead:** Single `GeminiImageClient` that accepts `api_key` at call time. Key selection is the responsibility of `UsageAwareKeySelector` (a separate concern, separate class).
+**What:** Handling `checkout.session.completed` without checking if already processed.
+**Why bad:** Stripe retries. Double-processing creates duplicate subscriptions.
+**Instead:** `stripe_events` table with unique `event_id`. Skip if already seen.
 
-### Anti-Pattern 5: Putting User Context in the Pipeline Orchestrator
+### Anti-Pattern 5: Global Instagram Token
 
-**What:** Passing `user_id` all the way from API route → AsyncPipelineOrchestrator → L4 → ImageWorker
-**Why bad:** Requires modifying every layer's signature. Breaks existing CLI usage where there's no user context.
-**Instead:** The API route resolves the `api_key` decision before calling the orchestrator. Pass the resolved `background_mode` (already an existing parameter) as `"static"` when the limit is hit. The orchestrator doesn't need to know about users.
+**What:** Current `config.INSTAGRAM_ACCESS_TOKEN` is a single global env var.
+**Why bad:** Multi-tenant means each user has their own Instagram Business account.
+**Instead:** Per-user encrypted tokens in `user_instagram_accounts` table. Global token only for admin/testing.
 
----
+### Anti-Pattern 6: Global Config Mutation
+
+**What:** `_run_pipeline_task` mutates global config objects.
+**Why bad:** Race condition when two users run pipelines simultaneously.
+**Instead:** Pass configuration as parameters through the call chain.
+
+## New vs Modified Summary
+
+### NEW Components (14 files)
+
+| File | Phase | Purpose |
+|------|-------|---------|
+| `src/auth/totp.py` | Auth v2 | TOTP secret gen, verify, backup codes |
+| `src/auth/oauth.py` | Auth v2 | Google OAuth code exchange |
+| `src/auth/email.py` | Auth v2 | Password reset token + email dispatch |
+| `src/services/stripe_service.py` | Multi-tenant | Checkout, webhook handler, plan enforcement |
+| `src/services/email_service.py` | Auth v2 | SMTP/Resend transactional email |
+| `src/services/cdn_service.py` | Auto-publish | Upload images to S3/R2 for public URLs |
+| `src/api/routes/billing.py` | Multi-tenant | Stripe checkout, portal, webhook |
+| `src/api/routes/dashboard.py` | Dashboard v2 | Analytics aggregation endpoints |
+| `src/database/repositories/dashboard_repo.py` | Dashboard v2 | Time-series aggregation queries |
+| `src/database/repositories/billing_repo.py` | Multi-tenant | Subscriptions CRUD |
+| `password_reset_tokens` model | Auth v2 | Reset token storage |
+| `user_instagram_accounts` model | Auto-publish | Per-user IG credentials |
+| `subscriptions` model | Multi-tenant | Stripe subscription sync |
+| `stripe_events` model | Multi-tenant | Webhook idempotency |
+
+### MODIFIED Components (risk-ordered)
+
+| File | Change | Risk |
+|------|--------|------|
+| ALL 8 repositories | Add user_id filtering to all query methods | **HIGH** -- pervasive, miss one = data leak |
+| ALL 11 route modules | Pass TenantContext to services | **HIGH** -- pervasive |
+| `src/api/deps.py` | Add TenantContext dependency | LOW -- additive |
+| `src/auth/service.py` | Add reset, 2FA, OAuth methods | MEDIUM -- core auth |
+| `src/auth/jwt.py` | Add temp_token creation for 2FA flow | MEDIUM -- affects auth flow |
+| `src/auth/schemas.py` | New request/response schemas | LOW -- additive |
+| `src/database/models.py` (User) | Add totp, oauth, stripe, plan columns | LOW -- additive ALTER |
+| `src/database/models.py` (new tables) | 4 new ORM models | LOW -- additive |
+| `publisher.py` lines 146-162 | Wire real InstagramClient | MEDIUM |
+| `scheduler_worker.py` | Load per-user IG tokens | MEDIUM |
+| `instagram_client.py` | Accept per-user tokens (already parameterized) | LOW |
+| Migration 009 | Schema changes for all new tables + columns | LOW |
+
+## Suggested Build Order
+
+```
+Phase 1: Pipeline Refactor + Multi-Character
+  Rationale: Establishes user_id threading pattern, foundation for all features.
+  Dependencies: None
+  Risk: LOW -- extends existing code, no new external integrations
+
+Phase 2: Tenant Isolation
+  Rationale: Must happen before user-facing features to prevent data leakage.
+  Dependencies: Phase 1 (user_id on pipeline_runs)
+  Risk: HIGH -- touches every repo and route, regression testing critical
+
+Phase 3: Auth v2 (Reset + 2FA + OAuth)
+  Rationale: Security foundation needed before exposing billing/publishing to users.
+  Dependencies: Phase 2 (tenant context infrastructure)
+  Risk: MEDIUM -- new auth flows, must not break existing login
+
+Phase 4: Auto-Publishing Instagram
+  Rationale: Core product value. Depends on tenant isolation for per-user IG tokens.
+  Dependencies: Phase 2 (per-user credentials), Phase 3 (OAuth pattern reuse for IG)
+  Risk: MEDIUM -- external API integration, image CDN setup
+
+Phase 5: Dashboard v2
+  Rationale: Monitoring and cost visibility. Pure SQL aggregation, low risk.
+  Dependencies: Phase 2 (user-scoped metrics)
+  Risk: LOW -- read-only aggregation, no new external dependencies
+
+Phase 6: Multi-Tenant Billing (Stripe)
+  Rationale: Monetization layer. Last because it needs plan enforcement across all features.
+  Dependencies: Phase 2 (tenant context), Phase 5 (usage data for billing)
+  Risk: MEDIUM -- Stripe webhooks, payment handling requires careful testing
+```
+
+**Why this order:**
+1. Pipeline refactor is the foundation -- establishes patterns everything else needs
+2. Tenant isolation early prevents data leakage as features are added
+3. Auth v2 before user-facing features ensures security baseline
+4. Auto-publishing is the highest user-value feature after the foundation
+5. Dashboard provides visibility needed for billing decisions
+6. Billing last because it gates access to all previous features
+
+## Key Libraries Required
+
+| Library | Purpose | Confidence |
+|---------|---------|------------|
+| `pyotp` | TOTP generation/verification (RFC 6238) | HIGH |
+| `cryptography` (Fernet) | Encrypt user secrets at rest | HIGH |
+| `stripe` | Stripe API SDK + webhook verification | HIGH |
+| `qrcode[pil]` | Generate QR codes for TOTP setup | HIGH |
+| `resend` | Transactional email (password reset, alerts) | MEDIUM |
+| `boto3` or `httpx` | S3/R2 image upload for CDN | MEDIUM |
 
 ## Scalability Considerations
 
-This is a single-user (admin) system today, preparing for multi-tenant structure.
-
-| Concern | Single user now | Multi-tenant later |
-|---------|-----------------|-------------------|
-| Usage tracking | user_id FK on api_usage (even if only one row) | Already correct schema |
-| API key rotation | 2 keys (free + paid) in .env | Per-user key vault (separate milestone) |
-| Rate limiting | Check api_usage by user_id | Same query, more rows |
-| JWT auth | Single admin account | Add registration flow, roles |
-| Session storage | Stateless JWT (no Redis needed) | Add token blacklist if refresh tokens needed |
-
-The `users` table with `role: "admin" | "user"` and `character → user_id` FK prepares the multi-tenant path without implementing isolation now.
-
----
-
-## Configuration Additions
-
-New entries needed in `.env` / `config.py`:
-
-```bash
-# Auth
-JWT_SECRET_KEY=<32+ random bytes>
-JWT_ALGORITHM=HS256
-JWT_ACCESS_EXPIRE_MINUTES=60
-JWT_REFRESH_EXPIRE_DAYS=30
-
-# Dual API keys
-GOOGLE_API_KEY=<free tier key>
-GOOGLE_API_KEY_PAID=<pay-as-you-go key>   # empty = no paid fallback
-
-# Usage limits (match Google's actual free tier limits)
-GEMINI_IMAGE_FREE_DAILY_LIMIT=500
-GEMINI_IMAGE_PAID_DAILY_LIMIT=2000
-GEMINI_TEXT_FREE_DAILY_LIMIT=1500        # RPD for flash
-```
-
-The `GOOGLE_API_KEY` variable already exists. `GOOGLE_API_KEY_PAID` is additive — if empty, the system operates in free-only mode.
-
----
+| Concern | At 10 users | At 1K users | At 10K users |
+|---------|-------------|-------------|--------------|
+| DB queries | No concern | Add composite indexes on (user_id, created_at) | Read replicas or move to Postgres |
+| Instagram API | 1-10 accounts | Each user's own rate limits | No server concern |
+| Scheduler | Single APScheduler, 60s | Fine | Batch per-user, distributed lock |
+| Stripe webhooks | ~10/day | ~1K/day | Async queue (Redis) |
+| Image storage | Local disk | S3/R2, ~10GB | S3/R2 with lifecycle policies |
+| Email | Direct SMTP | Resend/SES | SES with queue |
+| Pipeline runs | Sequential BackgroundTasks | asyncio.gather per user | Task queue (ARQ/Celery) |
 
 ## Sources
 
-- Direct codebase analysis: `src/api/app.py`, `src/api/deps.py`, `src/api/routes/`, `src/database/models.py`, `src/database/session.py`, `src/image_gen/gemini_client.py`, `memelab/src/lib/api.ts`, `memelab/next.config.ts`
-- FastAPI official patterns: Dependency Injection, Security utilities (OAuth2PasswordBearer), HTTPException
-- Next.js 15 docs: middleware.ts, Edge Runtime, rewrites configuration (already in use in this codebase)
-- Confidence: HIGH — all patterns derived from direct code inspection of the existing system
-
----
-
-*Architecture analysis: 2026-03-23*
+- **Codebase analysis (HIGH confidence):** All 14 ORM models, 11 route modules, AuthService, PublishingService, InstagramClient, SchedulerWorker, config.py, deps.py, jwt.py
+- **Existing infrastructure verified:** APScheduler singleton, httpx for Instagram Graph API, SQLAlchemy 2.0 async session factory, bcrypt passwords, SHA-256 refresh token hashing
+- **Training data (MEDIUM confidence):** Stripe webhook patterns, pyotp TOTP flow, Google OAuth OIDC flow, Fernet encryption pattern, S3-compatible upload
+- **Not verified (LOW confidence):** Exact Stripe API v2025+ changes, Instagram Graph API v21.0 specifics, Resend SDK current API

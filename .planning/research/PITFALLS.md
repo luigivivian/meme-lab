@@ -1,133 +1,204 @@
 # Domain Pitfalls
 
-**Domain:** Auth + Rate Limiting + API Key Management on Existing FastAPI App
+**Domain:** v2.0 Feature Additions — Pipeline Refactor, Auto-Publishing, Auth v2, Dashboard v2, Multi-Tenant
 **Project:** Clip-Flow — Mago Mestre pipeline
-**Researched:** 2026-03-23
-**Confidence:** HIGH (grounded in actual codebase analysis)
+**Researched:** 2026-03-24
+**Confidence:** HIGH (grounded in codebase analysis + domain expertise)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, security incidents, or production pipeline stoppages.
+Mistakes that cause rewrites, data breaches, or major production incidents.
 
 ---
 
-### Pitfall 1: CORS Wildcard Breaks When Credentials Are Added
+### Pitfall 1: Multi-Tenant Data Leakage — Queries Without user_id Filtering
 
-**What goes wrong:** `app.py` currently has `allow_origins=["*"]` with `allow_credentials=True`. This combination is already invalid per the CORS spec — browsers reject credentialed requests to wildcard origins. Adding JWT auth (which requires `Authorization` headers or cookies) will surface this latent bug immediately: the Next.js 15 frontend will silently fail all authenticated API calls.
+**What goes wrong:** Every route uses `get_current_user` as a dependency but almost NO query actually filters by `current_user.id`. Characters, content packages, pipeline runs, scheduled posts, themes — all queries return ALL records regardless of who is logged in. When multi-tenant ships, User A sees User B's characters, memes, and scheduled posts.
 
-**Why it happens:** The wildcard was added for development convenience before auth existed. With no auth, no credentials are ever sent, so the invalid config never fires. The moment a `Bearer` token is attached, browsers enforce the CORS spec.
+**Why it happens:** v1 was single-user. `get_current_user` was added for auth gating (401 protection), not data isolation. The repositories (`schedule_repo`, `content_repo`, character queries) have no `user_id` parameter in their list/get methods.
 
-**Consequences:** Every authenticated route returns a CORS error in the browser. Not a 401 — a network error. Very hard to diagnose if you don't know to look here first.
+**Consequences:**
+- Data breach: users see each other's content, API keys, characters
+- Users can cancel/modify each other's scheduled posts
+- Users can trigger pipeline runs using other users' characters
+- GDPR/LGPD violation if deployed with real users
+
+**Evidence from codebase:**
+- `src/api/routes/publishing.py` lines 49-61: `list_queue()` calls `repo.list_posts()` with no user_id filter
+- `src/api/routes/publishing.py` line 28-33: `schedule_post()` accepts any `content_package_id` without verifying ownership
+- `src/database/models.py`: `ScheduledPost` (line 463) has NO `user_id` column — only `character_id` and `content_package_id`
+- `src/database/models.py`: `PipelineRun` (line 163) has NO `user_id` column
+- `src/database/models.py`: `ContentPackage` (line 296) has NO `user_id` column
+- Only `Character` model has `user_id` FK (confirmed via `characters: Mapped[list["Character"]]` on User)
 
 **Prevention:**
-1. Before adding any auth middleware, change `allow_origins` in `app.py` to an explicit list: `["http://localhost:3000", "http://127.0.0.1:3000"]`
-2. Keep `allow_credentials=True`
-3. Add `allow_headers=["Authorization", "Content-Type"]` explicitly
+1. Add `user_id` FK to ALL tables that contain user-owned data: `pipeline_runs`, `content_packages`, `scheduled_posts`, `batch_jobs`, `agent_stats` (single migration)
+2. Create a `TenantFilterMixin` or repository base class that auto-injects `WHERE user_id = :current_user_id` on all list/get queries
+3. Every repository method that lists/gets data MUST accept and enforce `user_id`
+4. For cross-resource access (e.g., scheduling someone else's content_package), add explicit ownership check: `if pkg.user_id != current_user.id: raise 403`
+5. Write integration tests: create 2 users, create data for each, assert User A cannot see User B's data
+6. Consider SQLAlchemy event listeners (`before_insert`) to auto-set `user_id` on INSERT as a safety net
 
-**Detection:** Open browser devtools → Network tab → any API call shows `Access-Control-Allow-Origin` as `*` but the request includes `Authorization`. Console shows: `"The value of the 'Access-Control-Allow-Origin' header in the response must not be the wildcard '*'"`
+**Detection:** Create a test that registers 2 users, creates a character for each, then asserts GET /characters for User A returns only User A's characters. This test will FAIL today.
 
-**Phase:** Must be fixed before implementing any auth — Phase 1 / first task.
+**Phase to address:** Multi-tenant phase (Phase 6). Must be the FIRST thing built in that phase — before billing, before API keys per user. However, the user_id column additions should be designed in Phase 1 so the migration is clean.
 
 ---
 
-### Pitfall 2: Retrofitting Auth Across 50+ Routes — The Missed Route
+### Pitfall 2: Instagram Graph API — Token Lifecycle Trap
 
-**What goes wrong:** The app has 9 router modules (`generation`, `jobs`, `themes`, `pipeline`, `content`, `agents`, `drive`, `characters`, `publishing`) plus an inline `/llm/status` route on the app root. Adding a FastAPI `Depends(get_current_user)` to each route individually means one missed route becomes an unauthenticated endpoint in production.
+**What goes wrong:** Instagram Graph API requires a Facebook App with `instagram_content_publish` permission. This permission requires Facebook App Review, which takes 2-6 weeks and often gets rejected on first submission. Meanwhile, developers build against short-lived tokens (1 hour) that expire silently, causing the scheduler to fail at 3 AM with no recovery.
 
-**Why it happens:** Developers add auth to the routes they actively test. The `/drive/*` endpoint serving generated images, `/agents` listing agent status, `/llm/status`, and background-task status polling routes are easy to forget. Each route file needs to be audited independently.
+**Why it happens:** Instagram's API ecosystem is complex. The current path requires: Facebook Business account -> Facebook App -> Instagram Graph API -> App Review for `instagram_content_publish` + `pages_manage_posts`. Short-lived tokens are easy to get for testing but expire after 1 hour. Long-lived tokens last 60 days but still expire and need refresh.
 
-**Consequences:** Content leakage (generated images publicly accessible), pipeline status readable without auth, agent configuration exposed.
+**Consequences:**
+- Scheduler publishes silently fail for hours/days with expired tokens
+- Publishing works in dev (short-lived token) but breaks in prod after 1 hour
+- App Review rejection blocks the entire auto-publishing feature for weeks
+- Long-lived tokens (60 days) still expire — need a refresh mechanism
+- The current `_publish_instagram` placeholder (publisher.py lines 146-162) has zero token management — it returns a hardcoded placeholder
+
+**Evidence from codebase:**
+- `src/services/publisher.py` lines 146-162: `_publish_instagram()` is a placeholder with no actual API call
+- No Instagram token storage in the User model or any other model
+- No token refresh mechanism anywhere in the codebase
 
 **Prevention:**
-1. Apply auth at the **router level**, not the individual route level — add `dependencies=[Depends(get_current_user)]` to the `APIRouter()` constructor in each route file
-2. Maintain an explicit whitelist of public routes (`/docs`, `/openapi.json`, `/health`, `POST /auth/login`, `POST /auth/register`) — everything else is auth-required by default
-3. Add an integration test that scans all registered routes and asserts each one either has auth dependency or is on the whitelist
+1. Create an `instagram_tokens` table: `user_id`, `access_token` (encrypted), `token_type` (short/long), `expires_at`, `ig_user_id`, `page_id`
+2. Build token refresh into the Instagram client from day 1 — exchange short-lived for long-lived token, then schedule refresh before expiry
+3. Scheduler must check token validity BEFORE attempting publish (pre-flight check: `if token.expires_at < now + 5min: refresh or fail gracefully`)
+4. On token expiry: mark all queued posts as `token_expired` (not `failed`), notify user via dashboard — this prevents retry logic from wasting attempts
+5. Submit Facebook App Review EARLY — do it in parallel with development, not after. Requirements: privacy policy URL, business verification, demo video showing the publishing flow
+6. For development: use the Graph API Explorer to generate test tokens, but never hard-code them
+7. Store token alongside user_id from day 1 (even single-user) to avoid Phase 6 rewrite
 
-**Detection:** Run `python -c "from src.api.app import app; [print(r.path, r.dependencies) for r in app.routes]"` — any route with empty dependencies that is not on the public whitelist is a leak.
+**Detection:** Token expiry manifests as HTTP 190 ("access token has expired") or OAuthException from Graph API.
 
-**Phase:** Phase with auth implementation. Do not defer the route audit.
+**Phase to address:** Auto-publishing phase (Phase 3). Token management is foundational — build it before the publisher.
 
 ---
 
-### Pitfall 3: Gemini API 400 Error — Model Name vs. API Key Issue
+### Pitfall 3: Instagram Graph API — Two-Step Container Publishing
 
-**What goes wrong:** `gemini_client.py` defines `MODELOS_IMAGEM` as `["gemini-2.5-flash-image", "gemini-2.0-flash-exp-image-generation", "gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview"]`. None of these are confirmed valid model IDs for the Imagen/image generation API. The actual Gemini image generation model (as of early 2026) is `imagen-3.0-generate-002` accessed via the `generate_images()` method of the `google.genai` client, not `generate_content()`. Confusing text-generation model names with image-generation model names causes 400 errors that look like key problems.
+**What goes wrong:** Developers assume Instagram publishing is a single API call. It is actually a two-step async process: (1) create a media container via POST, (2) poll until container status is `FINISHED`, (3) publish the container via a second POST. If you publish before the container finishes processing, you get a cryptic "media not ready" error.
 
-**Why it happens:** Gemini's image generation API and text generation API use different client methods and different model namespaces. The `google-genai` SDK's changelog is sparse and model deprecations are announced with short notice. A 400 response body may say "model not found" or "invalid argument" — both are easy to misread as "bad API key."
+**Why it happens:** Instagram processes images server-side (resizing, format conversion). The container creation returns immediately with an ID, but the media is not ready for ~5-30 seconds (longer for carousels/video).
 
-**Consequences:** Wasted time rotating API keys when the real issue is an invalid model name. New key will also 400 with the same model name. Fallback to ComfyUI or static backgrounds kicks in permanently even though the API key is valid.
+**Consequences:**
+- Race condition: publish fires before container is ready
+- Carousel posts (already supported in v1 via `carousel_count`) require creating N child containers + 1 parent, all must finish processing before publish
+- Retry logic retries the PUBLISH step when it should be retrying the POLL step
+- Timeout on large images/carousels causes false failures
+- The current `_mark_failed` logic (publisher.py lines 180-200) increments retry_count and re-queues — but if the container was already created, re-creating it wastes API quota
 
 **Prevention:**
-1. On startup, run a single cheap validation call (1x1 pixel generation or `list_models()`) to confirm the key is valid and the model name resolves, before the pipeline runs
-2. Log the full 400 response body — the error detail distinguishes "invalid key" (`UNAUTHENTICATED`) from "invalid model" (`INVALID_ARGUMENT`) from "quota exceeded" (`RESOURCE_EXHAUSTED`)
-3. Store the validated model name in config at runtime rather than hardcoding a list of guesses
-4. Check Google AI Studio model list at: https://ai.google.dev/api/generate-content#v1beta.models (verify model names before using)
+1. Implement proper async container polling: `GET /{container-id}?fields=status_code` until `FINISHED` or `ERROR`
+2. Set polling timeout (60s for single image, 120s for carousel) with exponential backoff (2s, 4s, 8s)
+3. Separate error handling for container-creation errors vs publish errors vs polling timeouts
+4. For carousels: create all child containers, poll ALL until ready, then create parent container, poll parent, then publish
+5. Store `container_id` in `scheduled_posts.publish_result` so retry can resume polling instead of re-uploading
+6. Add a `container_status` column or use `publish_result` JSON to track: `container_created` -> `container_ready` -> `published`
 
-**Detection:** 400 error with `status: INVALID_ARGUMENT` and message containing "model" → model name problem, not key problem. 400 with `status: UNAUTHENTICATED` → key problem.
+**Detection:** Intermittent "media not ready" errors that succeed on retry, or "media already exists" errors on re-upload.
 
-**Phase:** Phase with Gemini key fix (immediate, first task).
+**Phase to address:** Auto-publishing phase (Phase 3). This is core Instagram publishing logic.
 
 ---
 
-### Pitfall 4: Dual API Key Strategy — Free Key Drains Before Fallback Triggers
+### Pitfall 4: OAuth Google + Existing JWT Auth — Session Confusion and Account Takeover
 
-**What goes wrong:** The plan is "free key as default, paid key as fallback." If the rate limiter checks quota and switches to the paid key only at request time — without a time-aware reset window — the free key's daily limit (e.g., 500 images/day for Imagen 3) depletes by midday, paid key handles the afternoon, and next morning the free key is available again but the system remembers it as "exhausted" (no reset logic). Within days the system is permanently on the paid key.
+**What goes wrong:** Adding OAuth Google login to an existing email+password JWT system creates two parallel auth flows that produce the same JWT but with different guarantees. OAuth users have no password (so password-reset breaks). Email users who later link Google have two login paths that can desync. Worst case: attacker registers with victim's email via OAuth (if email not verified) and takes over the account.
 
-**Why it happens:** Usage counters stored in-memory or in DB without a reset schedule tied to Google's quota window (midnight Pacific Time for Google AI Studio quotas). `datetime.now()` comparisons without timezone awareness make reset logic unreliable.
+**Why it happens:** The existing `AuthService.login()` (service.py line 51) requires `email` + `password`. OAuth users are created without a password. The User model has `hashed_password: Mapped[str]` as NOT nullable (models.py line 511), so you cannot even create an OAuth user without a schema change.
 
-**Consequences:** Unexpected billing charges as paid key handles load that free key could cover. Over-spending on the paid tier.
+**Evidence from codebase:**
+- `src/database/models.py` line 511: `hashed_password: Mapped[str] = mapped_column(String(200), nullable=False)` — cannot be NULL
+- `src/auth/service.py` line 37: `bcrypt.hashpw(password.encode("utf-8"), ...)` will crash on None
+- `src/auth/service.py` line 59: `bcrypt.checkpw(password.encode("utf-8"), user.hashed_password.encode("utf-8"))` will crash if hashed_password is empty string
+- No `auth_provider`, `google_id`, or `oauth_provider` column exists on User model
+- No account linking logic exists
+
+**Consequences:**
+- OAuth user creation crashes because `hashed_password` is `nullable=False`
+- If you set `hashed_password = ""` as a workaround, `bcrypt.checkpw("".encode(), "".encode())` behavior is undefined and may allow empty-password login
+- OAuth user calls password-reset: gets a reset email, sets password, now has two auth methods that can conflict
+- If email from OAuth matches existing user's email, auto-merge without verification = account takeover
+- Refresh token rotation logic assumes single auth path
 
 **Prevention:**
-1. Store `(date, count)` per key in the `api_key_usage` table — always compare against `date.today()` UTC, then reset on date change
-2. Google quota windows reset at midnight Pacific — use `pytz` or Python's `zoneinfo` for correct timezone math, not naive `datetime.now()`
-3. Implement a `KeySelector` class: check free key remaining quota before every image request, not just "is it over limit?"
-4. Add a daily cron reset of the in-DB counter to match Google's actual reset cycle
+1. Add `auth_provider` column to User model: `"email"`, `"google"`, `"both"` (String(20), default="email")
+2. Add `google_id` column: String(255), nullable, unique — stores Google's sub claim
+3. Make `hashed_password` nullable (Alembic migration) — OAuth-only users have NULL password
+4. Guard password login: `if user.hashed_password is None: raise ValueError("Use Google login")`
+5. Guard password-reset: reject for OAuth-only users (`auth_provider == "google"`)
+6. On OAuth login with existing email: require explicit account linking (NOT auto-merge). Show "This email is already registered. Log in with password to link your Google account."
+7. CRITICAL: Verify `email_verified: true` from Google's ID token before trusting the email
+8. Create separate `AuthService.register_oauth(email, google_id, display_name)` method
 
-**Detection:** Check the DB counter at 9:00 AM — if it shows yesterday's exhausted count but requests are being routed to paid key, the reset is broken.
+**Detection:** Try to create a User with `hashed_password=None` — SQLAlchemy will raise IntegrityError. Try with `hashed_password=""` — login with empty password may succeed.
 
-**Phase:** Phase implementing dual-key management.
+**Phase to address:** Auth v2 phase (Phase 4). Schema changes MUST come before OAuth implementation.
 
 ---
 
-### Pitfall 5: Usage Tracking Writes on Every Pipeline Event — MySQL Write Storm
+### Pitfall 5: Pipeline Refactor — Breaking the Monolithic Orchestrator
 
-**What goes wrong:** The pipeline runs L1→L5 producing ~227 trend events per run, each potentially triggering a DB write if usage tracking is naively implemented (e.g., `UPDATE api_usage SET count = count + 1` per event). At 5 images per run with semaphore(5) Gemini concurrency, that is 5 concurrent `UPDATE` statements on the same row — causing lock contention on MySQL's `api_usage` table, slowing the entire pipeline.
+**What goes wrong:** The v2 goal is to simplify the pipeline (decouple agents, manual mode with static backgrounds, zero Gemini Image calls). But `AsyncPipelineOrchestrator` (async_orchestrator.py) is a monolith with 30+ constructor parameters, 9 hardcoded agent imports, and tightly coupled layers. Refactoring it risks breaking the existing `manual_topics` flow that already works.
 
-**Why it happens:** Developers implement usage tracking as "write on every call" because it's simple and feels safe. In a single-user system the lock contention is invisible at low volume. It becomes visible at the exact moment you add concurrent Gemini calls.
+**Why it happens:** The orchestrator grew organically from v1. It imports all 9 agents at module level (lines 19-29), instantiates workers inline, and passes character config as 15+ individual parameters instead of a config object.
 
-**Consequences:** Pipeline run times increase 2-5x. MySQL `LOCK WAIT TIMEOUT` errors under concurrent load. Semaphore(5) for Gemini becomes effectively Semaphore(1) due to DB lock serialization.
+**Evidence from codebase:**
+- `src/pipeline/async_orchestrator.py` lines 43-75: 30+ constructor parameters including `character_system_prompt`, `character_max_chars`, `character_reference_dir`, `character_dna`, `character_negative_traits`, `character_composition`, `character_rendering`, `character_refs_priority`, `character_watermark`, `character_name`, `character_handle`, `character_branded_hashtags`, `character_caption_prompt`
+- Lines 19-29: Direct imports of all 9 agents at module level — importing the module means loading all agent dependencies
+- `manual_topics` parameter (line 74) exists but the code path still instantiates the full orchestrator with all its dependencies
+
+**Consequences:**
+- Refactoring the orchestrator breaks the API routes in `pipeline.py` that construct it
+- Removing agent imports breaks the agent-based pipeline mode
+- Changing the constructor signature breaks every call site
+- Silent regressions: the manual_topics path stops working because a refactored layer changes its contract
 
 **Prevention:**
-1. Use in-memory counters (a simple `dict` or `asyncio.Lock`-protected counter) during pipeline execution, then flush to DB in a single write after the run completes
-2. For the dashboard, read from DB — it doesn't need real-time accuracy, daily totals are fine
-3. If real-time tracking is needed, use MySQL's `INSERT ... ON DUPLICATE KEY UPDATE count = count + 1` which is atomic without a separate SELECT
-4. Index `api_usage` on `(key_id, date)` — without this index, every UPDATE scans the table
+1. Do NOT rewrite the orchestrator. Create a NEW `SimplePipelineOrchestrator` for the manual/static flow
+2. Keep `AsyncPipelineOrchestrator` as-is for agent-based runs (freeze it)
+3. Route selection in API: `mode=manual` -> `SimplePipelineOrchestrator`, `mode=agents` -> `AsyncPipelineOrchestrator`
+4. Extract character config into a `PipelineConfig` dataclass — both orchestrators accept it
+5. Write integration tests for the manual flow BEFORE refactoring: given topics + character, expect composed images
+6. Feature flag: `PIPELINE_VERSION=v1|v2` in `.env` for gradual rollout with instant rollback
 
-**Detection:** Enable MySQL slow query log (`long_query_time = 0.1`). If `UPDATE api_usage` appears in the slow log during pipeline runs, contention is occurring.
+**Detection:** Run the existing pipeline with `manual_topics=["test"]` before and after refactor, compare outputs.
 
-**Phase:** Phase implementing usage tracking.
+**Phase to address:** Pipeline refactor phase (Phase 1). This is the foundation — get it right before building on top.
 
 ---
 
-### Pitfall 6: JWT Secret in Config Without Rotation Plan
+### Pitfall 6: Stripe Webhook Signature Verification — FastAPI Raw Body Trap
 
-**What goes wrong:** JWT tokens signed with a static secret stored in `.env` are valid forever until the secret changes. If the secret is the same across dev/prod (common when `.env` is copy-pasted), a dev token works in production. When you eventually need to invalidate all sessions (security incident, secret rotation), there is no mechanism — you must change the secret and log out every user.
+**What goes wrong:** Stripe webhooks arrive at a public endpoint (no JWT). FastAPI automatically parses JSON request bodies, but Stripe webhook signature verification requires the RAW body bytes. If you use `request.json()` or a Pydantic model parameter, the re-serialized JSON may differ from the original bytes (whitespace, key ordering), and HMAC signature verification fails silently.
 
-**Why it happens:** JWT is stateless by design. The simplicity that makes it attractive also means there is no server-side session to invalidate.
+**Why it happens:** FastAPI's dependency injection encourages Pydantic models as parameters. Developers write `async def stripe_webhook(event: dict, request: Request)` which triggers JSON parsing before they can read raw bytes. By the time they call `stripe.Webhook.construct_event()`, the raw body is consumed.
 
-**Consequences:** Dev tokens work in production. Compromised tokens cannot be revoked without rotating the secret (logging out all users). A leaked `.env` means all existing sessions are compromised.
+**Consequences:**
+- Without verification: anyone can POST fake events (subscription created, payment succeeded) — free premium access
+- With incorrect verification: signatures never match, all real webhooks are rejected, billing is broken
+- Attacker sends fake `customer.subscription.created` event, gets free tier upgrade
+- In production with live money: fake `invoice.paid` events credit accounts without payment
 
 **Prevention:**
-1. Use different `JWT_SECRET` values in `.env` for dev vs production — never copy the same secret
-2. Set short expiry (`ACCESS_TOKEN_EXPIRE_MINUTES=60`) with a refresh token flow — short-lived tokens limit exposure windows
-3. Add a `jti` (JWT ID) claim and a `token_blacklist` table in MySQL to support forced logout — even if you don't use it initially, the schema slot is cheap to add now
-4. Store `JWT_SECRET` as minimum 32 random bytes: `python -c "import secrets; print(secrets.token_hex(32))"`
+1. Webhook endpoint signature: `async def stripe_webhook(request: Request)` — NO Pydantic body parameter
+2. Read raw body FIRST: `raw_body = await request.body()`
+3. Verify: `stripe.Webhook.construct_event(payload=raw_body, sig_header=request.headers.get("stripe-signature"), secret=STRIPE_WEBHOOK_SECRET)`
+4. Webhook endpoint must NOT have `get_current_user` dependency (it is called by Stripe, not users)
+5. Store `STRIPE_WEBHOOK_SECRET` separately from `STRIPE_SECRET_KEY` in `.env`
+6. Return 200 quickly (within 5 seconds) — do heavy processing in background task
+7. Handle duplicate events idempotently: store processed `event.id` in a `stripe_events` table, skip if already seen
+8. In dev: use `stripe listen --forward-to localhost:8000/api/webhooks/stripe`
 
-**Detection:** If the same JWT token works in both `localhost:8000` and production — the secret is shared. Warning sign.
+**Detection:** Test by sending a valid webhook payload with a tampered signature header — it should be rejected with 400, not processed.
 
-**Phase:** Phase implementing auth. Add the `jti` column to the users table at migration time.
+**Phase to address:** Multi-tenant/billing phase (Phase 6). Build webhook handler with verification from the start — never "add it later."
 
 ---
 
@@ -135,89 +206,180 @@ Mistakes that cause rewrites, security incidents, or production pipeline stoppag
 
 ---
 
-### Pitfall 7: bcrypt Async Blocking — Freezing the Event Loop
+### Pitfall 7: Scheduler Worker — Double-Publishing Race Condition
 
-**What goes wrong:** `bcrypt.hashpw()` is CPU-intensive and synchronous. Called directly in a FastAPI async route (e.g., `POST /auth/register`), it blocks the asyncio event loop for 100-300ms. During that window, no other requests are processed — the pipeline status polling, agent status checks, and concurrent pipeline runs all freeze.
+**What goes wrong:** The `scheduler_worker.py` uses APScheduler with a module-level singleton. If FastAPI runs with multiple uvicorn workers (`--workers 4`), each worker process gets its own scheduler instance. All instances query the same DB for due posts, and all process the same posts — causing double, triple, or quadruple publishing.
 
-**Why it happens:** FastAPI routes are async, but "async" only helps with I/O waiting. CPU-bound operations block regardless.
+**Evidence from codebase:**
+- `src/services/scheduler_worker.py` line 18: `_scheduler: AsyncIOScheduler | None = None` — module-level singleton per process
+- `start_scheduler()` called in FastAPI lifespan — each uvicorn worker calls it independently
+- `process_due_posts()` in publisher.py lines 95-96: queries due posts with `get_due_posts()` — no locking mechanism
+- Status update to "publishing" (line 105) happens AFTER the query, not atomically — window for race condition
 
 **Prevention:**
-1. Always wrap bcrypt calls with `await asyncio.to_thread(bcrypt.hashpw, password, salt)` — same pattern already used by `SyncAgentAdapter` in this codebase
-2. Alternatively use `passlib[bcrypt]` which is designed to work with FastAPI's thread pool
-3. `argon2-cffi` is a faster alternative that can be run in a thread pool more efficiently
+1. Use `SELECT ... FOR UPDATE SKIP LOCKED` pattern in `get_due_posts()`: claims rows atomically, other workers skip claimed rows
+2. OR: run the scheduler as a separate process (`python -m src.services.scheduler_worker`), not in FastAPI lifespan — only one instance ever runs
+3. Add `processing_started_at` and `processing_worker_id` columns to `scheduled_posts` — claim the post before processing
+4. If staying with APScheduler in FastAPI: use `--workers 1` and scale horizontally with separate scheduler process
+5. Consider replacing APScheduler with a DB-polling pattern: a single cron-like task that uses `FOR UPDATE SKIP LOCKED`
 
-**Detection:** Add timing logs around password operations. Any hash taking >10ms in an async route is a blocking call.
+**Detection:** Run 2 uvicorn workers, schedule a post, observe if it gets processed twice.
 
-**Phase:** Auth implementation phase.
+**Phase to address:** Auto-publishing phase (Phase 3). This must be solved before going to production.
 
 ---
 
-### Pitfall 8: Next.js 15 JWT Storage — localStorage vs httpOnly Cookie
+### Pitfall 8: Password Reset Token — Insecure Implementation Patterns
 
-**What goes wrong:** Storing JWT in `localStorage` in the Next.js frontend (the quick/obvious approach) exposes the token to XSS attacks. Any injected script can read `localStorage` and exfiltrate the token. The memeLab frontend uses third-party UI libraries and chart components — any supply-chain compromise of those packages could harvest tokens.
-
-**Why it happens:** `localStorage` is the first thing developers reach for because it's simple and persists across tabs. httpOnly cookies require more setup (CSRF protection, SameSite config, API to issue cookies).
+**What goes wrong:** Password reset is implemented with tokens that are too long-lived, stored in plaintext, reusable, or sent via unencrypted email without rate limiting. The existing `refresh_tokens` table pattern (hashed, with expiry) is good — but developers often take shortcuts for reset tokens.
 
 **Prevention:**
-1. Use httpOnly cookies with `SameSite=Strict` and `Secure` for token storage — the token is then inaccessible to JavaScript
-2. For the API: FastAPI sets the cookie via `response.set_cookie(key="access_token", value=token, httponly=True, samesite="strict")`
-3. If localStorage is used (acceptable for single-user local deployment): document the risk explicitly, add Content-Security-Policy headers
-4. For a single-user local tool (this project's current scope), the risk is much lower — but build the pattern right since multi-tenant is the stated future direction
+1. Token must be cryptographically random (32+ bytes via `secrets.token_urlsafe(32)`), hashed with SHA-256 in DB (like refresh tokens do)
+2. Short expiry: 15-30 minutes max — not hours, not days
+3. Single-use: delete token row on successful password change
+4. Rate limit: max 3 reset emails per hour per email address (prevent abuse as spam vector)
+5. Do NOT reveal if email exists: always respond "if an account exists, we sent a reset email" (prevents email enumeration)
+6. Use a real transactional email service (Resend, SendGrid, AWS SES) — not SMTP from the app server (deliverability will be terrible)
+7. Reset token URL must use HTTPS, include a nonce, and expire the URL after first click (not just first use)
 
-**Detection:** Open browser devtools → Application tab → Local Storage. If `access_token` is visible there, it is XSS-vulnerable.
-
-**Phase:** Auth implementation phase — decision on cookie vs localStorage must be made before writing the login page.
+**Phase to address:** Auth v2 phase (Phase 4).
 
 ---
 
-### Pitfall 9: Missing Rate Limit on Auth Endpoints — Brute Force on Login
+### Pitfall 9: 2FA TOTP — Recovery Flow Amnesia
 
-**What goes wrong:** Adding rate limiting to protect Gemini API quotas but forgetting to rate-limit `POST /auth/login` and `POST /auth/register`. A bot can attempt thousands of passwords per second against any known email address.
-
-**Why it happens:** Developers focus rate limiting on the business logic (image generation, pipeline runs) and treat auth endpoints as "simple."
+**What goes wrong:** TOTP implementation without recovery codes. User enables 2FA, loses phone, account is permanently locked. No admin bypass, no recovery path. This is the single most common 2FA implementation failure.
 
 **Prevention:**
-1. Apply `slowapi` (FastAPI-compatible rate limiter) to `POST /auth/login` with a tight limit: 5 requests per IP per minute
-2. Add progressive delay after failed attempts (100ms, 200ms, 400ms) — this is a constant-time defense
-3. Log all failed login attempts with IP address — even without blocking, this creates an audit trail
+1. At 2FA setup time: generate 8-10 one-time recovery codes (e.g., `secrets.token_hex(4)` each)
+2. Store recovery codes HASHED in DB (bcrypt or SHA-256) — never plaintext
+3. Show recovery codes ONCE during setup, force user to acknowledge they saved them
+4. Each recovery code is single-use: delete after use, show remaining count
+5. 2FA verification must happen AFTER password verification (not instead of) — it is a second factor, not a replacement
+6. Rate limit TOTP attempts: 5 failures = 15 minute lockout (prevents brute force of 6-digit codes)
+7. Encrypt TOTP secret at rest (use Fernet, not just hash — you need to decrypt to generate expected code for verification)
+8. Admin "disable 2FA" endpoint for support cases (with audit log)
+9. Store 2FA state on User model: `totp_enabled: bool`, `totp_secret: str (encrypted)`, `totp_verified_at: datetime`
 
-**Detection:** Check if `/auth/login` has a rate limit dependency. If not, run `ab -n 1000 -c 10 http://localhost:8000/auth/login` — if it handles 1000 requests without throttling, it is vulnerable.
-
-**Phase:** Auth implementation phase. Rate limit auth endpoints before any other endpoint.
+**Phase to address:** Auth v2 phase (Phase 4). Recovery codes are NOT optional — they are part of the 2FA feature.
 
 ---
 
-### Pitfall 10: Pipeline Background Tasks Run Without User Context
+### Pitfall 10: Dashboard 30-Day History — N+1 Query and Date Column Ambiguity
 
-**What goes wrong:** `POST /pipeline/run` launches a `BackgroundTask` (`_run_pipeline_task`) that runs after the request returns. When auth is added, the user's identity is available during the request handler, but `BackgroundTasks` in FastAPI do not receive the dependency-injected `current_user`. The background task runs without knowing which user triggered it — making per-user usage tracking and result isolation impossible.
+**What goes wrong:** Building a 30-day usage chart by querying `api_usage` table day-by-day (30 separate queries), or loading all 30 days of records into Python and aggregating in-memory. Additionally, the `date` column type causes subtle bugs.
 
-**Why it happens:** FastAPI's `BackgroundTasks` mechanism runs the function after the response is sent. The dependency injection context (including `Depends(get_current_user)`) has already been closed. This is a documented FastAPI limitation that surprises developers.
+**Evidence from codebase:**
+- `src/database/models.py` line 564: `date: Mapped[datetime] = mapped_column(DateTime, nullable=False)` — this is DateTime, NOT Date
+- Line 572: `UniqueConstraint("user_id", "service", "tier", "date", ...)` — the constraint includes time component, meaning the "uniqueness" depends on exact timestamp matching, which may not work as intended if time varies by microseconds
+- The column is named `date` but stores `datetime` — this will confuse every developer who touches it
 
 **Prevention:**
-1. Pass `user_id` as an explicit argument to the background task function: `background_tasks.add_task(_run_pipeline_task, run_id, request, user_id=current_user.id)`
-2. Do NOT pass the `AsyncSession` to background tasks — the session from the request will be closed. Create a new session inside the background task using `get_session_factory()`
-3. The existing code in `_run_pipeline_task` already creates its own session (`get_session_factory()`) — follow this same pattern for user context
+1. Use SQL `GROUP BY DATE(date)` aggregation, not Python loops — single query
+2. For the 30-day chart: `SELECT DATE(date) as day, service, SUM(usage_count) FROM api_usage WHERE user_id = :uid AND date >= NOW() - INTERVAL 30 DAY GROUP BY day, service`
+3. Consider renaming `date` column to `recorded_at` (DateTime) or changing type to `Date` if time is not needed — the current naming is misleading
+4. Verify the UniqueConstraint actually works: if two usage records have the same date but different times, they are NOT considered duplicates
+5. Add index on `(user_id, date)` — already exists (`idx_api_usage_user_id`, `idx_api_usage_date`) but a composite index would be faster
+6. If api_usage grows large (>100k rows): add a materialized daily summary table refreshed by a background job
 
-**Detection:** Add a debug print of `user_id` inside `_run_pipeline_task`. If it is None or the dependency injection value, the context is not being passed correctly.
-
-**Phase:** Auth implementation phase, specifically when adding user_id to pipeline_runs table.
+**Phase to address:** Dashboard v2 phase (Phase 5). Fix the date ambiguity early to avoid downstream bugs.
 
 ---
 
-### Pitfall 11: API Key Exposure in Startup Logs (Existing Bug Compounded)
+### Pitfall 11: JWT SECRET_KEY Is 31 Bytes — Amplified by OAuth and 2FA
 
-**What goes wrong:** `CONCERNS.md` already identifies that `async_orchestrator.py:217-228` (`_log_config_summary`) and `llm_client.py` can print API keys in logs. Adding a second API key (paid tier) doubles the exposure surface. If the new `GOOGLE_API_KEY_PAID` is added to `config.py` and the log-config function is not updated, the paid key will be printed in plaintext on every startup.
+**What goes wrong:** The project documents this tech debt: "JWT SECRET_KEY is 31 bytes (below 32-byte HS256 minimum)." Adding OAuth and 2FA on top of a weak JWT foundation amplifies the risk — more tokens, more claims, more attack surface, same weak key.
 
-**Why it happens:** The existing masking oversight will be copy-pasted when adding the second key.
+**Evidence from codebase:**
+- `PROJECT.md` line 33: "JWT SECRET_KEY is 31 bytes (below 32-byte HS256 minimum)"
+- The `jose` library (python-jose) may silently accept a short key without warning
 
 **Prevention:**
-1. Fix the existing log masking before adding the second key: `key_display = f"...{key[-4:]}"` for any key in `_log_config_summary`
-2. Add a `sanitize_config_for_log(config_dict)` helper in `config.py` that masks any key containing "KEY", "SECRET", "PASSWORD", or "TOKEN"
-3. Search for both key variable names in all logging calls before shipping: `grep -r "GOOGLE_API_KEY" src/ | grep -v ".env"`
+1. Generate a new 64-byte SECRET_KEY: `python -c "import secrets; print(secrets.token_hex(32))"`
+2. Add startup validation in `src/auth/jwt.py`: `assert len(SECRET_KEY) >= 32, "SECRET_KEY must be at least 32 bytes for HS256"`
+3. Rotate the key as part of v2 launch (invalidates all existing sessions — acceptable at this stage)
+4. Document in `.env.example` that SECRET_KEY must be 32+ bytes
 
-**Detection:** Start the server with a known API key, capture stdout/stderr. If the full key appears anywhere in logs, the masking is incomplete.
+**Phase to address:** Auth v2 phase (Phase 4). Fix BEFORE adding OAuth/2FA — this is a 5-minute fix with outsized security impact.
 
-**Phase:** Gemini key fix phase (immediate). Fix before adding the paid key.
+---
+
+### Pitfall 12: API Key Encryption — Plaintext Storage in Multi-Tenant Context
+
+**What goes wrong:** User API keys (`gemini_free_key`, `gemini_paid_key`) are stored as plaintext Text columns. In a multi-tenant system, a SQL injection, admin panel bug, or DB dump exposes every user's Gemini API keys. One compromised key could run up thousands of dollars in API charges.
+
+**Evidence from codebase:**
+- `src/database/models.py` lines 517-518: `gemini_free_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)` — plaintext
+- `PROJECT.md` line 34: "User API keys stored as plaintext (encryption deferred to v2)"
+
+**Prevention:**
+1. Encrypt with `cryptography.fernet.Fernet` using a separate `ENCRYPTION_KEY` env var (not the JWT secret)
+2. Create `encrypt_api_key(key: str) -> str` and `decrypt_api_key(encrypted: str) -> str` utility functions
+3. Encrypt before INSERT, decrypt on read — transparent to the rest of the codebase
+4. Never log decrypted keys — mask in all API responses (show only last 4 characters: `...xYz1`)
+5. Migration: encrypt all existing plaintext keys in a one-time Alembic migration with data transform
+6. Key rotation: if `ENCRYPTION_KEY` is compromised, re-encrypt all keys with new key (store key version alongside encrypted data)
+
+**Phase to address:** Multi-tenant phase (Phase 6), or earlier if any phase adds more user-stored secrets.
+
+---
+
+### Pitfall 13: Instagram Image Requirements — Silent Rejection
+
+**What goes wrong:** Instagram has strict image requirements. Images that violate them are silently rejected or degraded during container creation. The error message is vague ("An unknown error has occurred") without indicating the real issue.
+
+**Evidence from codebase:**
+- Pipeline generates images at 1080x1350 (4:5) — this is within Instagram's ratio range (good)
+- Images are composed via Pillow — output format depends on save call, may be PNG
+- No image validation step exists before publishing
+- Carousel mode (`carousel_count` up to 5 slides) requires all images to have identical aspect ratios
+
+**Prevention:**
+1. Add pre-publish validation function: check format, dimensions, file size, color mode
+2. Convert to JPEG before upload: `image.convert("RGB").save(path, "JPEG", quality=95)` — JPEG required, PNG not accepted for feed posts
+3. Convert RGBA to RGB before JPEG save (JPEG does not support alpha channel — Pillow will crash)
+4. Strip EXIF metadata (privacy) but keep ICC color profile
+5. Max file size: 8MB for images, 100MB for video — compress if needed
+6. For carousels: validate all images have the same aspect ratio before creating containers
+7. Validate in the publisher (not the composer) — separation of concerns
+
+**Phase to address:** Auto-publishing phase (Phase 3).
+
+---
+
+### Pitfall 14: Alembic Migration Conflicts Across Parallel Features
+
+**What goes wrong:** Multiple phases add migrations simultaneously (multi-tenant adds user_id columns, auth v2 adds auth_provider, dashboard adds summary tables). If developed on branches, Alembic revision chains create a "multiple heads" conflict on merge that blocks deployment.
+
+**Prevention:**
+1. Establish convention: each phase gets a migration version range (e.g., 006-009 for pipeline, 010-012 for auth, 013-015 for multi-tenant)
+2. Always run `alembic heads` before creating a new migration — if there are multiple heads, merge first with `alembic merge heads`
+3. Test migrations on a fresh DB AND on the current production schema (forward) AND test downgrade (backward)
+4. Never edit a migration that has been applied to production — create a new migration to fix mistakes
+5. Keep migrations small and focused — one logical change per migration (not "add 5 tables and 10 columns")
+6. Since phases are sequential (not parallel branches), this risk is lower — but still establish the convention early
+
+**Phase to address:** All phases. Establish convention in Phase 1 (pipeline refactor).
+
+---
+
+### Pitfall 15: process_due_posts Commits Inside a Loop — Partial Failure State
+
+**What goes wrong:** The current `process_due_posts()` method (publisher.py lines 90-133) commits after EACH post (`await self.session.commit()` on lines 107, 113, 126, 131). If the process crashes mid-loop, some posts are marked "published" and some are still "queued" — but there is no way to know which ones actually published to Instagram and which just had their status updated.
+
+**Evidence from codebase:**
+- `publisher.py` line 105: `update_status(post.id, "publishing")` then `commit()` on line 107
+- `publisher.py` line 112: `_mark_published(post.id, result)` then `commit()` on line 113
+- If the process crashes between line 107 (status = "publishing") and line 113 (status = "published"), the post is stuck in "publishing" state forever
+- No cleanup job for stuck "publishing" posts
+
+**Prevention:**
+1. Add a `publishing_started_at` timestamp — if a post has been in "publishing" state for >5 minutes, consider it stuck
+2. Add a cleanup job: `UPDATE scheduled_posts SET status = 'queued' WHERE status = 'publishing' AND updated_at < NOW() - INTERVAL 5 MINUTE`
+3. Store the Instagram container_id and publication_id in `publish_result` immediately after each API call — so retry can check if it actually published
+4. Consider processing one post per scheduler tick instead of batching — simpler error handling, no partial-batch failures
+
+**Phase to address:** Auto-publishing phase (Phase 3). Fix the stuck-state problem before going to production.
 
 ---
 
@@ -225,59 +387,141 @@ Mistakes that cause rewrites, security incidents, or production pipeline stoppag
 
 ---
 
-### Pitfall 12: Alembic Migration for `users` Table — MySQL JSON Column Trap
+### Pitfall 16: Instagram Rate Limits — 25 Posts Per Day Per Account
 
-**What goes wrong:** The existing `CONCERNS.md` documents that `TEXT`/`JSON` columns without `server_default` cause MySQL migration inconsistencies. A `users` table will likely include a `preferences` JSON column or `roles` JSON column. If written the same way as `catchphrases: Mapped[list] = mapped_column(JSON, default=list, nullable=False)` without following the established `nullable=False` + ORM `default=` pattern, the migration will fail on MySQL.
+**What goes wrong:** Instagram Graph API limits to 25 media publishes per 24-hour rolling window per Instagram account. The scheduler does not track this, and heavy users (or multi-character setups with one Instagram account) hit the limit silently.
 
-**Prevention:** Follow the established pattern in `models.py`: use `nullable=False` with `default=list` or `default=dict` at the ORM level, never `server_default` for JSON columns. Document this as the project's MySQL JSON pattern in a code comment at the top of `models.py`.
+**Prevention:**
+1. Track daily publish count per Instagram account in DB (not per user — a user could have multiple IG accounts)
+2. Pre-flight check before publish: if at 24/25, warn; if at 25, defer to next window
+3. Dashboard shows remaining daily capacity
+4. For multi-character setups: enforce that characters mapped to the same IG account share the 25/day limit
 
-**Phase:** Auth implementation phase, during users table migration.
-
----
-
-### Pitfall 13: `allow_origins=["*"]` in CORS Breaks Auth Preflight for DELETE/PATCH
-
-**What goes wrong:** Even after fixing the credentials issue (Pitfall 1), forgetting to include `DELETE` and `PATCH` in `allow_methods` means the publishing queue (`DELETE /publishing/{id}`) and character update (`PATCH /characters/{id}`) routes will fail CORS preflight after auth is added. These routes work today because no credentials are sent, so the preflight is simpler.
-
-**Prevention:** Set `allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]` explicitly. Do not rely on `["*"]` — it is valid here but explicit is better when debugging.
-
-**Phase:** Auth implementation phase, same fix as Pitfall 1.
+**Phase to address:** Auto-publishing phase (Phase 3).
 
 ---
 
-### Pitfall 14: `sqlalchemy.exc.MissingGreenlet` Under Async Load
+### Pitfall 17: OAuth State Parameter — CSRF Attack Vector
 
-**What goes wrong:** If a new `users` table relationship is added to existing models (e.g., `Character` gets a `user_id` FK, `PipelineRun` gets `user_id`) and lazy-loading relationships are accessed outside an async context, SQLAlchemy raises `MissingGreenlet`. This is an existing risk in the codebase but becomes more likely when auth adds user relationships to every major table.
+**What goes wrong:** OAuth flows without a `state` parameter are vulnerable to CSRF. An attacker crafts a URL that links their Google account to the victim's session, gaining access to the victim's account.
 
-**Prevention:** Always use `selectinload()` or `joinedload()` for relationship loading in async contexts. Never access `character.refs` or `pipeline_run.content_packages` without explicit loading. The existing code in `characters.py` and `serializers.py` should be audited when adding `user_id` relationships.
+**Prevention:**
+1. Generate cryptographic `state` parameter: `secrets.token_urlsafe(32)`, store in HTTP-only cookie (not just memory)
+2. Verify `state` on callback matches the stored value — reject if missing or mismatched
+3. Use `nonce` in the OpenID Connect ID token request for replay protection
+4. Set `state` expiry to 10 minutes — reject stale callbacks
+5. PKCE (Proof Key for Code Exchange) is now recommended even for server-side OAuth — use it
 
-**Phase:** Auth implementation phase, when adding user_id FKs to existing tables.
+**Phase to address:** Auth v2 phase (Phase 4).
+
+---
+
+### Pitfall 18: Multi-Character Pipeline — Background Pool Contamination
+
+**What goes wrong:** When running pipeline for multiple characters, static backgrounds from one character's directory are accidentally used for another character if the directory resolution uses a shared/cached path or falls back to a global default.
+
+**Prevention:**
+1. Character backgrounds must be fully namespaced: `assets/backgrounds/{character_slug}/`
+2. Pipeline must receive explicit `background_dir` per character, never use a global fallback
+3. If a character has zero backgrounds, fail loudly ("Character X has no backgrounds") rather than falling back to another character's pool
+4. Test: run pipeline for 2 characters in sequence, verify zero cross-contamination in output
+
+**Phase to address:** Multi-character pipeline phase (Phase 2).
+
+---
+
+### Pitfall 19: Stripe Customer/Subscription Sync — Eventual Consistency and Out-of-Order Events
+
+**What goes wrong:** Stripe webhook says "subscription active" but the DB update fails. User sees "free tier" even though they paid. Or: webhook events arrive out of order (`subscription.updated` before `subscription.created`). Or: the same event is delivered twice (Stripe retries on timeout).
+
+**Prevention:**
+1. Store Stripe `customer_id` and `subscription_id` on User model — always fetch current state from Stripe API on critical paths (login, feature gate checks)
+2. Handle out-of-order events: use `event.created` timestamp, ignore events older than the last processed event for that resource
+3. Idempotency: store processed `event.id` in a `stripe_webhook_events` table, skip duplicates
+4. On webhook failure: Stripe retries for up to 3 days — design for eventual consistency, not immediate consistency
+5. Dashboard "subscription" status should have a "refresh from Stripe" button for support edge cases
+6. Use Stripe's `checkout.session.completed` event (not `customer.subscription.created`) for the primary subscription activation flow — it is more reliable
+
+**Phase to address:** Multi-tenant/billing phase (Phase 6).
+
+---
+
+### Pitfall 20: Environment Variable Sprawl — Secret Management at Scale
+
+**What goes wrong:** v1 has ~5 env vars (DATABASE_URL, GOOGLE_API_KEY, SECRET_KEY, etc.). v2 adds: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, ENCRYPTION_KEY, GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, EMAIL_API_KEY (for password reset). That is 13+ secrets, all in `.env`, none validated at startup.
+
+**Prevention:**
+1. Add a startup config validator: load all required env vars at app init, fail fast with clear error messages for missing vars
+2. Group secrets by feature: `AUTH_*`, `STRIPE_*`, `INSTAGRAM_*`, `EMAIL_*` prefix convention
+3. Document every env var in `.env.example` with descriptions and dummy values
+4. For production: use a secrets manager (not `.env`) — even a simple encrypted file is better than plaintext `.env` on disk
+5. Never log env var values — log only which vars are present/missing
+
+**Phase to address:** Phase 1 (pipeline refactor) — establish the config validation pattern early so all subsequent phases follow it.
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|----------------|------------|
-| Gemini key fix (Phase 1) | 400 is model name, not key — Pitfall 3 | Log full 400 body, validate model with `list_models()` |
-| Gemini key fix (Phase 1) | New paid key printed in startup logs — Pitfall 11 | Fix log masking first, then add key |
-| Auth implementation | CORS blocks all credentialed requests — Pitfall 1 | Fix CORS before writing a single auth route |
-| Auth implementation | One missed unprotected route — Pitfall 2 | Auth at router level, not route level; automated audit |
-| Auth implementation | bcrypt blocks event loop — Pitfall 7 | `asyncio.to_thread()` wrapper |
-| Auth implementation | Background tasks lose user context — Pitfall 10 | Pass `user_id` as explicit argument |
-| Auth implementation | JWT shared between dev/prod — Pitfall 6 | Different secret per environment |
-| Auth implementation | MySQL JSON column in users table — Pitfall 12 | Follow established ORM default pattern |
-| Dual key management | Free key exhaustion not resetting — Pitfall 4 | Timezone-aware reset, timezone = Pacific |
-| Usage tracking | Write storm on MySQL — Pitfall 5 | In-memory counter, flush at run end |
-| Login page (Next.js) | Token stored in localStorage — Pitfall 8 | httpOnly cookie or document risk explicitly |
-| Login page (Next.js) | Brute force on /auth/login — Pitfall 9 | slowapi rate limit before shipping |
+| Phase | Feature | Likely Pitfall | Severity | Mitigation |
+|-------|---------|---------------|----------|------------|
+| 1 - Pipeline Refactor | Decouple agents | Breaking manual_topics flow (P5) | Critical | New orchestrator, keep old one |
+| 1 - Pipeline Refactor | Config foundation | Env var sprawl (P20) | Minor | Startup validator pattern |
+| 1 - Pipeline Refactor | Migration convention | Alembic conflicts (P14) | Moderate | Version range convention |
+| 2 - Multi-Character | Per-character runs | Background cross-contamination (P18) | Minor | Namespace directories strictly |
+| 3 - Auto-Publishing | Instagram tokens | Token expiry (P2) | Critical | Build token manager + async refresh |
+| 3 - Auto-Publishing | Instagram API | Container polling (P3) | Critical | Two-step publish with polling |
+| 3 - Auto-Publishing | Scheduler | Double-publish race (P7) | Moderate | FOR UPDATE SKIP LOCKED or separate process |
+| 3 - Auto-Publishing | Image upload | Silent rejection (P13) | Moderate | Pre-publish JPEG validation |
+| 3 - Auto-Publishing | Rate limits | 25/day limit (P16) | Minor | Track daily count per IG account |
+| 3 - Auto-Publishing | Crash recovery | Stuck "publishing" state (P15) | Moderate | Timeout cleanup job |
+| 4 - Auth v2 | JWT foundation | Weak SECRET_KEY (P11) | Moderate | Fix to 32+ bytes FIRST |
+| 4 - Auth v2 | OAuth Google | Session confusion + account takeover (P4) | Critical | auth_provider column, nullable password |
+| 4 - Auth v2 | OAuth CSRF | Missing state parameter (P17) | Minor | Crypto state + PKCE |
+| 4 - Auth v2 | Password reset | Insecure token patterns (P8) | Moderate | Hashed, single-use, short-lived |
+| 4 - Auth v2 | 2FA | Recovery lockout (P9) | Moderate | Recovery codes at setup time |
+| 5 - Dashboard v2 | 30-day chart | N+1 queries + date ambiguity (P10) | Moderate | SQL aggregation, fix date column |
+| 6 - Multi-Tenant | Data isolation | Full data leakage (P1) | Critical | user_id on ALL tables, filter ALL queries |
+| 6 - Multi-Tenant | API key storage | Plaintext keys exposed (P12) | Moderate | Fernet encryption |
+| 6 - Multi-Tenant | Stripe webhooks | Signature bypass (P6) | Critical | Raw body verification from day 1 |
+| 6 - Multi-Tenant | Stripe sync | Out-of-order events (P19) | Minor | Idempotent handler, event store |
+
+---
+
+## Integration Pitfalls (Cross-Phase)
+
+### The Auth-Publishing-Tenant Triangle
+
+When auto-publishing (Phase 3) goes multi-tenant (Phase 6), each user needs their OWN Instagram tokens stored securely. But if Phase 3 stores Instagram tokens globally (single-account assumption), Phase 6 requires a complete rewrite of the token storage layer.
+
+**Prevention:** Even in Phase 3 (single user), store Instagram tokens in a `social_tokens` table with `user_id` FK. Use the same Fernet encryption planned for API keys. This costs minutes now and saves a rewrite later. Table schema: `id, user_id, platform, access_token (encrypted), refresh_token (encrypted), expires_at, platform_user_id, platform_page_id, created_at, updated_at`.
+
+### The Pipeline-Character-Tenant Chain
+
+Pipeline runs create content_packages linked to characters. Characters have user_id. But pipeline_runs, content_packages, and scheduled_posts do NOT have user_id. When multi-tenant arrives, you need to JOIN through character to get user_id, which is slow and error-prone (what if character_id is NULL on a pipeline_run?).
+
+**Prevention:** Add `user_id` FK directly to `pipeline_runs`, `content_packages`, and `scheduled_posts` in the multi-tenant migration. Do not rely on JOIN chains for tenant filtering — denormalize `user_id` for query performance and safety.
+
+### The 2FA-OAuth-Password Reset Interaction
+
+Users with 2FA + OAuth + password create a complex auth state machine. What happens when: OAuth user enables 2FA, then tries to disable it via password-reset? What if a user has 2FA enabled and tries to link Google? The permutation matrix is large.
+
+**Prevention:** Define auth state machine explicitly before implementing:
+- `email_only` -> can add 2FA, can add Google
+- `google_only` -> can add password (becomes `both`), cannot add 2FA until password is set
+- `both` -> can add 2FA, can unlink Google (reverts to `email_only`)
+- `email_with_2fa` -> password reset requires 2FA verification first, then disables 2FA as part of reset
+- Write tests for EVERY state transition, not just the happy paths
 
 ---
 
 ## Sources
 
-- Codebase analysis: `src/api/app.py`, `src/api/deps.py`, `src/api/routes/*.py`, `src/database/models.py`, `src/image_gen/gemini_client.py`, `config.py`
-- `.planning/codebase/CONCERNS.md` — Security Considerations, Performance Bottlenecks sections
-- `.planning/PROJECT.md` — Requirements, Key Decisions, Constraints
-- Confidence: HIGH — all pitfalls are grounded in actual code patterns found in the codebase, not generic advice
-- Note: Gemini API model name validation (Pitfall 3) is MEDIUM confidence — model names in `gemini_client.py` look incorrect but exact current model IDs for Imagen 3 require verification against official Google AI docs
+- Codebase analysis: `src/database/models.py`, `src/api/deps.py`, `src/api/routes/publishing.py`, `src/services/publisher.py`, `src/services/scheduler_worker.py`, `src/pipeline/async_orchestrator.py`, `src/auth/service.py`
+- Instagram Graph API Content Publishing documentation (training data, MEDIUM confidence — Meta changes API requirements frequently)
+- Stripe Webhook best practices (training data, HIGH confidence — well-established, stable patterns)
+- OAuth 2.0 / OpenID Connect security considerations (training data, HIGH confidence — mature standards)
+- OWASP authentication cheat sheet (training data, HIGH confidence — industry standard)
+- APScheduler distributed execution limitations (training data, HIGH confidence)
+
+**Confidence note:** Instagram API specifics (rate limits, container publishing flow, token refresh mechanics) are based on training data up to early 2025. These SHOULD be verified against current Instagram Graph API documentation before implementation, as Meta frequently changes API requirements and review processes. All other pitfalls are grounded in codebase analysis and well-established security/architecture patterns with HIGH confidence.
