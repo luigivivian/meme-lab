@@ -126,17 +126,47 @@ def save_themes_config(themes: list):
 # ── Theme resolver ───────────────────────────────────────────────────────────
 
 def resolver_tema(theme_key: str, acao_custom: str = "", cenario_custom: str = "") -> tuple[str, str, str]:
-    """Resolve theme_key para (situacao_key, acao, cenario)."""
+    """Resolve theme_key para (situacao_key, acao, cenario).
+
+    Comportamento:
+    - Sem theme_key + com acao/cenario custom → tema livre ("custom")
+    - Com theme_key + sem custom → usa acao/cenario padrao do tema
+    - Com theme_key + com acao_custom → combina: acao do tema + variacao custom
+    - Com theme_key + com cenario_custom → sobrescreve cenario, mantem acao do tema
+    """
     from src.image_gen.gemini_client import SITUACOES
 
-    if acao_custom or cenario_custom:
-        return ("custom", acao_custom, cenario_custom)
+    # Resolver acao/cenario base do tema
+    base_acao = ""
+    base_cenario = ""
+    found = False
+
     if theme_key in SITUACOES:
-        return (theme_key, "", "")
-    for t in load_themes_config():
-        if t.get("key") == theme_key:
-            return ("custom", t.get("acao", ""), t.get("cenario", ""))
-    return (theme_key, "", "")
+        base_acao = SITUACOES[theme_key]["acao"]
+        base_cenario = SITUACOES[theme_key]["cenario"]
+        found = True
+    else:
+        for t in load_themes_config():
+            if t.get("key") == theme_key:
+                base_acao = t.get("acao", "")
+                base_cenario = t.get("cenario", "")
+                found = True
+                break
+
+    # Sem tema encontrado — usar custom puro
+    if not found:
+        return ("custom", acao_custom, cenario_custom)
+
+    # Tema encontrado — combinar com variacao custom
+    if acao_custom:
+        # Variacao: acao do tema como base + custom como direcao adicional
+        acao_final = f"{base_acao}. VARIATION: {acao_custom}"
+    else:
+        acao_final = base_acao
+
+    cenario_final = cenario_custom if cenario_custom else base_cenario
+
+    return (theme_key, acao_final, cenario_final)
 
 
 def resolver_tema_batch(item) -> tuple[str, str, str, int]:
