@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Ready to execute
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-03-25T02:55:52.433Z"
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-03-25T03:01:14.823Z"
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 ## Current Position
 
 Phase: 13 (tenant-isolation) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Plan: 2 of 3
 | Phase 12 P01 | 9min | 2 tasks | 9 files |
 | Phase 12 P02 | 8min | 2 tasks | 4 files |
 | Phase 13 P01 | 3min | 2 tasks | 5 files |
+| Phase 13 P02 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Optimistic UI updates for approve/reject — immediate feedback, revert on API error
 - [Phase 13]: Fetch-then-check pattern for 403 vs 404 distinction in CharacterRepository
 - [Phase 13]: PermissionError at repo level, HTTPException 403 at deps.py helper level
+- [Phase 13]: Transitive ownership via Character join for all child-table repos (consistent pattern)
+- [Phase 13]: ThemeRepository hybrid ownership: global themes public, user themes by user_id, character themes by Character.user_id
 
 ### Pending Todos
 
@@ -80,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T02:55:52.429Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-03-25T03:01:14.820Z
+Stopped at: Completed 13-02-PLAN.md
 Resume file: None
