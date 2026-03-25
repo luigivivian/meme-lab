@@ -328,6 +328,11 @@ class ContentPackage(Base):
     phrase_alternatives: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
     carousel_slides: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
 
+    # Approval workflow (Phase 12)
+    approval_status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending", nullable=False
+    )
+
     # Publishing
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

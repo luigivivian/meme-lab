@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +27,7 @@ class ContentPackageRepository:
         pipeline_run_id: int | None = None,
         min_quality: float | None = None,
         is_published: bool | None = None,
+        approval_status: str | None = None,
     ) -> list[ContentPackage]:
         stmt = select(ContentPackage).order_by(ContentPackage.created_at.desc())
         if character_id is not None:
@@ -37,6 +38,8 @@ class ContentPackageRepository:
             stmt = stmt.where(ContentPackage.quality_score >= min_quality)
         if is_published is not None:
             stmt = stmt.where(ContentPackage.is_published == is_published)
+        if approval_status is not None:
+            stmt = stmt.where(ContentPackage.approval_status == approval_status)
         stmt = stmt.offset(offset).limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
@@ -111,6 +114,17 @@ class ContentPackageRepository:
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def bulk_update_approval(self, package_ids: list[int], status: str) -> int:
+        """Update approval_status for multiple packages. Returns count updated."""
+        stmt = (
+            update(ContentPackage)
+            .where(ContentPackage.id.in_(package_ids))
+            .values(approval_status=status)
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return result.rowcount
 
     async def get_recent_topics(self, days: int = 7, limit: int = 100) -> list[str]:
         """Retorna topics unicos dos ultimos N dias para dedup cross-run.

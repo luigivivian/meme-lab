@@ -189,7 +189,7 @@ async def test_bulk_update_approval(async_session):
 def test_themes_yaml_has_colors():
     """Every theme in themes.yaml has a 'colors' key with 3-5 hex strings."""
     themes_path = os.path.join(os.path.dirname(__file__), "..", "config", "themes.yaml")
-    with open(themes_path) as f:
+    with open(themes_path, encoding="utf-8") as f:
         themes = yaml.safe_load(f)
 
     assert isinstance(themes, list)

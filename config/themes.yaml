@@ -1,65 +1,143 @@
 - acao: wise elderly wizard contemplating ancient knowledge
   cenario: mystical library with floating books and candlelight
+  colors:
+  - '#1A1A3E'
+  - '#2C3E6B'
+  - '#0D1B2A'
+  - '#1B3A5C'
+  - '#2E4057'
   count: 1
   key: sabedoria
   label: Sabedoria
 - acao: bewildered wizard scratching head looking at strange spell result
   cenario: chaotic potion lab with smoke and sparks
+  colors:
+  - '#4A0E4E'
+  - '#6B2D5B'
+  - '#3D0C40'
+  - '#7B3F6D'
+  - '#5C2D53'
   count: 1
   key: confusao
   label: Confusao
 - acao: exhausted wizard dragging himself with staff barely awake
   cenario: dark gloomy Monday morning castle corridor
+  colors:
+  - '#1A1A2E'
+  - '#2D2D44'
+  - '#16213E'
+  - '#0F3460'
+  - '#1A1A3E'
   count: 1
   key: segunda_feira
   label: Segunda-feira
 - acao: triumphant wizard raising staff with magical energy burst
   cenario: epic mountain peak with dramatic golden sunset
+  colors:
+  - '#B7791F'
+  - '#D69E2E'
+  - '#C05621'
+  - '#DD6B20'
+  - '#B7791F'
   count: 1
   key: vitoria
   label: Vitoria
 - acao: frustrated wizard trying to understand a glowing crystal tablet
   cenario: medieval desk cluttered with magical gadgets
+  colors:
+  - '#0D1B2A'
+  - '#1B2838'
+  - '#2D3748'
+  - '#1A365D'
+  - '#2A4365'
   count: 1
   key: tecnologia
   label: Tecnologia
 - acao: wizard lovingly holding enchanted steaming coffee mug
   cenario: cozy tavern corner with warm morning light
+  colors:
+  - '#3E2723'
+  - '#5D4037'
+  - '#4E342E'
+  - '#6D4C41'
+  - '#795548'
   count: 1
   key: cafe
   label: Cafe
 - acao: hungry wizard eyeing a feast of medieval delicacies
   cenario: grand dining hall with magical floating platters
+  colors:
+  - '#7B341E'
+  - '#9C4221'
+  - '#C05621'
+  - '#DD6B20'
+  - '#B7791F'
   count: 1
   key: comida
   label: Comida
 - acao: overworked wizard buried under scrolls and paperwork
   cenario: cramped wizard office with piles of enchanted documents
+  colors:
+  - '#2D3748'
+  - '#4A5568'
+  - '#1A202C'
+  - '#2D3748'
+  - '#4A5568'
   count: 1
   key: trabalho
   label: Trabalho
 - acao: wizard peacefully lounging in a magical hammock
   cenario: serene enchanted garden with fireflies and soft glow
+  colors:
+  - '#1A4731'
+  - '#276749'
+  - '#2F855A'
+  - '#38A169'
+  - '#22543D'
   count: 1
   key: relaxando
   label: Relaxando
 - acao: wizard deep in meditation with magical aura surrounding him
   cenario: ancient stone temple with mystical energy swirling
+  colors:
+  - '#2D1B69'
+  - '#44337A'
+  - '#553C9A'
+  - '#6B46C1'
+  - '#4C1D95'
   count: 1
   key: meditando
   label: Meditando
 - acao: wizard awkwardly trying to charm with a magic rose
   cenario: moonlit castle balcony with stars and soft magic
+  colors:
+  - '#702459'
+  - '#97266D'
+  - '#B83280'
+  - '#D53F8C'
+  - '#9B2C2C'
   count: 1
   key: relacionamento
   label: Relacionamento
 - acao: wizard in dramatic battle stance facing dark shadows
   cenario: stormy battlefield with lightning and dark clouds
+  colors:
+  - '#742A2A'
+  - '#9B2C2C'
+  - '#C53030'
+  - '#E53E3E'
+  - '#822727'
   count: 1
   key: confronto
   label: Confronto
 - acao: wizard with wide eyes discovering something unexpected
   cenario: mysterious cave with a glowing magical artifact
+  colors:
+  - '#2C7A7B'
+  - '#285E61'
+  - '#234E52'
+  - '#319795'
+  - '#38B2AC'
   count: 1
   key: surpresa
   label: Surpresa
@@ -81,6 +159,12 @@
     poeira dourada dançam na luz ambiente. A atmosfera é aconchegante, íntima e cheia
     de mistério, com sombras profundas e realces sutis que acentuam a sabedoria e
     a serenidade do Mago.
+  colors:
+  - '#1A1A3E'
+  - '#2C3E6B'
+  - '#0D1B2A'
+  - '#3E2723'
+  - '#5D4037'
   count: 1
   key: mago_cachimbo_poltrona
   label: 🧙‍♂️ Mago na Poltrona
@@ -97,6 +181,12 @@
     criando um ambiente místico e isolado. Uma névoa leve paira no ar, adicionando
     uma camada de mistério. A câmera está em um close-up médio, focando no mago e
     na erva.
+  colors:
+  - '#2D1B69'
+  - '#1A4731'
+  - '#234E52'
+  - '#0D1B2A'
+  - '#44337A'
   count: 1
   key: erva_misteriosa
   label: 🌿 Erva Misteriosa
@@ -112,6 +202,12 @@
     ervas secas penduradas no teto e livros de receitas arcaicos. Tábuas de cortar
     de madeira e utensílios de metal enferrujado estão espalhados sobre uma bancada
     de pedra. A atmosfera é acolhedora, mas cheia de um ar de magia e experimentação.
+  colors:
+  - '#7B341E'
+  - '#9C4221'
+  - '#C05621'
+  - '#3E2723'
+  - '#5D4037'
   count: 1
   key: cozinha_alquimica
   label: 🍲 Cozinha Alquímica
@@ -126,6 +222,12 @@
     filtram-se através das folhas, criando padrões de luz e sombra no chão coberto
     de musgo e folhas caídas. Pequenas flores silvestres e cogumelos coloridos pontilham
     a paisagem. Um riacho murmura suavemente à distância. A cena transmite paz e simplicidade.
+  colors:
+  - '#1A4731'
+  - '#276749'
+  - '#2F855A'
+  - '#7B341E'
+  - '#9C4221'
   count: 1
   key: fome_na_floresta
   label: 🍎 Fome na Floresta
@@ -141,6 +243,12 @@
     caminho de cascalho serpenteiam pelo jardim. A luz da manhã é suave e dourada,
     filtrando-se através de árvores altas e criando um ambiente sereno e mágico. Pequenos
     insetos polinizadores voam entre as flores.
+  colors:
+  - '#1A4731'
+  - '#276749'
+  - '#22543D'
+  - '#2F855A'
+  - '#38A169'
   count: 1
   key: coleta_de_ervas
   label: 🧺 Coleta de Ervas
@@ -155,6 +263,12 @@
     brilho quente sobre o ambiente. Ervas secas pendem do teto e livros antigos estão
     empilhados nas prateleiras. A atmosfera é de tranquilidade e conforto, com a luz
     do fim de tarde criando longas sombras.
+  colors:
+  - '#3E2723'
+  - '#5D4037'
+  - '#4E342E'
+  - '#6D4C41'
+  - '#795548'
   count: 1
   key: preparando_o_cha
   label: ☕ Preparando Chá
@@ -169,6 +283,12 @@
     natural. O chão é coberto por folhas úmidas e raízes expostas. Uma névoa leve
     paira entre as árvores, adicionando uma atmosfera etérea. A câmera está focada
     no mago e no arbusto, com a floresta escura ao fundo.
+  colors:
+  - '#1A4731'
+  - '#0D1B2A'
+  - '#234E52'
+  - '#22543D'
+  - '#2D3748'
   count: 1
   key: busca_por_ingredientes
   label: 🔍 Busca Ingredientes
@@ -182,6 +302,12 @@
     um campo verdejante. Uma chaleira fumegante está sobre um fogão a lenha no canto,
     e ervas secas pendem do teto. A atmosfera é rústica e acolhedora, com a luz dourada
     do amanhecer preenchendo o ambiente.
+  colors:
+  - '#3E2723'
+  - '#5D4037'
+  - '#B7791F'
+  - '#D69E2E'
+  - '#6D4C41'
   count: 1
   key: primeiro_cafe_da_manha
   label: 🍳 Primeiro Café
@@ -197,6 +323,12 @@
     A atmosfera é mágica e tranquila, com o ar noturno fresco e uma brisa suave que
     faz as flores balançarem. A iluminação é dramática, com contrastes fortes entre
     a escuridão e os pontos de luz.
+  colors:
+  - '#1A1A2E'
+  - '#2D1B69'
+  - '#0D1B2A'
+  - '#1A1A3E'
+  - '#44337A'
   count: 1
   key: colheita_noturna
   label: 🌙 Colheita Noturna
@@ -211,6 +343,12 @@
     iluminando a poeira que dança no ar. Prateleiras de madeira escura estão repletas
     de recipientes com ingredientes misteriosos. A atmosfera é de trabalho sério e
     conhecimento antigo.'
+  colors:
+  - '#1A4731'
+  - '#3E2723'
+  - '#276749'
+  - '#4E342E'
+  - '#22543D'
   count: 1
   key: medicina_natural
   label: 💊 Medicina Natural
@@ -226,6 +364,12 @@
     e rindo, criando uma atmosfera animada e calorosa. As paredes são de pedra exposta
     e madeira escura, com tapeçarias simples. A luz é quente e convidativa, com sombras
     dançando nas paredes.
+  colors:
+  - '#7B341E'
+  - '#B7791F'
+  - '#3E2723'
+  - '#D69E2E'
+  - '#5D4037'
   count: 1
   key: banquete_simples
   label: 🍽️ Banquete Simples
@@ -241,6 +385,12 @@
     e a via láctea brilhando intensamente. A luz da lua cheia ilumina a paisagem com
     um brilho prateado e etéreo, criando sombras longas e dramáticas. A atmosfera
     é serena e mágica, com um toque de mistério cósmico.
+  colors:
+  - '#0D1B2A'
+  - '#1A1A3E'
+  - '#1A1A2E'
+  - '#2D1B69'
+  - '#1B3A5C'
   count: 1
   key: observando_estrelas
   label: ✨ Observando Estrelas
@@ -256,6 +406,12 @@
     por uma cama de folhas caídas e samambaias exuberantes. Uma névoa leve e mágica
     paira entre as árvores, adicionando um ar místico e etéreo. Sons suaves da natureza,
     como o canto dos pássaros e o sussurro do vento, preenchem o ambiente.
+  colors:
+  - '#1A4731'
+  - '#276749'
+  - '#22543D'
+  - '#2F855A'
+  - '#0D1B2A'
   count: 1
   key: encantamento_floresta
   label: 🌿 Encantamento Florestal
@@ -271,6 +427,12 @@
     de luz e sombra dramático sobre as estruturas. Vinhas e musgo cobrem as pedras,
     e pequenas flores silvestres crescem nas frestas. O ambiente é de silêncio e história
     esquecida, com uma sensação de mistério esperando para ser desvendado.
+  colors:
+  - '#3E2723'
+  - '#4E342E'
+  - '#2D3748'
+  - '#5D4037'
+  - '#1A202C'
   count: 1
   key: explorando_ruinas
   label: 🏛️ Explorando Ruínas
@@ -287,6 +449,12 @@
     que chicoteiam a paisagem. A luz ambiente é dramática e sombria, com flashes ocasionais
     de luz dos raios. A paisagem abaixo é selvagem e intocada, com florestas escuras
     e rios sinuosos.
+  colors:
+  - '#1A1A2E'
+  - '#2D3748'
+  - '#742A2A'
+  - '#0D1B2A'
+  - '#4A5568'
   count: 1
   key: tempestade_chegando
   label: ⛈️ Tempestade Chegando
@@ -303,6 +471,12 @@
     com uma caneca de chá fumegante. A luz ambiente é dominada pelo brilho quente
     e dançante do fogo, criando sombras suaves e uma atmosfera íntima e acolhedora.
     O ar cheira a madeira queimada e livros velhos.
+  colors:
+  - '#3E2723'
+  - '#5D4037'
+  - '#7B341E'
+  - '#1A1A3E'
+  - '#4E342E'
   count: 1
   key: historia_na_lareira
   label: 📜 História na Lareira
