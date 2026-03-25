@@ -679,7 +679,8 @@ async def upload_background(
         raise HTTPException(status_code=404, detail="Character not found")
 
     # Save to assets/backgrounds/{character_slug}/
-    bg_dir = Path("assets/backgrounds") / character_slug
+    from config import BACKGROUNDS_DIR
+    bg_dir = BACKGROUNDS_DIR / character_slug
     bg_dir.mkdir(parents=True, exist_ok=True)
     dest = bg_dir / file.filename
 
@@ -736,18 +737,20 @@ async def serve_background_image(
     current_user=Depends(get_current_user),
 ):
     from fastapi.responses import FileResponse
+    from config import BACKGROUNDS_DIR
+
     safe_name = Path(filename).name
     if safe_name != filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    # Primary: character-specific directory
-    path = Path("assets/backgrounds") / character_slug / safe_name
+    # Primary: character-specific directory (absolute via config)
+    path = BACKGROUNDS_DIR / character_slug / safe_name
     # Legacy fallback for mago-mestre
     if not path.exists() and character_slug == "mago-mestre":
-        path = Path("assets/backgrounds") / "mago" / safe_name
+        path = BACKGROUNDS_DIR / "mago" / safe_name
 
     if not path.exists():
-        raise HTTPException(status_code=404, detail="Background not found")
+        raise HTTPException(status_code=404, detail=f"Background not found: {safe_name}")
 
     return FileResponse(str(path))
 
@@ -771,7 +774,8 @@ async def delete_background(
     if safe_name != filename or ".." in filename or "/" in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    bg_path = Path("assets/backgrounds") / character_slug / safe_name
+    from config import BACKGROUNDS_DIR
+    bg_path = BACKGROUNDS_DIR / character_slug / safe_name
     if not bg_path.exists():
         raise HTTPException(status_code=404, detail="Background not found")
 
