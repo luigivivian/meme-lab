@@ -92,36 +92,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PIPE-01 | — | Pending |
-| PIPE-02 | — | Pending |
-| PIPE-03 | — | Pending |
-| PIPE-04 | — | Pending |
-| TENANT-01 | — | Pending |
-| TENANT-02 | — | Pending |
-| TENANT-03 | — | Pending |
-| TENANT-04 | — | Pending |
-| PUB-01 | — | Pending |
-| PUB-02 | — | Pending |
-| PUB-03 | — | Pending |
-| PUB-04 | — | Pending |
-| PUB-05 | — | Pending |
-| PUB-06 | — | Pending |
-| PUB-07 | — | Pending |
-| DASH-01 | — | Pending |
-| DASH-02 | — | Pending |
-| DASH-03 | — | Pending |
-| DASH-04 | — | Pending |
-| BILL-01 | — | Pending |
-| BILL-02 | — | Pending |
-| BILL-03 | — | Pending |
-| BILL-04 | — | Pending |
-| BILL-05 | — | Pending |
+| PIPE-01 | Phase 12 | Pending |
+| PIPE-02 | Phase 12 | Pending |
+| PIPE-03 | Phase 12 | Pending |
+| PIPE-04 | Phase 12 | Pending |
+| TENANT-01 | Phase 13 | Pending |
+| TENANT-02 | Phase 13 | Pending |
+| TENANT-03 | Phase 13 | Pending |
+| TENANT-04 | Phase 13 | Pending |
+| PUB-01 | Phase 14 | Pending |
+| PUB-02 | Phase 14 | Pending |
+| PUB-07 | Phase 14 | Pending |
+| PUB-03 | Phase 15 | Pending |
+| PUB-04 | Phase 15 | Pending |
+| PUB-05 | Phase 15 | Pending |
+| PUB-06 | Phase 15 | Pending |
+| DASH-01 | Phase 16 | Pending |
+| DASH-02 | Phase 16 | Pending |
+| DASH-03 | Phase 16 | Pending |
+| DASH-04 | Phase 16 | Pending |
+| BILL-01 | Phase 17 | Pending |
+| BILL-02 | Phase 17 | Pending |
+| BILL-03 | Phase 17 | Pending |
+| BILL-04 | Phase 17 | Pending |
+| BILL-05 | Phase 17 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24
+- Mapped to phases: 24
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-24 after initial definition*
+*Last updated: 2026-03-24 after roadmap creation*
