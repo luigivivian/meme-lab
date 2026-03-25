@@ -566,8 +566,7 @@ async def approve_content(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    try:
-        pkg = await repo.get_by_id(package_id)
+    pkg = await repo.get_by_id(package_id)
     if not pkg:
         raise HTTPException(404, "Package not found")
     await repo.update(package_id, {"approval_status": "approved"})
@@ -584,8 +583,7 @@ async def reject_content(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    try:
-        pkg = await repo.get_by_id(package_id)
+    pkg = await repo.get_by_id(package_id)
     if not pkg:
         raise HTTPException(404, "Package not found")
     await repo.update(package_id, {"approval_status": "rejected"})
@@ -602,8 +600,7 @@ async def unreject_content(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    try:
-        pkg = await repo.get_by_id(package_id)
+    pkg = await repo.get_by_id(package_id)
     if not pkg:
         raise HTTPException(404, "Package not found")
     await repo.update(package_id, {"approval_status": "pending"})
@@ -620,10 +617,8 @@ async def bulk_approve(
     from src.database.repositories.content_repo import ContentPackageRepository
 
     repo = ContentPackageRepository(session)
-    # Validate ownership of all packages before bulk update
     for pkg_id in request.package_ids:
-        try:
-            pkg = await repo.get_by_id(pkg_id)
+        pkg = await repo.get_by_id(pkg_id)
         if not pkg:
             raise HTTPException(status_code=404, detail=f"Package {pkg_id} not found")
     count = await repo.bulk_update_approval(request.package_ids, "approved")
@@ -641,8 +636,7 @@ async def bulk_reject(
 
     repo = ContentPackageRepository(session)
     for pkg_id in request.package_ids:
-        try:
-            pkg = await repo.get_by_id(pkg_id)
+        pkg = await repo.get_by_id(pkg_id)
         if not pkg:
             raise HTTPException(status_code=404, detail=f"Package {pkg_id} not found")
     count = await repo.bulk_update_approval(request.package_ids, "rejected")
