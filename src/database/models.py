@@ -1,4 +1,4 @@
-"""ORM models — 14 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+"""ORM models — 15 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
 
 from datetime import datetime
 from typing import Optional
@@ -545,6 +545,7 @@ class User(TimestampMixin, Base):
     # Relationships
     characters: Mapped[list["Character"]] = relationship(back_populates="owner")
     api_usage_records: Mapped[list["ApiUsage"]] = relationship(back_populates="user")
+    instagram_connections: Mapped[list["InstagramConnection"]] = relationship(back_populates="owner")
 
     __table_args__ = (
         Index("idx_users_role", "role"),
@@ -598,4 +599,35 @@ class ApiUsage(TimestampMixin, Base):
         Index("idx_api_usage_user_id", "user_id"),
         Index("idx_api_usage_date", "date"),
         Index("idx_api_usage_service", "service"),
+    )
+
+
+# ============================================================
+# 15. instagram_connections
+# ============================================================
+
+class InstagramConnection(TimestampMixin, Base):
+    __tablename__ = "instagram_connections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    ig_user_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    ig_username: Mapped[str] = mapped_column(String(200), nullable=False)
+    page_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    access_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    token_expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    connected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="active", server_default="active"
+    )  # active | expired | disconnected | error
+
+    # Relationship
+    owner: Mapped["User"] = relationship(back_populates="instagram_connections")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "ig_user_id", name="uq_ig_conn_user_ig"),
+        Index("idx_ig_conn_user_id", "user_id"),
+        Index("idx_ig_conn_status", "status"),
     )
