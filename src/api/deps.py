@@ -125,8 +125,15 @@ def save_themes_config(themes: list):
 
 # ── Theme resolver ───────────────────────────────────────────────────────────
 
-def resolver_tema(theme_key: str, acao_custom: str = "", cenario_custom: str = "") -> tuple[str, str, str]:
+async def resolver_tema(
+    theme_key: str,
+    acao_custom: str = "",
+    cenario_custom: str = "",
+    session: "AsyncSession | None" = None,
+) -> tuple[str, str, str]:
     """Resolve theme_key para (situacao_key, acao, cenario).
+
+    Busca em: SITUACOES (builtin) → themes.yaml (legacy) → banco de dados.
 
     Comportamento:
     - Sem theme_key + com acao/cenario custom → tema livre ("custom")
@@ -153,6 +160,16 @@ def resolver_tema(theme_key: str, acao_custom: str = "", cenario_custom: str = "
                 found = True
                 break
 
+    # Fallback: buscar no banco de dados (temas criados via IA)
+    if not found and session is not None:
+        from src.database.repositories.theme_repo import ThemeRepository
+        repo = ThemeRepository(session)
+        db_theme = await repo.get_by_key(theme_key)
+        if db_theme:
+            base_acao = db_theme.acao or ""
+            base_cenario = db_theme.cenario or ""
+            found = True
+
     # Sem tema encontrado — usar custom puro
     if not found:
         return ("custom", acao_custom, cenario_custom)
@@ -169,9 +186,19 @@ def resolver_tema(theme_key: str, acao_custom: str = "", cenario_custom: str = "
     return (theme_key, acao_final, cenario_final)
 
 
-def resolver_tema_batch(item) -> tuple[str, str, str, int]:
+async def resolver_tema_batch(item, session: "AsyncSession | None" = None) -> tuple[str, str, str, int]:
     """Resolve item de batch para (situacao_key, acao, cenario, count)."""
     from src.image_gen.gemini_client import SITUACOES
+
+    async def _db_lookup(key: str) -> tuple[str, str, str, int] | None:
+        if session is None:
+            return None
+        from src.database.repositories.theme_repo import ThemeRepository
+        repo = ThemeRepository(session)
+        db_theme = await repo.get_by_key(key)
+        if db_theme:
+            return ("custom", db_theme.acao or "", db_theme.cenario or "", db_theme.count or 1)
+        return None
 
     if isinstance(item, str):
         if item in SITUACOES:
@@ -179,6 +206,9 @@ def resolver_tema_batch(item) -> tuple[str, str, str, int]:
         for t in load_themes_config():
             if t.get("key") == item:
                 return ("custom", t.get("acao", ""), t.get("cenario", ""), t.get("count", 1))
+        db_result = await _db_lookup(item)
+        if db_result:
+            return db_result
         return (item, "", "", 1)
 
     if isinstance(item, dict):
@@ -193,6 +223,9 @@ def resolver_tema_batch(item) -> tuple[str, str, str, int]:
         for t in load_themes_config():
             if t.get("key") == key:
                 return ("custom", t.get("acao", ""), t.get("cenario", ""), t.get("count", 1))
+        db_result = await _db_lookup(key)
+        if db_result:
+            return db_result
         return (key, "", "", count)
 
     return ("sabedoria", "", "", 1)

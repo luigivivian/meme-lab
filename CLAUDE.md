@@ -17,10 +17,7 @@ Notebook Jupyter/Colab para geração de imagens do personagem **O Mago Mestre**
 
 ```python
 MODELOS_IMAGEM = [
-    "gemini-2.5-flash-image",                 # produção, estável
-    "gemini-2.0-flash-exp-image-generation",  # experimental, rápido
-    "gemini-3.1-flash-image-preview",
-    "gemini-3-pro-image-preview",
+    "gemini-2.5-flash-image",  # Nano Banana Flash — único modelo usado (500 RPD, 15 RPM)
 ]
 ```
 
@@ -40,7 +37,7 @@ MODELOS_IMAGEM = [
 | Parâmetro | Valor | Notas |
 |-----------|-------|-------|
 | `TEMPERATURA` | `0.85` | criatividade (0.0–2.0) |
-| `N_REFERENCIAS` | `5` | imagens de referência por geração (recomendado 3–7, máx 14) |
+| `N_REFERENCIAS` | `3` | imagens de referência por geração (mínimo para consistência, máx 14) |
 | `RESOLUCAO_MAX_REF` | `1024` | limite de redimensionamento das refs |
 | `MAX_TENTATIVAS_429` | `2` | retries ao receber rate limit |
 | `ESPERA_BASE_429` | `60s` | base de espera (dobra a cada tentativa) |

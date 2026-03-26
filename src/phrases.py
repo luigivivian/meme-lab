@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -19,5 +20,9 @@ def generate_phrases(topic: str, count: int = 5) -> list[str]:
         tier="lite",
     )
 
-    phrases = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]
+    phrases = [
+        re.sub(r'^\d+[\.\)]\s*', '', line.strip())
+        for line in raw_text.strip().splitlines()
+        if line.strip()
+    ]
     return phrases

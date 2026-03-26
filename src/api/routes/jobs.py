@@ -73,7 +73,10 @@ def _persist_job_to_db(job_id: str, job: dict):
 def _run_batch_job(
     job_id: str, lote: list, n_refs: int, pausa: int,
     auto_refine: bool = False, refinement_passes: int = 1,
+    resolved_themes: dict | None = None,
 ):
+    if resolved_themes is None:
+        resolved_themes = {}
     """Worker de batch — roda em thread separada."""
     from src.image_gen.gemini_client import GeminiImageClient
 
@@ -91,8 +94,8 @@ def _run_batch_job(
     client = GeminiImageClient(n_referencias=n_refs)
     gerado = 0
 
-    for item in lote:
-        situacao_key, acao, cenario, count = resolver_tema_batch(item)
+    for idx, item in enumerate(lote):
+        situacao_key, acao, cenario, count = resolved_themes.get(idx, (item if isinstance(item, str) else item.get("key", "custom"), "", "", 1))
         original_key = item if isinstance(item, str) else item.get("key", "custom")
 
         for i in range(count):
@@ -156,10 +159,15 @@ async def create_batch(req: BatchRequest, current_user=Depends(get_current_user)
         "auto_refine": req.auto_refine, "refinement_passes": req.refinement_passes,
     })
 
+    # Pre-resolve themes (including DB themes) before launching thread
+    resolved_themes = {}
+    for idx, item in enumerate(req.themes):
+        resolved_themes[idx] = await resolver_tema_batch(item, session=session)
+
     threading.Thread(
         target=_run_batch_job,
         args=(job_id, req.themes, req.n_refs, req.pausa),
-        kwargs={"auto_refine": req.auto_refine, "refinement_passes": req.refinement_passes},
+        kwargs={"auto_refine": req.auto_refine, "refinement_passes": req.refinement_passes, "resolved_themes": resolved_themes},
         daemon=True,
     ).start()
     return {"job_id": job_id, "status": "queued", "total_themes": len(req.themes), "auto_refine": req.auto_refine}
@@ -186,10 +194,14 @@ async def batch_from_config(
         "auto_refine": auto_refine, "refinement_passes": refinement_passes,
     })
 
+    resolved_themes = {}
+    for idx, item in enumerate(themes):
+        resolved_themes[idx] = await resolver_tema_batch(item, session=session)
+
     threading.Thread(
         target=_run_batch_job,
         args=(job_id, themes, 5, 15),
-        kwargs={"auto_refine": auto_refine, "refinement_passes": refinement_passes},
+        kwargs={"auto_refine": auto_refine, "refinement_passes": refinement_passes, "resolved_themes": resolved_themes},
         daemon=True,
     ).start()
     return {"job_id": job_id, "status": "queued", "total_themes": len(themes), "auto_refine": auto_refine}

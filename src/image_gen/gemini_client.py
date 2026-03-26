@@ -839,9 +839,17 @@ class GeminiImageClient:
     ) -> PIL.Image.Image | None:
         """Tenta modelos em ordem. No 429, pula pro proximo imediatamente."""
         key_hint = f"...{api_key[-6:]}" if api_key else "default(_get_client)"
-        # Filtrar modelos incompativeis (imagen-* usa API predict, nao generateContent)
-        # Tentar todos os gemini-*-image models — free tier limits mudam frequentemente
-        modelos = [m for m in MODELOS_IMAGEM if not m.startswith("imagen-")]
+        # Filtrar modelos incompativeis:
+        # - imagen-*: API diferente (predict, nao generateContent)
+        # - gemini-3-pro-image, gemini-3.1-flash-image: limit=0 no free tier
+        modelos = [
+            m for m in MODELOS_IMAGEM
+            if not m.startswith("imagen-")
+            and "gemini-3-pro" not in m
+            and "gemini-3.1-flash" not in m
+        ]
+        if not modelos:
+            modelos = [m for m in MODELOS_IMAGEM if not m.startswith("imagen-")]
         logger.info(f"_tentar_modelos: key={key_hint}, modelos={modelos}")
         rate_limited_count = 0
 

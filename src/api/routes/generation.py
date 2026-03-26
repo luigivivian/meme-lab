@@ -80,7 +80,7 @@ async def generate_single(
         _log.warning("[single] Gemini Image not available (no refs or API key)")
         raise HTTPException(status_code=503, detail="Gemini Image nao disponivel (sem referencias ou API key)")
 
-    situacao_key, acao, cenario = resolver_tema(req.theme_key, req.acao_custom, req.cenario_custom)
+    situacao_key, acao, cenario = await resolver_tema(req.theme_key, req.acao_custom, req.cenario_custom, session=session)
     _log.info(f"[single] situacao={situacao_key}, acao={acao[:60]}...")
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     nome = f"single_{req.theme_key}_{ts}"

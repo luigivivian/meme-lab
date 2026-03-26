@@ -32,6 +32,10 @@ class UsageAwareKeySelector:
         self._paid_key: str = os.getenv("GOOGLE_API_KEY_PAID", "")
         self._force_tier_env: str = os.getenv("GEMINI_FORCE_TIER", "").lower()
 
+        free_hint = f"...{self._free_key[-6:]}" if self._free_key else "MISSING"
+        paid_hint = f"...{self._paid_key[-6:]}" if self._paid_key else "MISSING"
+        logger.info(f"KeySelector init: free={free_hint}, paid={paid_hint}, force_env={self._force_tier_env or 'none'}")
+
         if not self._free_key:
             raise ValueError("GOOGLE_API_KEY not configured")
 
@@ -62,6 +66,7 @@ class UsageAwareKeySelector:
           3. Free-only mode (no paid key available)
           4. Automatic: check daily usage via UsageRepository
         """
+        logger.info(f"resolve: user_id={user_id}, force_tier={force_tier}, free_only={self._free_only}")
         # Priority 1: request-level force
         if force_tier:
             return self._forced_resolution(force_tier, mode="forced_request")

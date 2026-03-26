@@ -148,7 +148,11 @@ def _generate_with_prompt(
         max_tokens=2048,
         tier="lite",
     )
-    phrases = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]
+    phrases = [
+        re.sub(r'^\d+[\.\)]\s*', '', line.strip())
+        for line in raw_text.strip().splitlines()
+        if line.strip()
+    ]
     return phrases
 
 

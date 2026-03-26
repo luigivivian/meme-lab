@@ -34,9 +34,9 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 - [x] **VIRAL-09**: Trend scores apply temporal velocity decay (e^(-age_hours/24))
 - [x] **VIRAL-10**: TrendAggregator applies multi-source boost (1 + 0.2*(sources-1), capped at 2.0x)
 - [x] **VIRAL-11**: Reddit posts use engagement/position-based scoring instead of fixed 0.4
-- [ ] **VIRAL-12**: Curator uses LLM-based theme mapping instead of rigid KEYWORD_MAP
-- [ ] **VIRAL-13**: Curator processes 20+ trends and produces 10-15 WorkOrders per run
-- [ ] **VIRAL-14**: Curator filters topics with meme potential below 3 (LLM-rated 1-5)
+- [x] **VIRAL-12**: Curator uses LLM-based theme mapping instead of rigid KEYWORD_MAP
+- [x] **VIRAL-13**: Curator processes 20+ trends and produces 10-15 WorkOrders per run
+- [x] **VIRAL-14**: Curator filters topics with meme potential below 3 (LLM-rated 1-5)
 - [x] **VIRAL-15**: Generated phrases validated for length (<120 chars), language, and format before use
 - [x] **VIRAL-16**: Topic-image coherence checked before generation, with LLM-based theme remapping on mismatch
 
@@ -147,9 +147,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VIRAL-09 | Phase 12.1 | Complete |
 | VIRAL-10 | Phase 12.1 | Complete |
 | VIRAL-11 | Phase 12.1 | Complete |
-| VIRAL-12 | Phase 12.1 | Pending |
-| VIRAL-13 | Phase 12.1 | Pending |
-| VIRAL-14 | Phase 12.1 | Pending |
+| VIRAL-12 | Phase 12.1 | Complete |
+| VIRAL-13 | Phase 12.1 | Complete |
+| VIRAL-14 | Phase 12.1 | Complete |
 | VIRAL-15 | Phase 12.1 | Complete |
 | VIRAL-16 | Phase 12.1 | Complete |
 | PUB-01 | Phase 14 | Pending |

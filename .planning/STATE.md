@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to execute
+status: Ready to plan
 stopped_at: Completed 12.1-04-PLAN.md
-last_updated: "2026-03-26T17:28:06Z"
+last_updated: "2026-03-26T17:36:47.364Z"
 progress:
   total_phases: 9
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 
 ## Current Position
 
-Phase: 12.1 (viral-content-engine-trend-agents-content-quality-overhaul) — EXECUTING
-Plan: 4 of 4
+Phase: 13
+Plan: Not started
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Plan: 4 of 4
 | Phase 12.1 P04 | 4min | 2 tasks | 2 files |
 | Phase 12.1 P02 | 3min | 2 tasks | 3 files |
 | Phase 12.1 P01 | 2min | 2 tasks | 9 files |
+| Phase 12.1 P03 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -92,9 +93,20 @@ Recent decisions affecting current work:
 - [Phase 12.1]: Agents own their curated data sources (DEFAULT_SUBREDDITS/DEFAULT_FEEDS) instead of config.py overrides
 - [Phase 12.1]: Regex-based traffic parsing with K/M/B suffix support replaces brittle char-by-char iteration
 - [Phase 12.1]: Exponential decay e^(-age/24) for temporal freshness; multi-source boost min(1+0.2*(n-1), 2.0)
+
+<<<<<<< Updated upstream
+
 - [Phase 12.1]: Language detection via PT markers + English-only words instead of per-word dictionary -- handles accent-less informal BR text
 - [Phase 12.1]: Coherence check uses _OBVIOUS_MATCHES shortcut for 13 themes to avoid unnecessary LLM calls
 - [Phase 12.1]: Created _remap_theme inline in generation_layer.py because _llm_map_theme from plan 12.1-03 not yet available
+
+=======
+
+- [Phase 12.1]: LLM theme mapping uses generate() with tier=lite for cheap Gemini flash-lite calls (~$0.001/mapping)
+- [Phase 12.1]: KEYWORD_MAP preserved as offline/error fallback; LLM -> KEYWORD_MAP -> random graceful degradation
+- [Phase 12.1]: meme_potential filter >= 3 threshold with safety fallback to keep all if everything filtered
+
+>>>>>>> Stashed changes
 
 ### Pending Todos
 
@@ -108,6 +120,11 @@ None.
 
 ## Session Continuity
 
+<<<<<<< Updated upstream
 Last session: 2026-03-26T17:28:06Z
 Stopped at: Completed 12.1-04-PLAN.md
+=======
+Last session: 2026-03-26T17:28:10.874Z
+Stopped at: Completed 12.1-03-PLAN.md
+>>>>>>> Stashed changes
 Resume file: None
