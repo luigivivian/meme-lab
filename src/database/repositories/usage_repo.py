@@ -26,12 +26,14 @@ _DEFAULT_LIMITS: dict[tuple[str, str], int] = {
     ("gemini_image", "paid"): 0,
     ("gemini_text", "paid"): 0,
     ("gemini_web", "paid"): 0,
+    ("kie_video", "standard"): 0,  # Unlimited count -- budget enforced by VIDEO_DAILY_BUDGET_USD
 }
 
 # Known services to always include in usage response
 _KNOWN_SERVICES: list[tuple[str, str]] = [
     ("gemini_image", "free"),
     ("gemini_text", "free"),
+    ("kie_video", "standard"),
 ]
 
 
@@ -293,3 +295,24 @@ class UsageRepository:
             "avg_cost_per_image": round(avg_cost, 6),
             "days_tracked": days_tracked,
         }
+
+    async def get_daily_cost(self, user_id: int, service: str) -> float:
+        """Get total cost_usd spent today for a specific service.
+
+        Used by video budget enforcement (D-09) to check daily spend
+        against VIDEO_DAILY_BUDGET_USD before allowing new generation.
+
+        Returns sum of cost_usd for all successful usage rows matching
+        user_id + service for today's date bucket (PT timezone).
+        """
+        today_utc = self._get_pt_today_start_utc()
+        result = await self.session.execute(
+            select(func.sum(ApiUsage.cost_usd)).where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.service == service,
+                ApiUsage.date == today_utc,
+                ApiUsage.status == "success",
+            )
+        )
+        total = result.scalar_one_or_none()
+        return float(total) if total is not None else 0.0
