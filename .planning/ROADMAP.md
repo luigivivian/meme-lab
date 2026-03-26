@@ -156,10 +156,10 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
+- [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
 - [ ] 999.1-02-PLAN.md — Core modules: KieSora2Client (async API client) + VideoPromptBuilder (LLM motion prompts)
 - [ ] 999.1-03-PLAN.md — API routes: video generation endpoints, cost tracking, app wiring
 
