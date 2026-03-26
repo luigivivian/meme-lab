@@ -167,15 +167,27 @@ class UsageRepository:
         user_id: int,
         service: str,
         tier: str,
+        plan_tier: str = "free",
     ) -> tuple[bool, dict]:
         """Check if user is within daily limit for service/tier.
+
+        Args:
+            plan_tier: User's subscription plan tier ("free"/"pro"/"enterprise").
+                       Defaults to "free" for backward compatibility.
+                       When provided, limits are looked up from PLAN_TIERS first.
 
         Returns (allowed, info_dict).
         If rejected, inserts a status='rejected' row (D-03).
         """
         today_utc = self._get_pt_today_start_utc()
         current = await self._get_current_count(user_id, service, tier, today_utc)
-        limit = get_daily_limit(service, tier)
+
+        # Try tier-aware limit first (from billing plan), fallback to env/default
+        try:
+            from src.services.stripe_billing import get_tier_limit
+            limit = get_tier_limit(plan_tier, service, tier)
+        except ImportError:
+            limit = get_daily_limit(service, tier)
         resets_at = self._next_pt_midnight_iso()
 
         # 0 = unlimited
@@ -215,8 +227,13 @@ class UsageRepository:
             "resets_at": resets_at,
         })
 
-    async def get_user_usage(self, user_id: int) -> dict:
+    async def get_user_usage(self, user_id: int, plan_tier: str = "free") -> dict:
         """Get per-service usage breakdown for today.
+
+        Args:
+            plan_tier: User's subscription plan tier ("free"/"pro"/"enterprise").
+                       Defaults to "free" for backward compatibility.
+                       When provided, limits are looked up from PLAN_TIERS first.
 
         Returns dict matching UsageResponse schema:
         {"services": [...], "resets_at": "..."}
@@ -237,12 +254,20 @@ class UsageRepository:
         for row in rows:
             usage_map[(row.service, row.tier)] = row.usage_count
 
+        # Helper to get tier-aware limit
+        def _get_limit(svc: str, tier: str) -> int:
+            try:
+                from src.services.stripe_billing import get_tier_limit
+                return get_tier_limit(plan_tier, svc, tier)
+            except ImportError:
+                return get_daily_limit(svc, tier)
+
         # Build services list — always include known services
         services = []
         seen: set[tuple[str, str]] = set()
         for svc, tier in _KNOWN_SERVICES:
             used = usage_map.get((svc, tier), 0)
-            limit = get_daily_limit(svc, tier)
+            limit = _get_limit(svc, tier)
             remaining = limit - used if limit > 0 else -1
             services.append({
                 "service": svc,
@@ -256,7 +281,7 @@ class UsageRepository:
         # Include any extra services from actual usage
         for (svc, tier), used in usage_map.items():
             if (svc, tier) not in seen:
-                limit = get_daily_limit(svc, tier)
+                limit = _get_limit(svc, tier)
                 remaining = limit - used if limit > 0 else -1
                 services.append({
                     "service": svc,
