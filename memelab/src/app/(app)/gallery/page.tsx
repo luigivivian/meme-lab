@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown, Undo2, Filter } from "lucide-react";
+import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { SOURCE_COLORS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +23,6 @@ import {
   generateVideo,
   approveContent,
   rejectContent,
-  unrejectContent,
   bulkApproveContent,
   bulkRejectContent,
   type ImageInfo,
@@ -128,13 +127,13 @@ export default function GalleryPage() {
   const [approving, setApproving] = useState<number | null>(null);
 
   const allPackages = contentData?.packages ?? [];
+  const visiblePackages = allPackages.filter((p) => p.approval_status !== "rejected");
   const filteredPackages = statusFilter
-    ? allPackages.filter((p) => p.approval_status === statusFilter)
-    : allPackages;
+    ? visiblePackages.filter((p) => p.approval_status === statusFilter)
+    : visiblePackages;
 
   const pendingCount = allPackages.filter((p) => p.approval_status === "pending").length;
   const approvedCount = allPackages.filter((p) => p.approval_status === "approved").length;
-  const rejectedCount = allPackages.filter((p) => p.approval_status === "rejected").length;
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -152,11 +151,6 @@ export default function GalleryPage() {
   const handleReject = async (id: number) => {
     setApproving(id);
     try { await rejectContent(id); mutateContent(); } catch {} finally { setApproving(null); }
-  };
-
-  const handleUnreject = async (id: number) => {
-    setApproving(id);
-    try { await unrejectContent(id); mutateContent(); } catch {} finally { setApproving(null); }
   };
 
   const handleBulkApprove = async () => {
@@ -644,10 +638,9 @@ export default function GalleryPage() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1 rounded-lg bg-white/[0.02] p-0.5">
                 {([
-                  { key: "", label: "Todos", count: allPackages.length },
+                  { key: "", label: "Todos", count: visiblePackages.length },
                   { key: "pending", label: "Pendentes", count: pendingCount },
                   { key: "approved", label: "Aprovados", count: approvedCount },
-                  { key: "rejected", label: "Rejeitados", count: rejectedCount },
                 ] as const).map((tab) => (
                   <button
                     key={tab.key}
@@ -705,13 +698,11 @@ export default function GalleryPage() {
                   const isSelected = selectedIds.has(pkg.id);
                   const isPending = pkg.approval_status === "pending";
                   const isApproved = pkg.approval_status === "approved";
-                  const isRejected = pkg.approval_status === "rejected";
                   return (
                     <motion.div
                       key={pkg.id}
                       className={`group relative overflow-hidden rounded-xl border transition-all ${
                         isSelected ? "border-primary ring-1 ring-primary/30" :
-                        isRejected ? "border-rose-500/20 opacity-60" :
                         "border-white/[0.04] hover:border-white/[0.08]"
                       } bg-secondary`}
                       variants={staggerItem}
@@ -733,9 +724,9 @@ export default function GalleryPage() {
                         {/* Status + video badges */}
                         <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
                           <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm ${
-                            isApproved ? "bg-emerald-500/80" : isRejected ? "bg-rose-500/80" : "bg-amber-500/80"
+                            isApproved ? "bg-emerald-500/80" : "bg-amber-500/80"
                           }`}>
-                            {isApproved ? "Aprovado" : isRejected ? "Rejeitado" : "Pendente"}
+                            {isApproved ? "Aprovado" : "Pendente"}
                           </span>
                           {pkg.video_status && (
                             <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm ${
@@ -768,13 +759,6 @@ export default function GalleryPage() {
                               Rejeitar
                             </Button>
                           </div>
-                        )}
-
-                        {isRejected && (
-                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={() => handleUnreject(pkg.id)} disabled={approving === pkg.id}>
-                            {approving === pkg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Undo2 className="h-3 w-3" />}
-                            Desfazer rejeicao
-                          </Button>
                         )}
 
                         {isApproved && !pkg.video_status && (
