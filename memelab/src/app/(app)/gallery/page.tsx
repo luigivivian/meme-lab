@@ -117,7 +117,7 @@ export default function GalleryPage() {
     }
   };
 
-  const approvedPackages = contentData?.packages.filter((p) => p.approval_status === "approved") ?? [];
+  const allPackages = contentData?.packages ?? [];
 
   const driveThemeList = driveThemesData?.themes ?? [];
   const situacaoThemes = themesData?.themes ?? [];
@@ -579,18 +579,18 @@ export default function GalleryPage() {
       </Dialog>
 
       {/* Conteudo Aprovado — Video Generation */}
-      {approvedPackages.length > 0 && (
+      {allPackages.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Package className="h-4 w-4 text-primary" />
-              Conteudo Aprovado
-              <Badge variant="secondary" className="text-xs ml-auto">{approvedPackages.length}</Badge>
+              Conteudo Gerado
+              <Badge variant="secondary" className="text-xs ml-auto">{allPackages.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <motion.div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" variants={staggerContainer} initial="initial" animate="animate">
-              {approvedPackages.map((pkg) => {
+              {allPackages.map((pkg) => {
                 const filename = pkg.image_path.split(/[/\\]/).pop() ?? "";
                 return (
                   <motion.div
@@ -626,8 +626,14 @@ export default function GalleryPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="w-full h-7 text-xs gap-1"
+                          className={`w-full h-7 text-xs gap-1 ${pkg.approval_status !== "approved" ? "opacity-60" : ""}`}
                           onClick={() => {
+                            if (pkg.approval_status !== "approved") {
+                              setVideoTarget(pkg);
+                              setVideoError("Aprove o conteudo antes de gerar video");
+                              setVideoSuccess(false);
+                              return;
+                            }
                             setVideoTarget(pkg);
                             setVideoError(null);
                             setVideoSuccess(false);
