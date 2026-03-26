@@ -379,3 +379,22 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "clipflow-video-uploads")
 
 # Signed URL expiry in seconds (1 hour — video gen takes 30-120s)
 GCS_SIGNED_URL_EXPIRY = int(os.getenv("GCS_SIGNED_URL_EXPIRY", "3600"))
+
+# ===== Billing & Stripe — Phase 17 =====
+
+# Stripe API secret key (sk_test_... or sk_live_...)
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+
+# Stripe webhook endpoint signing secret (whsec_...)
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+# Stripe Price IDs for each plan (created in Stripe Dashboard)
+STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "")
+STRIPE_ENTERPRISE_PRICE_ID = os.getenv("STRIPE_ENTERPRISE_PRICE_ID", "")
+
+# URLs for Stripe Checkout redirect
+STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "http://localhost:3000/billing?session_id={CHECKOUT_SESSION_ID}")
+STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "http://localhost:3000/billing?canceled=true")
+
+# Grace period in days after failed payment before auto-downgrade to Free
+STRIPE_GRACE_PERIOD_DAYS = int(os.getenv("STRIPE_GRACE_PERIOD_DAYS", "7"))
