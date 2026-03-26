@@ -250,8 +250,8 @@ export default function DashboardPage() {
                               </span>
                             )}
                           </div>
-                          {/* Video generate button on hover — only for approved packages without video */}
-                          {pkg.approval_status === "approved" && !pkg.video_status && (
+                          {/* Video generate button on hover */}
+                          {!pkg.video_status && (
                             <div className="absolute bottom-2 right-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                               <Button
                                 size="sm"
@@ -260,7 +260,11 @@ export default function DashboardPage() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setVideoTarget(pkg);
-                                  setVideoError(null);
+                                  if (pkg.approval_status !== "approved") {
+                                    setVideoError("Aprove o conteudo antes de gerar video");
+                                  } else {
+                                    setVideoError(null);
+                                  }
                                   setVideoSuccess(false);
                                   setVideoDuration(10);
                                 }}
