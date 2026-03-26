@@ -114,12 +114,12 @@ Plans:
   3. Stripe webhooks correctly handle subscription lifecycle events (create, renew, update, cancel) and the app reflects changes within seconds
   4. User can manage billing (update card, change plan, cancel subscription) via Stripe Customer Portal without leaving the flow
   5. Failed payments trigger a grace period and eventual automatic downgrade to Free tier
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 17-01: TBD
-- [ ] 17-02: TBD
+- [x] 17-01-PLAN.md -- Backend: DB migration (subscriptions table + user billing columns), Stripe service, billing API routes, plan-aware quota enforcement
+- [ ] 17-02-PLAN.md -- Frontend: billing page, plan selector, checkout redirect, subscription management UI
 
 ## Progress
 
@@ -133,7 +133,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
-| 17. Billing & Stripe | 0/? | Not started | - |
+| 17. Billing & Stripe | 1/2 | In Progress | - |
 
 ## Backlog
 
