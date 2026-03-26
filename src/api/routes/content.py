@@ -108,30 +108,42 @@ def _build_metadata(pkg, image_found: bool) -> dict:
     return meta
 
 
+def _resolve_watermark(pkg) -> str:
+    """Resolve watermark text from character or global config."""
+    if pkg.character and getattr(pkg.character, "watermark", None):
+        return pkg.character.watermark
+    from config import WATERMARK_TEXT
+    return WATERMARK_TEXT
+
+
 def _add_package_to_zip(zf: zipfile.ZipFile, pkg, prefix: str = "") -> dict:
     """Adiciona arquivos de um package ao ZIP. Retorna metadados.
 
+    Watermark e aplicada dinamicamente no export — imagens originais ficam sem watermark.
     Suporta carousel: se pkg.carousel_slides tiver multiplos paths,
     exporta como slide_01.png, slide_02.png, etc.
     """
+    from src.image_maker import stamp_watermark
+
     carousel_slides = getattr(pkg, "carousel_slides", None) or []
     is_carousel = bool(carousel_slides) and len(carousel_slides) > 1
     image_found = False
+    wm_text = _resolve_watermark(pkg)
 
     if is_carousel:
-        # Carousel: slides numerados
+        # Carousel: slides numerados com watermark
         for i, slide_path in enumerate(carousel_slides, 1):
             sp = Path(slide_path)
             if sp.exists():
                 image_found = True
-                zf.write(str(sp), f"{prefix}slide_{i:02d}.png")
+                zf.writestr(f"{prefix}slide_{i:02d}.png", stamp_watermark(str(sp), wm_text))
     else:
-        # Imagem unica
+        # Imagem unica com watermark
         if pkg.image_path:
             img_path = Path(pkg.image_path)
             if img_path.exists():
                 image_found = True
-                zf.write(str(img_path), f"{prefix}image.png")
+                zf.writestr(f"{prefix}image.png", stamp_watermark(str(img_path), wm_text))
 
     # Caption
     caption_text = pkg.caption or ""

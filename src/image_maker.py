@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 import unicodedata
@@ -288,18 +289,19 @@ def create_image(
 
         y += line_heights[i] + line_spacing
 
-    # Watermark — muda de lado no layout split_top
-    wm_bbox = watermark_font.getbbox(wm)
-    wm_width = wm_bbox[2] - wm_bbox[0]
-    if layout_name == "split_top":
-        wm_x = 20  # Canto inferior esquerdo
-    else:
-        wm_x = IMAGE_WIDTH - wm_width - 20  # Canto inferior direito
-    wm_y = IMAGE_HEIGHT - 50
-    draw.text(
-        (wm_x, wm_y), wm, font=watermark_font,
-        fill=WATERMARK_COLOR,
-    )
+    # Watermark — so aplica se wm nao for vazio (exportacao aplica separadamente)
+    if wm:
+        wm_bbox = watermark_font.getbbox(wm)
+        wm_width = wm_bbox[2] - wm_bbox[0]
+        if layout_name == "split_top":
+            wm_x = 20  # Canto inferior esquerdo
+        else:
+            wm_x = IMAGE_WIDTH - wm_width - 20  # Canto inferior direito
+        wm_y = IMAGE_HEIGHT - 50
+        draw.text(
+            (wm_x, wm_y), wm, font=watermark_font,
+            fill=WATERMARK_COLOR,
+        )
 
     # Converter para RGB e salvar
     final = bg.convert("RGB")
@@ -313,6 +315,31 @@ def create_image(
 
     final.save(output_path, quality=95)
     return output_path
+
+
+def stamp_watermark(image_path: str, watermark_text: str | None = None) -> bytes:
+    """Aplica watermark numa imagem e retorna os bytes PNG.
+
+    Usado pelo export para aplicar watermark dinamicamente sem alterar o original.
+    """
+    wm = watermark_text if watermark_text is not None else WATERMARK_TEXT
+    if not wm:
+        with open(image_path, "rb") as f:
+            return f.read()
+
+    img = Image.open(image_path).convert("RGBA")
+    draw = ImageDraw.Draw(img)
+    font = _load_font(WATERMARK_FONT_SIZE)
+
+    wm_bbox = font.getbbox(wm)
+    wm_width = wm_bbox[2] - wm_bbox[0]
+    wm_x = img.width - wm_width - 20
+    wm_y = img.height - 50
+    draw.text((wm_x, wm_y), wm, font=font, fill=WATERMARK_COLOR)
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", quality=95)
+    return buf.getvalue()
 
 
 def create_placeholder_background(output_path: str) -> str:
