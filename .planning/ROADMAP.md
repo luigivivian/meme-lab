@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 13: Tenant Isolation** - Per-user data scoping across all resources with admin bypass (completed 2026-03-25)
 - [x] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, GCS CDN image upload, token lifecycle management (completed 2026-03-26)
 - [x] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts (completed 2026-03-26)
-- [ ] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history
+- [x] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history (completed 2026-03-26)
 - [ ] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement
 
 ## Phase Details
@@ -121,8 +121,8 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 16-01-PLAN.md — Backend: dashboard route module (4 endpoints) + usage_repo aggregate methods
-- [ ] 16-02-PLAN.md — Frontend: recharts charts, quota alerts, enhanced dashboard page
+- [x] 16-01-PLAN.md — Backend: dashboard route module (4 endpoints) + usage_repo aggregate methods
+- [x] 16-02-PLAN.md — Frontend: recharts charts, quota alerts, enhanced dashboard page
 
 ### Phase 17: Billing & Stripe
 **Goal**: Users can subscribe to plans, have limits enforced, and manage their billing entirely through Stripe integration
@@ -153,7 +153,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
 | 14. Instagram Connection & CDN | 1/3 | Complete    | 2026-03-26 |
 | 15. Publishing & Scheduling | 1/2 | Complete    | 2026-03-26 |
-| 16. Dashboard v2 | 0/2 | Not started | - |
+| 16. Dashboard v2 | 2/2 | Complete   | 2026-03-26 |
 | 17. Billing & Stripe | 0/? | Not started | - |
 
 ## Backlog

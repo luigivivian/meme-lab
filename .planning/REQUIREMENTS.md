@@ -52,10 +52,10 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 
 ### Dashboard v2
 
-- [ ] **DASH-01**: User can view 30-day usage history chart
-- [ ] **DASH-02**: User sees limit alerts at 80% and 95% of plan quota
-- [ ] **DASH-03**: User can view estimated cost report by service/tier
-- [ ] **DASH-04**: User can view pipeline run history with status
+- [x] **DASH-01**: User can view 30-day usage history chart
+- [x] **DASH-02**: User sees limit alerts at 80% and 95% of plan quota
+- [x] **DASH-03**: User can view estimated cost report by service/tier
+- [x] **DASH-04**: User can view pipeline run history with status
 
 ### Billing (Stripe)
 
@@ -159,10 +159,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PUB-04 | Phase 15 | Complete |
 | PUB-05 | Phase 15 | Complete |
 | PUB-06 | Phase 15 | Complete |
-| DASH-01 | Phase 16 | Pending |
-| DASH-02 | Phase 16 | Pending |
-| DASH-03 | Phase 16 | Pending |
-| DASH-04 | Phase 16 | Pending |
+| DASH-01 | Phase 16 | Complete |
+| DASH-02 | Phase 16 | Complete |
+| DASH-03 | Phase 16 | Complete |
+| DASH-04 | Phase 16 | Complete |
 | BILL-01 | Phase 17 | Pending |
 | BILL-02 | Phase 17 | Pending |
 | BILL-03 | Phase 17 | Pending |
