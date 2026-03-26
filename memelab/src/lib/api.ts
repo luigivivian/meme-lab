@@ -1138,6 +1138,7 @@ export interface VideoListItem {
   video_metadata: Record<string, unknown> | null;
   video_prompt_used: string | null;
   created_at: string | null;
+  is_published: boolean;
 }
 
 export interface VideoListResponse {
@@ -1154,6 +1155,12 @@ export const getVideoList = (status?: string) => {
 
 export const videoFileUrl = (contentPackageId: number) =>
   `${BASE}/generate/video/file/${contentPackageId}`;
+
+export const deleteVideo = (contentPackageId: number) =>
+  request<{ deleted: boolean; content_package_id: number }>(
+    `/generate/video/${contentPackageId}`,
+    { method: "DELETE" }
+  );
 
 export const generateVideo = (params: VideoGenerateRequest) =>
   request<VideoStatusResponse>("/generate/video", {

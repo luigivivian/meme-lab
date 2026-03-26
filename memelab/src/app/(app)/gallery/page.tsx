@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown, Download, Play, XCircle } from "lucide-react";
+import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown, Download, Play, XCircle, Trash2, Send } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { SOURCE_COLORS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
   generateSingle,
   refineImage,
   generateVideo,
+  deleteVideo,
   imageDownloadUrl,
   videoFileUrl,
   approveContent,
@@ -92,7 +93,7 @@ export default function GalleryPage() {
 
   // Content packages + video generation
   const { data: contentData, mutate: mutateContent } = useContentPackages(50);
-  const { data: videoListData } = useVideoList();
+  const { data: videoListData, mutate: mutateVideoList } = useVideoList();
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
   const [videoDuration, setVideoDuration] = useState<10 | 15>(10);
   const [videoPrompt, setVideoPrompt] = useState("");
@@ -838,12 +839,25 @@ export default function GalleryPage() {
                           </div>
                         </a>
                       </div>
-                      <div className="absolute top-2 right-2">
+                      <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
                         <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/80 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
                           <Video className="h-2.5 w-2.5" />
                           {duration ?? 10}s
                         </span>
+                        {v.is_published && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/80 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                            <Send className="h-2.5 w-2.5" />
+                            Publicado
+                          </span>
+                        )}
                       </div>
+                      {!v.is_published && (
+                        <div className="absolute top-2 left-2">
+                          <span className="inline-flex items-center rounded-full bg-amber-500/80 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                            Nao publicado
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="p-2.5 space-y-1.5">
                       <p className="line-clamp-2 text-xs leading-snug">{v.phrase}</p>
@@ -852,11 +866,28 @@ export default function GalleryPage() {
                         {cost != null && <span>${cost.toFixed(3)}</span>}
                         {genTime != null && <span>{(genTime / 1000).toFixed(0)}s</span>}
                       </div>
-                      <a href={videoFileUrl(v.content_package_id)} download>
-                        <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1">
-                          <Download className="h-3 w-3" /> Baixar video
+                      <div className="flex gap-1.5">
+                        <a href={videoFileUrl(v.content_package_id)} download className="flex-1">
+                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1">
+                            <Download className="h-3 w-3" /> Baixar
+                          </Button>
+                        </a>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1 text-rose-400 border-rose-500/20 hover:bg-rose-500/10"
+                          onClick={async () => {
+                            if (!confirm("Excluir este video?")) return;
+                            try {
+                              await deleteVideo(v.content_package_id);
+                              mutateVideoList();
+                              mutateContent();
+                            } catch {}
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </Button>
-                      </a>
+                      </div>
                     </div>
                   </motion.div>
                 );

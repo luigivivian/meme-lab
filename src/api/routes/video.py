@@ -481,6 +481,7 @@ async def list_videos(
                 "video_metadata": pkg.video_metadata,
                 "video_prompt_used": pkg.video_prompt_used,
                 "created_at": pkg.created_at.isoformat() if pkg.created_at else None,
+                "is_published": pkg.is_published,
             }
             for pkg in packages
         ],
@@ -511,6 +512,42 @@ async def serve_video_file(
         media_type="video/mp4",
         filename=f"memelab_video_{content_package_id}.mp4",
     )
+
+
+@router.delete("/{content_package_id}", summary="Delete generated video from a content package")
+async def delete_video(
+    content_package_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Delete a generated video, clearing video fields on the content package."""
+    result = await session.execute(
+        select(ContentPackage).where(ContentPackage.id == content_package_id)
+    )
+    pkg = result.scalar_one_or_none()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Content package not found")
+
+    if not pkg.video_status:
+        raise HTTPException(status_code=400, detail="No video to delete")
+
+    # Delete file from disk
+    if pkg.video_path:
+        video_file = Path(pkg.video_path)
+        if video_file.exists():
+            video_file.unlink()
+            logger.info("Deleted video file: %s", video_file)
+
+    # Clear video fields
+    pkg.video_status = None
+    pkg.video_path = None
+    pkg.video_task_id = None
+    pkg.video_metadata = None
+    pkg.video_source = None
+    pkg.video_prompt_used = None
+    await session.commit()
+
+    return {"deleted": True, "content_package_id": content_package_id}
 
 
 @router.post("/enhance-prompt", summary="Enhance user animation description into Sora 2 prompt")

@@ -17,72 +17,90 @@ logger = logging.getLogger("clip-flow.video_prompt_builder")
 
 MOTION_TEMPLATES: dict[str, str] = {
     "sabedoria": (
-        "wizard slowly strokes his beard thoughtfully, staff crystal pulses "
-        "with faint blue glow, subtle magical particles drift upward"
+        "The wizard slowly strokes his long beard with one hand, head nodding gently. "
+        "His other hand grips the staff as the crystal tip pulses with blue glow. "
+        "Robes sway with his breathing, magical particles drift upward around him."
     ),
     "confusao": (
-        "wizard tilts his head back and forth in confusion, magical question "
-        "marks float and pop around him, hat wobbles slightly"
+        "The wizard tilts his head side to side in confusion, eyebrows furrowing. "
+        "He shifts his weight between feet, one hand scratches under his hat. "
+        "His staff wobbles slightly in his grip, small sparkles pop around his head."
     ),
     "segunda_feira": (
-        "wizard drowsily sips from coffee goblet, steam rises with golden "
-        "sparkles, eyes droop then snap open, slight head nod"
+        "The wizard raises a coffee goblet to his lips with both hands, sipping slowly. "
+        "His eyes droop heavily then snap open with a blink. His shoulders slump, "
+        "chest rises with a deep sigh. Steam curls from the mug with golden sparkles."
     ),
     "vitoria": (
-        "wizard raises staff triumphantly overhead, golden magical particles "
-        "erupt from staff tip, robes billow with celebration energy"
+        "The wizard thrusts his staff upward triumphantly, arm fully extended. "
+        "His body leans back with the motion, robes billow outward. "
+        "He pumps his fist, beard swaying with the celebration. Golden particles erupt."
     ),
     "tecnologia": (
-        "wizard pokes at a glowing crystal device with curiosity, digital "
-        "runes flicker around it, hat tilts as he leans in"
+        "The wizard leans forward curiously, poking at a glowing crystal with one finger. "
+        "His head tilts, eyes widen, then he pulls back startled. "
+        "His hat shifts as he scratches his head in bewilderment. Digital runes flicker."
     ),
     "cafe": (
-        "wizard holds ornate mug with both hands, steam curls upward with "
-        "magical sparkles, content smile deepens, gentle breathing motion"
+        "The wizard cradles an ornate mug with both hands, bringing it close to inhale the steam. "
+        "He takes a long sip, eyes closing contentedly. His chest expands with a satisfied breath, "
+        "shoulders relaxing down. Magical sparkles rise from the mug."
     ),
     "comida": (
-        "wizard stirs bubbling cauldron, colorful potion vapors rise and "
-        "swirl, floating ingredients orbit lazily, focused expression"
+        "The wizard stirs a bubbling cauldron with a large ladle, leaning in to smell. "
+        "He tastes from the ladle, eyes rolling with delight. His free hand gestures approvingly, "
+        "beard swinging with his animated movements. Colorful vapors swirl."
     ),
     "trabalho": (
-        "wizard writes on parchment at desk, quill moves with magical trail, "
-        "ink transforms into tiny floating runes, focused gaze"
+        "The wizard hunches over parchment, quill moving rapidly in his hand. "
+        "He pauses, looks up thinking, then returns to writing with intensity. "
+        "His other hand taps the desk impatiently. Ink trails transform into floating runes."
     ),
     "relaxando": (
-        "wizard dozes in chair, hat tips over eyes, chest rises and falls "
-        "with slow breathing, staff leans and glows faintly"
+        "The wizard reclines in a chair, arms crossed over his chest. His hat slowly tips "
+        "over his eyes. His chest rises and falls with deep, slow breaths. "
+        "One hand dangles limply, fingers twitching. Staff leans nearby, glowing faintly."
     ),
     "meditando": (
-        "wizard sits in deep meditation, ethereal blue-gold aura pulses "
-        "outward in waves, staff hovers gently, serene stillness"
+        "The wizard sits cross-legged, hands resting on knees, palms up. "
+        "His chest rises slowly with deep breathing, robes settling with each exhale. "
+        "His head tilts slightly upward, a serene expression. Blue-gold aura pulses outward."
     ),
     "relacionamento": (
-        "wizard holds glowing heart-shaped crystal, soft pink and blue "
-        "magical aura shifts and flows between hands, gentle knowing expression"
+        "The wizard holds a glowing heart crystal between both hands, turning it gently. "
+        "He looks at it with a knowing smile, then glances up warmly. "
+        "His shoulders shift as he brings the crystal closer to his chest. Pink aura flows."
     ),
     "confronto": (
-        "wizard plants staff firmly, golden energy bursts from tip, robes "
-        "whip in dramatic wind, stern determined gaze forward"
+        "The wizard plants his staff firmly on the ground, both hands gripping tight. "
+        "He steps forward with one foot, robes whipping in dramatic wind. "
+        "His jaw clenches, eyes narrow with determination. Golden energy crackles from the staff tip."
     ),
     "surpresa": (
-        "wizard jolts with wide eyes, hat blows back slightly, hands raise "
-        "in shock, exclamation-shaped sparkles pop around head"
+        "The wizard jolts backward, eyes going wide, hat flying up from his head briefly. "
+        "Both hands shoot up in shock, fingers splayed. He stumbles back half a step, "
+        "then catches himself on his staff. Sparkles burst around him."
     ),
     "internet": (
-        "wizard gazes into glowing crystal ball with shifting expressions, "
-        "blue light reflects on face, occasional surprised reaction"
+        "The wizard peers into a glowing crystal ball, leaning in close. "
+        "His expression shifts from curiosity to surprise to amusement rapidly. "
+        "One hand waves dismissively, the other adjusts his hat. Blue light dances on his face."
     ),
     "generico": (
-        "wizard stands with staff, subtle magical glow from crystal tip "
-        "pulses rhythmically, robes sway gently in ambient breeze"
+        "The wizard shifts his weight, adjusting his grip on the staff. "
+        "He looks around slowly, beard swaying with the head turn. "
+        "His chest rises with a calm breath, robes flowing gently. "
+        "The crystal tip pulses with rhythmic magical glow, particles drift."
     ),
     "cotidiano": (
-        "wizard leans on staff casually, takes a relaxed sip from ale mug, "
-        "faint sparkles drift lazily around him, easy-going posture"
+        "The wizard leans casually on his staff, crossing one ankle over the other. "
+        "He raises an ale mug for a relaxed sip, then wipes his beard with his sleeve. "
+        "His body sways slightly, easy posture. Faint sparkles drift around."
     ),
     "descanso": (
-        "wizard peacefully sleeps in wooden chair, hat droops forward, "
-        "chest rises and falls slowly, soft blue particles float around"
+        "The wizard sleeps in a wooden chair, head nodding forward and catching himself. "
+        "His chest rises and falls with slow breaths, hat drooping over his eyes. "
+        "One hand twitches in his lap. Soft blue particles float around peacefully."
     ),
 }
 
@@ -91,32 +109,35 @@ MOTION_TEMPLATES: dict[str, str] = {
 
 _SYSTEM_PROMPT = (
     "You generate SHORT motion/animation prompts for Sora 2 image-to-video AI. "
-    "You receive an image of a wizard character meme and must describe ONLY the animation/motion.\n\n"
+    "You receive an image of a cartoon wizard character and must describe the animation.\n\n"
     "CRITICAL RULES:\n"
-    "- Output ONLY the motion prompt (1-3 sentences, max 200 chars)\n"
-    "- ANIMATION ONLY: subtle character movement, ambient effects, camera motion\n"
-    "- PRESERVE the original scene: same background, same lighting, same colors, same environment\n"
-    "- NO speech, NO dialogue, NO mouth movement, NO text, NO words\n"
-    "- NO scene changes, NO transitions, NO new elements, NO lighting changes\n"
-    "- Camera: prefer static or very slow push-in. NO fast zooms, NO pans, NO rotations\n"
-    "- Movement must be SUBTLE: gentle sway, particle drift, hair/cloth flow, breathing\n"
-    "- Keep the cartoon cel-shading art style of the original image\n"
+    "- Output ONLY the motion prompt (2-4 sentences, max 300 chars)\n"
+    "- CHARACTER MUST MOVE: describe specific body movements — head turning, arms gesturing, "
+    "hands gripping staff tighter, shoulders shifting, beard swaying, eyes blinking or looking around, "
+    "chest rising with breath, weight shifting between feet, robes flowing with body motion\n"
+    "- CHARACTER is the PRIMARY subject of animation — background is secondary\n"
+    "- Background: add ambient motion (particles, wind, light shifts) but keep the SAME scene\n"
+    "- Camera: static or very slow push-in. NO fast zooms, NO cuts\n"
+    "- NO speech, NO dialogue, NO lip movement, NO text, NO words appearing\n"
+    "- NO scene changes, NO new objects, NO dramatic lighting changes\n"
+    "- Keep the cartoon cel-shading art style\n"
     "- Portrait 4:5 aspect ratio\n"
-    "- NEVER describe the character appearance (it's already in the image)\n"
-    "- Think of it as a LIVING PHOTO — the scene comes alive with minimal, elegant motion"
+    "- NEVER describe character appearance (already in the image)\n"
+    "- Think: the character COMES ALIVE — natural idle animation like a video game character waiting"
 )
 
 _ENHANCE_PROMPT = (
     "You are a prompt engineer for Sora 2 image-to-video AI. "
-    "The user provided a brief animation description. Enhance it into an optimal Sora 2 prompt.\n\n"
+    "The user described how they want a cartoon wizard character animated. Enhance it.\n\n"
     "RULES:\n"
     "- Keep the user's INTENT but make it technically precise for Sora 2\n"
-    "- Output 1-3 sentences, max 200 chars\n"
-    "- Add: camera instruction (static or slow push-in), ambient particle effects\n"
-    "- PRESERVE: original background, lighting, colors, environment — NO changes\n"
-    "- NO speech, NO dialogue, NO mouth movement, NO text\n"
-    "- Movement must be SUBTLE and elegant\n"
-    "- Keep cartoon cel-shading art style\n"
+    "- Output 2-4 sentences, max 300 chars\n"
+    "- CHARACTER MUST BE THE FOCUS of animation — body, arms, head, expressions\n"
+    "- Add specific body mechanics: breathing, weight shift, gesture follow-through\n"
+    "- Add ambient effects: particles, cloth physics, hair/beard sway\n"
+    "- Camera: static or slow push-in\n"
+    "- PRESERVE: original background, scene, art style — NO changes\n"
+    "- NO speech, NO lip movement, NO text\n"
     "- Output ONLY the enhanced prompt, nothing else"
 )
 
