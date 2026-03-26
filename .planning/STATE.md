@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to plan
-stopped_at: Completed 999.1-03-PLAN.md
-last_updated: "2026-03-26T06:01:25.165Z"
+status: Ready to execute
+stopped_at: Completed 12.1-02-PLAN.md
+last_updated: "2026-03-26T17:21:23.978Z"
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 2
-  total_plans: 9
-  completed_plans: 8
+  total_plans: 13
+  completed_plans: 10
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 999.1 — video-generation-kie-sora2
+**Current focus:** Phase 12.1 — viral-content-engine-trend-agents-content-quality-overhaul
 
 ## Current Position
 
-Phase: 999.2
-Plan: Not started
+Phase: 12.1 (viral-content-engine-trend-agents-content-quality-overhaul) — EXECUTING
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -54,6 +54,8 @@ Plan: Not started
 | Phase 999.1 P01 | 2min | 2 tasks | 6 files |
 | Phase 999.1 P02 | 3min | 2 tasks | 3 files |
 | Phase 999.1 P03 | 3min | 2 tasks | 4 files |
+| Phase 12.1 P02 | 3min | 2 tasks | 3 files |
+| Phase 12.1 P01 | 2min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -85,6 +87,10 @@ Recent decisions affecting current work:
 - [Phase 999.1]: 17 motion templates for full theme coverage (15 core + cotidiano + descanso)
 - [Phase 999.1]: Background video task uses get_session_factory() for independent DB sessions (request session unavailable in BackgroundTasks)
 - [Phase 999.1]: Budget enforcement: pre-check estimated cost before generation, track actual cost after completion via kie_video service
+- [Phase 12.1]: Delete HN/Lemmy agents entirely rather than disable — dead code removal
+- [Phase 12.1]: Agents own their curated data sources (DEFAULT_SUBREDDITS/DEFAULT_FEEDS) instead of config.py overrides
+- [Phase 12.1]: Regex-based traffic parsing with K/M/B suffix support replaces brittle char-by-char iteration
+- [Phase 12.1]: Exponential decay e^(-age/24) for temporal freshness; multi-source boost min(1+0.2*(n-1), 2.0)
 
 ### Pending Todos
 
@@ -98,6 +104,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T05:56:19.479Z
-Stopped at: Completed 999.1-03-PLAN.md
+Last session: 2026-03-26T17:21:23.975Z
+Stopped at: Completed 12.1-02-PLAN.md
 Resume file: None

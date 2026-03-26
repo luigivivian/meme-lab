@@ -23,13 +23,13 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 
 ### Viral Content Engine (Phase 12.1 — INSERTED)
 
-- [ ] **VIRAL-01**: HackerNewsAgent removed from pipeline (irrelevant for BR meme content)
-- [ ] **VIRAL-02**: LemmyCommunitiesAgent removed from pipeline (low-volume, duplicates Reddit)
-- [ ] **VIRAL-03**: RSSFeedAgent simplified to Sensacionalista + cannabis feeds only (no Reddit RSS overlap)
-- [ ] **VIRAL-04**: RedditMemesAgent uses BR-first scoring (BR subs 0.6 base, English subs 0.3 base)
-- [ ] **VIRAL-05**: YouTubeRSSAgent expanded with 5+ major Brazilian comedy/entertainment channels
-- [ ] **VIRAL-06**: GeminiWebTrendsAgent requests 25 topics per fetch for broader coverage
-- [ ] **VIRAL-07**: BlueSkyAgent uses specific BR humor keywords instead of generic terms
+- [x] **VIRAL-01**: HackerNewsAgent removed from pipeline (irrelevant for BR meme content)
+- [x] **VIRAL-02**: LemmyCommunitiesAgent removed from pipeline (low-volume, duplicates Reddit)
+- [x] **VIRAL-03**: RSSFeedAgent simplified to Sensacionalista + cannabis feeds only (no Reddit RSS overlap)
+- [x] **VIRAL-04**: RedditMemesAgent uses BR-first scoring (BR subs 0.6 base, English subs 0.3 base)
+- [x] **VIRAL-05**: YouTubeRSSAgent expanded with 5+ major Brazilian comedy/entertainment channels
+- [x] **VIRAL-06**: GeminiWebTrendsAgent requests 25 topics per fetch for broader coverage
+- [x] **VIRAL-07**: BlueSkyAgent uses specific BR humor keywords instead of generic terms
 - [ ] **VIRAL-08**: Google Trends traffic parsing uses regex with K/M/B suffix support
 - [ ] **VIRAL-09**: Trend scores apply temporal velocity decay (e^(-age_hours/24))
 - [ ] **VIRAL-10**: TrendAggregator applies multi-source boost (1 + 0.2*(sources-1), capped at 2.0x)
@@ -136,13 +136,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TENANT-02 | Phase 13 | Complete |
 | TENANT-03 | Phase 13 | Complete |
 | TENANT-04 | Phase 13 | Complete |
-| VIRAL-01 | Phase 12.1 | Pending |
-| VIRAL-02 | Phase 12.1 | Pending |
-| VIRAL-03 | Phase 12.1 | Pending |
-| VIRAL-04 | Phase 12.1 | Pending |
-| VIRAL-05 | Phase 12.1 | Pending |
-| VIRAL-06 | Phase 12.1 | Pending |
-| VIRAL-07 | Phase 12.1 | Pending |
+| VIRAL-01 | Phase 12.1 | Complete |
+| VIRAL-02 | Phase 12.1 | Complete |
+| VIRAL-03 | Phase 12.1 | Complete |
+| VIRAL-04 | Phase 12.1 | Complete |
+| VIRAL-05 | Phase 12.1 | Complete |
+| VIRAL-06 | Phase 12.1 | Complete |
+| VIRAL-07 | Phase 12.1 | Complete |
 | VIRAL-08 | Phase 12.1 | Pending |
 | VIRAL-09 | Phase 12.1 | Pending |
 | VIRAL-10 | Phase 12.1 | Pending |

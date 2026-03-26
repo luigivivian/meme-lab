@@ -55,8 +55,8 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 12.1-01-PLAN.md — Agent cleanup: remove HN/Lemmy, simplify RSS, improve Reddit/YouTube/Gemini/BlueSky agents
-- [ ] 12.1-02-PLAN.md — Scoring engine: fix Google Trends parsing, temporal decay, multi-source boost, engagement scoring
+- [x] 12.1-01-PLAN.md — Agent cleanup: remove HN/Lemmy, simplify RSS, improve Reddit/YouTube/Gemini/BlueSky agents
+- [x] 12.1-02-PLAN.md — Scoring engine: fix Google Trends parsing, temporal decay, multi-source boost, engagement scoring
 - [ ] 12.1-03-PLAN.md — Curator intelligence: LLM theme mapping, relevance filter, throughput increase
 - [ ] 12.1-04-PLAN.md — Content guardrails: phrase validation, topic-image coherence check
 
@@ -148,7 +148,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 12. Pipeline Simplification | 2/3 | In Progress|  |
-| 12.1 Viral Content Engine | 0/4 | Not started | - |
+| 12.1 Viral Content Engine | 2/4 | In Progress|  |
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
@@ -176,7 +176,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 3/3 plans complete
+**Plans:** 2/4 plans executed
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
