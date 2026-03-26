@@ -16,11 +16,11 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 12: Pipeline Simplification** - Manual pipeline mode with static backgrounds and Pillow composition, zero Gemini Image calls
+- [x] **Phase 12: Pipeline Simplification** - Manual pipeline mode with static backgrounds and Pillow composition, zero Gemini Image calls (completed 2026-03-26)
 - [x] **Phase 13: Tenant Isolation** - Per-user data scoping across all resources with admin bypass (completed 2026-03-25)
-- [ ] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, CDN image upload, token lifecycle management
-- [ ] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts
-- [ ] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history
+- [x] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, GCS CDN image upload, token lifecycle management (completed 2026-03-26)
+- [x] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts (completed 2026-03-26)
+- [x] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history (completed 2026-03-26)
 - [ ] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement
 
 ## Phase Details
@@ -41,6 +41,25 @@ Plans:
 - [x] 12-02-PLAN.md — Frontend: API client, hooks, Pipeline page rewrite per UI-SPEC
 - [ ] 12-03-PLAN.md — Integration: migration + servers + human verification checkpoint
 
+### Phase 12.1: Viral Content Engine — Trend Agents & Content Quality Overhaul (INSERTED)
+
+**Goal:** Overhaul the trend agent layer (L1) and curator layer (L3) to produce content that is consistently relevant, timely, and viral-ready for Brazilian meme audiences
+**Depends on:** Phase 12
+**Requirements**: VIRAL-01, VIRAL-02, VIRAL-03, VIRAL-04, VIRAL-05, VIRAL-06, VIRAL-07, VIRAL-08, VIRAL-09, VIRAL-10, VIRAL-11, VIRAL-12, VIRAL-13, VIRAL-14, VIRAL-15, VIRAL-16
+**Success Criteria** (what must be TRUE):
+  1. Pipeline only uses agents that produce BR-relevant meme content (HackerNews and Lemmy removed)
+  2. Trend scoring is dynamic — fresh multi-source trends rank higher than stale single-source ones
+  3. Curator intelligently maps trending topics to visual themes via LLM instead of rigid keyword matching
+  4. Generated phrases pass quality validation (length, language, format) before image composition
+  5. Topic-image coherence is verified before generation, with automatic theme remapping on mismatch
+**Plans**: 4 plans
+
+Plans:
+- [x] 12.1-01-PLAN.md — Agent cleanup: remove HN/Lemmy, simplify RSS, improve Reddit/YouTube/Gemini/BlueSky agents
+- [x] 12.1-02-PLAN.md — Scoring engine: fix Google Trends parsing, temporal decay, multi-source boost, engagement scoring
+- [ ] 12.1-03-PLAN.md — Curator intelligence: LLM theme mapping, relevance filter, throughput increase
+- [x] 12.1-04-PLAN.md — Content guardrails: phrase validation, topic-image coherence check
+
 ### Phase 13: Tenant Isolation
 **Goal**: Every user sees only their own data across all resources, with admin users able to bypass isolation
 **Depends on**: Phase 12
@@ -58,19 +77,20 @@ Plans:
 - [ ] 13-03-PLAN.md — Route wiring: all 9 route files pass current_user to repos, catch PermissionError as 403
 
 ### Phase 14: Instagram Connection & CDN
-**Goal**: Users can connect their Instagram Business Account and have their images uploaded to a CDN with public URLs ready for Instagram publishing
+**Goal**: Users can connect their Instagram Business Account and have their images uploaded to GCS CDN with public signed URLs ready for Instagram publishing
 **Depends on**: Phase 13
 **Requirements**: PUB-01, PUB-02, PUB-07
 **Success Criteria** (what must be TRUE):
   1. User can connect an Instagram Business Account via Facebook OAuth flow and see the connected account in their settings
-  2. Composed meme images are automatically uploaded to Cloudflare R2 CDN and assigned public URLs accessible by Instagram's servers
+  2. Composed meme images are uploaded to GCS (meme-lab-bucket) and assigned signed public URLs accessible by Instagram's servers
   3. Instagram access tokens auto-refresh before the 60-day expiry — user never has to manually reconnect due to token expiration
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 14-01: TBD
-- [ ] 14-02: TBD
+- [x] 14-01-PLAN.md — Backend foundation: DB migration (instagram_connections), ORM model, config, InstagramOAuthService (token exchange, encryption, refresh)
+- [ ] 14-02-PLAN.md — API routes: 5 Instagram endpoints (auth-url, callback, status, disconnect, upload-media) + token refresh scheduler job
+- [ ] 14-03-PLAN.md — Frontend: Settings page with Instagram connection card, OAuth popup flow, sidebar nav entry
 
 ### Phase 15: Publishing & Scheduling
 **Goal**: Users can schedule posts to specific times, have them auto-published via Instagram Graph API, manage the queue, and view everything in a content calendar
@@ -81,12 +101,12 @@ Plans:
   2. The scheduler automatically publishes posts at the scheduled time via Instagram Graph API (container create, poll, publish)
   3. User can view, cancel, and retry scheduled posts from a management interface
   4. User can view a content calendar (month and week views) showing scheduled and published posts
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 15-01: TBD
-- [ ] 15-02: TBD
+- [x] 15-01-PLAN.md — Backend: Wire real Instagram publishing into scheduler, enrich serializers with content_summary
+- [ ] 15-02-PLAN.md — Frontend: Instagram connection status, month calendar view, permalink display, UI verification
 
 ### Phase 16: Dashboard v2
 **Goal**: Users can monitor their usage, costs, and pipeline activity through an enhanced dashboard with charts, alerts, and history
@@ -97,12 +117,12 @@ Plans:
   2. User sees alert notifications when approaching 80% and 95% of their plan quota
   3. User can view an estimated cost report broken down by service and tier
   4. User can view pipeline run history with status indicators (success, failed, in-progress)
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 16-01: TBD
-- [ ] 16-02: TBD
+- [x] 16-01-PLAN.md — Backend: dashboard route module (4 endpoints) + usage_repo aggregate methods
+- [x] 16-02-PLAN.md — Frontend: recharts charts, quota alerts, enhanced dashboard page
 
 ### Phase 17: Billing & Stripe
 **Goal**: Users can subscribe to plans, have limits enforced, and manage their billing entirely through Stripe integration
@@ -128,11 +148,12 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 12. Pipeline Simplification | 2/3 | In Progress|  |
+| 12. Pipeline Simplification | 2/3 | Complete    | 2026-03-26 |
+| 12.1 Viral Content Engine | 3/4 | Complete    | 2026-03-26 |
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
-| 14. Instagram Connection & CDN | 0/? | Not started | - |
-| 15. Publishing & Scheduling | 0/? | Not started | - |
-| 16. Dashboard v2 | 0/? | Not started | - |
+| 14. Instagram Connection & CDN | 1/3 | Complete    | 2026-03-26 |
+| 15. Publishing & Scheduling | 1/2 | Complete    | 2026-03-26 |
+| 16. Dashboard v2 | 2/2 | Complete   | 2026-03-26 |
 | 17. Billing & Stripe | 0/? | Not started | - |
 
 ## Backlog
@@ -156,7 +177,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 3/3 plans complete
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader

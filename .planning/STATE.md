@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Ready to plan
-stopped_at: Completed 999.1-03-PLAN.md
-last_updated: "2026-03-26T06:01:25.165Z"
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-03-26T20:13:06.168Z"
 progress:
-  total_phases: 8
-  completed_phases: 2
-  total_plans: 9
-  completed_plans: 8
+  total_phases: 9
+  completed_phases: 7
+  total_plans: 20
+  completed_plans: 20
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 999.1 — video-generation-kie-sora2
+**Current focus:** Phase 15 — publishing-scheduling
 
 ## Current Position
 
-Phase: 999.2
+Phase: 999.1
 Plan: Not started
 
 ## Performance Metrics
@@ -54,6 +54,9 @@ Plan: Not started
 | Phase 999.1 P01 | 2min | 2 tasks | 6 files |
 | Phase 999.1 P02 | 3min | 2 tasks | 3 files |
 | Phase 999.1 P03 | 3min | 2 tasks | 4 files |
+| Phase 15 P01 | 4min | 2 tasks | 4 files |
+| Phase 15 P02 | 4min | 2 tasks | 3 files |
+| Phase 16 P02 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -81,6 +84,12 @@ Recent decisions affecting current work:
 - [Phase 999.1]: 17 motion templates for full theme coverage (15 core + cotidiano + descanso)
 - [Phase 999.1]: Background video task uses get_session_factory() for independent DB sessions (request session unavailable in BackgroundTasks)
 - [Phase 999.1]: Budget enforcement: pre-check estimated cost before generation, track actual cost after completion via kie_video service
+- [Phase 15]: InstagramStatus type includes token_expires_at for future expiry warnings
+- [Phase 15]: useInstagramStatus refreshes every 60s with errorRetryCount 1 (non-critical)
+- [Phase 15]: Month view uses colored dots (not full cards) for compact calendar cells
+- [Phase 15]: Schedule dialog hard-blocks submit when Instagram not connected
+- [Phase 16]: QuotaAlerts uses existing useUsage() data (no new endpoint/DB tables needed)
+- [Phase 16]: Charts placed below existing dashboard content, not replacing anything
 
 ### Pending Todos
 
@@ -94,6 +103,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T05:56:19.479Z
-Stopped at: Completed 999.1-03-PLAN.md
+Last session: 2026-03-26T20:13:06.165Z
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None
