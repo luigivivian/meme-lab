@@ -990,6 +990,17 @@ export const testCharacterCompose = (slug: string, topic = "segunda-feira", situ
     body: JSON.stringify({ topic, situacao }),
   });
 
+// --- Instagram Status ---
+export interface InstagramStatus {
+  connected: boolean;
+  ig_username?: string;
+  status?: string;
+  token_expires_at?: string;
+}
+
+export const getInstagramStatus = () =>
+  request<InstagramStatus>("/instagram/status");
+
 // --- Publishing / Scheduling ---
 export interface ScheduledPost {
   id: number;
