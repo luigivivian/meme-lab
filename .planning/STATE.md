@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Phase complete — ready for verification
+status: Ready to plan
 stopped_at: Completed 999.1-03-PLAN.md
-last_updated: "2026-03-26T05:56:19.482Z"
+last_updated: "2026-03-26T06:01:25.165Z"
 progress:
   total_phases: 8
   completed_phases: 2
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 
 ## Current Position
 
-Phase: 999.1 (video-generation-kie-sora2) — EXECUTING
-Plan: 3 of 3
+Phase: 999.2
+Plan: Not started
 
 ## Performance Metrics
 
