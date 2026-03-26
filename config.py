@@ -101,21 +101,17 @@ PIPELINE_PHRASES_PER_TOPIC = 1
 # Geo para Google Trends (BR = Brasil)
 PIPELINE_GOOGLE_TRENDS_GEO = "BR"
 
-# Subreddits para monitorar
+# Subreddits para monitorar (legacy — RedditMemesAgent uses own DEFAULT_SUBREDDITS)
 PIPELINE_REDDIT_SUBREDDITS = [
     "brasil",
     "eu_nvr",
     "DiretoDoZapZap",
     "memes",
     "dankmemes",
-    "meirl",
 ]
 
-# RSS feeds de humor
+# RSS feeds de humor (legacy — RSSFeedAgent uses own DEFAULT_FEEDS)
 PIPELINE_RSS_FEEDS = [
-    "https://www.reddit.com/r/brasil/hot/.rss",
-    "https://www.reddit.com/r/eu_nvr/hot/.rss",
-    "https://www.reddit.com/r/memes/hot/.rss",
     "https://www.sensacionalista.com.br/feed/",
 ]
 
@@ -249,7 +245,7 @@ YOUTUBE_RSS_MAX_PER_CATEGORY = 30
 GEMINI_TRENDS_MODEL = "gemini-2.5-flash"
 
 # Quantos topicos virais pedir ao Gemini por fetch
-GEMINI_TRENDS_MAX_TOPICS = 15
+GEMINI_TRENDS_MAX_TOPICS = 25
 
 # ===== BlueSky Trends Agent =====
 
@@ -264,15 +260,6 @@ BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD", "")
 # Max itens por feed curado de memes BR
 BRAZIL_VIRAL_RSS_MAX_PER_FEED = 10
 
-# ===== Lemmy Communities Agent =====
-
-# Max posts por comunidade Lemmy
-LEMMY_MAX_POSTS = 15
-
-# ===== HackerNews Agent =====
-
-# Max stories para buscar do HN top stories
-HACKERNEWS_MAX_STORIES = 20
 
 # ===== Dedup Cross-Run =====
 

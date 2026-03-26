@@ -22,16 +22,18 @@ logger = logging.getLogger("clip-flow.agent.bluesky")
 _PUBLIC_API = "https://public.api.bsky.app/xrpc"
 _SEARCH_POSTS = f"{_PUBLIC_API}/app.bsky.feed.searchPosts"
 
-# Keywords para buscar conteudo viral BR
+# Keywords para buscar conteudo viral BR — foco em humor brasileiro
 _KEYWORDS_BR = [
-    "meme viral",
-    "zoeira brasileira",
-    "humor brasileiro",
-    "engraçado demais",
-    "kkkkk",
-    "socorro mano",
-    "não aguento mais",
+    "humor br",
+    "zoeira",
     "piada do dia",
+    "memes brasileiros",
+    "tio do pave",
+    "meme viral brasil",
+    "humor brasileiro",
+    "zoeira brasileira",
+    "engraçado demais",
+    "kkkkk meme",
 ]
 
 _HEADERS = {

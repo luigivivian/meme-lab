@@ -7,9 +7,6 @@ DEFAULT_FEEDS = [
     # Cannabis BR — noticias, ciencia, legalizacao
     "https://www.smokebuddies.com.br/feed/",
     "https://maryjuana.com.br/feed/",
-    # Cultura/cotidiano BR
-    "https://www.reddit.com/r/desabafos/top/.rss?t=day",
-    "https://www.reddit.com/r/antitrampo/top/.rss?t=day",
 ]
 
 

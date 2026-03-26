@@ -36,6 +36,11 @@ _CHANNELS = [
     # Comedia/Humor
     ("UCEWHPFNilsT0IfQfutVzsag", "Porta dos Fundos", 0.75, "comedia"),
     ("UCKHhA5hN2UohhFDfNXB_cvQ", "Manual do Mundo",  0.68, "entretenimento"),
+    ("UC254GjMuz2eFYfMEyEH0ZTQ", "Felipe Neto",      0.75, "comedia"),
+    ("UC5Lkmon4P8bmjTOLeEZ3cqA", "Whindersson Nunes", 0.75, "comedia"),
+    ("UCZbgt7GZQHM__B7PyhBaABQ", "Casimiro",         0.78, "entretenimento"),
+    ("UCyMr-FAsKUba4ALoXCFDG5Q", "Gaules",            0.65, "gaming"),
+    ("UCyZ_tOP7NYpnIziIVXSaYYw", "Coreano Doido",    0.72, "comedia"),
     # Musica/Cultura
     ("UCffDXn7ycAzwL2LDlbyWOTw", "KondZilla",         0.65, "musica_viral"),
     ("UCWKtHaeXVzUscYGcm0hEunw", "BRKsEDU",           0.60, "gaming"),
