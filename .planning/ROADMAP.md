@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 12: Pipeline Simplification** - Manual pipeline mode with static backgrounds and Pillow composition, zero Gemini Image calls (completed 2026-03-26)
 - [x] **Phase 13: Tenant Isolation** - Per-user data scoping across all resources with admin bypass (completed 2026-03-25)
-- [x] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, GCS CDN image upload, token lifecycle management (completed 2026-03-26)
+- [x] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, GCS CDN image upload, token lifecycle management (completed 2026-03-26)
 - [ ] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts
 - [ ] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history
 - [ ] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement
@@ -101,12 +101,12 @@ Plans:
   2. The scheduler automatically publishes posts at the scheduled time via Instagram Graph API (container create, poll, publish)
   3. User can view, cancel, and retry scheduled posts from a management interface
   4. User can view a content calendar (month and week views) showing scheduled and published posts
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 15-01: TBD
-- [ ] 15-02: TBD
+- [ ] 15-01-PLAN.md — Backend: Wire real Instagram publishing into scheduler, enrich serializers with content_summary
+- [ ] 15-02-PLAN.md — Frontend: Instagram connection status, month calendar view, permalink display, UI verification
 
 ### Phase 16: Dashboard v2
 **Goal**: Users can monitor their usage, costs, and pipeline activity through an enhanced dashboard with charts, alerts, and history
@@ -152,7 +152,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 12.1 Viral Content Engine | 3/4 | Complete    | 2026-03-26 |
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
 | 14. Instagram Connection & CDN | 1/3 | Complete    | 2026-03-26 |
-| 15. Publishing & Scheduling | 0/? | Not started | - |
+| 15. Publishing & Scheduling | 0/2 | Not started | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
 | 17. Billing & Stripe | 0/? | Not started | - |
 
