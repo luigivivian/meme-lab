@@ -146,6 +146,9 @@ class Theme(TimestampMixin, Base):
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
+    # Video prompt improvement (Phase 999.1, per D-03)
+    video_prompt_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Owner (multi-tenant, per D-03)
     user_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
@@ -335,6 +338,14 @@ class ContentPackage(Base):
     phrase_alternatives: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
     carousel_slides: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
 
+    # Video generation (Phase 999.1)
+    video_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    video_source: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    video_prompt_used: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    video_task_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    video_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    video_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     # Approval workflow (Phase 12)
     approval_status: Mapped[str] = mapped_column(
         String(20), default="pending", server_default="pending", nullable=False
@@ -359,6 +370,7 @@ class ContentPackage(Base):
         Index("idx_pkg_quality_score", "quality_score"),
         Index("idx_pkg_created_at", "created_at"),
         Index("idx_pkg_is_published", "is_published"),
+        Index("idx_pkg_video_status", "video_status"),
     )
 
 
