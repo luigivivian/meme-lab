@@ -41,6 +41,27 @@ async def _process_due_posts_job():
             await session.rollback()
 
 
+async def _refresh_instagram_tokens():
+    """Check and refresh Instagram tokens expiring within 7 days (per D-05).
+
+    Runs every 12 hours via APScheduler. Uses independent session
+    (same pattern as _process_due_posts_job).
+    """
+    from src.database.session import get_session_factory
+    from src.services.instagram_oauth import InstagramOAuthService
+
+    try:
+        factory = get_session_factory()
+        async with factory() as session:
+            service = InstagramOAuthService(session)
+            refreshed = await service.refresh_expiring_tokens(days_before_expiry=7)
+            if refreshed > 0:
+                logger.info(f"Instagram tokens refreshed: {refreshed}")
+            await session.commit()
+    except Exception as e:
+        logger.error(f"Instagram token refresh failed: {e}")
+
+
 def get_scheduler() -> AsyncIOScheduler:
     """Retorna instancia singleton do scheduler."""
     global _scheduler
@@ -72,8 +93,19 @@ def start_scheduler(interval_seconds: int = 60) -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # Instagram token refresh — every 12 hours (per D-05)
+    scheduler.add_job(
+        _refresh_instagram_tokens,
+        trigger=IntervalTrigger(hours=12),
+        id="instagram_token_refresh",
+        name="Refresh Instagram tokens expiring within 7 days",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     scheduler.start()
     logger.info(f"Scheduler iniciado — intervalo: {interval_seconds}s")
+    logger.info("Instagram token refresh job scheduled (every 12h)")
     return scheduler
 
 

@@ -88,7 +88,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 14-01-PLAN.md — Backend foundation: DB migration (instagram_connections), ORM model, config, InstagramOAuthService (token exchange, encryption, refresh)
+- [x] 14-01-PLAN.md — Backend foundation: DB migration (instagram_connections), ORM model, config, InstagramOAuthService (token exchange, encryption, refresh)
 - [ ] 14-02-PLAN.md — API routes: 5 Instagram endpoints (auth-url, callback, status, disconnect, upload-media) + token refresh scheduler job
 - [ ] 14-03-PLAN.md — Frontend: Settings page with Instagram connection card, OAuth popup flow, sidebar nav entry
 
@@ -151,7 +151,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 12. Pipeline Simplification | 2/3 | Complete    | 2026-03-26 |
 | 12.1 Viral Content Engine | 3/4 | Complete    | 2026-03-26 |
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
-| 14. Instagram Connection & CDN | 0/3 | Not started | - |
+| 14. Instagram Connection & CDN | 1/3 | In Progress|  |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
 | 17. Billing & Stripe | 0/? | Not started | - |
@@ -177,7 +177,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 3/3 plans complete
+**Plans:** 1/3 plans executed
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader

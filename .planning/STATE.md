@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to plan
-stopped_at: Completed 12.1-04-PLAN.md
-last_updated: "2026-03-26T18:49:21.813Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-03-26T19:21:13.569Z"
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 16
+  completed_plans: 14
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 12.1 — viral-content-engine-trend-agents-content-quality-overhaul
+**Current focus:** Phase 14 — instagram-connection-cdn
 
 ## Current Position
 
-Phase: 999.2
-Plan: Not started
+Phase: 14 (instagram-connection-cdn) — EXECUTING
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -58,6 +58,9 @@ Plan: Not started
 | Phase 12.1 P02 | 3min | 2 tasks | 3 files |
 | Phase 12.1 P01 | 2min | 2 tasks | 9 files |
 | Phase 12.1 P03 | 4min | 2 tasks | 3 files |
+| Phase 14 P01 | 3min | 2 tasks | 4 files |
+| Phase 14 P03 | 3min | 3 tasks | 5 files |
+| Phase 14 P02 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -108,6 +111,12 @@ Recent decisions affecting current work:
 
 >>>>>>> Stashed changes
 
+- [Phase 14]: Fernet symmetric encryption for Instagram OAuth tokens at rest (cryptography.fernet)
+- [Phase 14]: Ephemeral Fernet key fallback with warning when INSTAGRAM_TOKEN_ENCRYPTION_KEY not set
+- [Phase 14]: OAuth popup flow with postMessage relay for seamless UX (no full-page redirect)
+- [Phase 14]: Ownership verification via character.user_id chain for upload-media endpoint
+- [Phase 14]: GCS bucket meme-lab-bucket for Instagram media (per D-01), token refresh every 12h with misfire grace
+
 ### Pending Todos
 
 None.
@@ -121,8 +130,8 @@ None.
 ## Session Continuity
 
 <<<<<<< Updated upstream
-Last session: 2026-03-26T17:28:06Z
-Stopped at: Completed 12.1-04-PLAN.md
+Last session: 2026-03-26T19:21:13.565Z
+Stopped at: Completed 14-02-PLAN.md
 =======
 Last session: 2026-03-26T17:28:10.874Z
 Stopped at: Completed 12.1-03-PLAN.md

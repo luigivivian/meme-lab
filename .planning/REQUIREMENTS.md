@@ -42,13 +42,13 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 
 ### Instagram Auto-Publishing
 
-- [ ] **PUB-01**: User can connect Instagram Business Account and store credentials securely
-- [ ] **PUB-02**: Images are uploaded to CDN (Cloudflare R2) with public URLs for Instagram API
+- [x] **PUB-01**: User can connect Instagram Business Account and store credentials securely
+- [x] **PUB-02**: Images are uploaded to CDN (Cloudflare R2) with public URLs for Instagram API
 - [ ] **PUB-03**: User can schedule a post for a specific date/time
 - [ ] **PUB-04**: Scheduler automatically publishes posts at scheduled time via Instagram Graph API
 - [ ] **PUB-05**: User can view, cancel, and retry scheduled posts
 - [ ] **PUB-06**: User can view a content calendar (month/week views) of scheduled and published posts
-- [ ] **PUB-07**: Instagram tokens auto-refresh before 60-day expiry
+- [x] **PUB-07**: Instagram tokens auto-refresh before 60-day expiry
 
 ### Dashboard v2
 
@@ -152,9 +152,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VIRAL-14 | Phase 12.1 | Complete |
 | VIRAL-15 | Phase 12.1 | Complete |
 | VIRAL-16 | Phase 12.1 | Complete |
-| PUB-01 | Phase 14 | Pending |
-| PUB-02 | Phase 14 | Pending |
-| PUB-07 | Phase 14 | Pending |
+| PUB-01 | Phase 14 | Complete |
+| PUB-02 | Phase 14 | Complete |
+| PUB-07 | Phase 14 | Complete |
 | PUB-03 | Phase 15 | Pending |
 | PUB-04 | Phase 15 | Pending |
 | PUB-05 | Phase 15 | Pending |
