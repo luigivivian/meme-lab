@@ -237,3 +237,37 @@ class SchedulePostRequest(BaseModel):
     platform: str = Field(default="instagram", description="Plataforma (instagram, tiktok)")
     scheduled_at: datetime = Field(description="Data/hora para publicar (ISO 8601)")
     character_id: int | None = Field(default=None, description="ID do personagem (herda do package se nulo)")
+
+
+# ===== Video Generation (Phase 999.1) =====
+
+class VideoGenerateRequest(BaseModel):
+    """Request to generate a video from an approved content package."""
+    content_package_id: int
+    duration: int = 10  # 10 or 15 seconds (per D-08)
+    character_ids: list[str] = []  # Kie.ai character_id_list (per D-10)
+
+
+class VideoBatchRequest(BaseModel):
+    """Request to generate videos for multiple content packages."""
+    content_package_ids: list[int]
+    duration: int = 10
+    character_ids: list[str] = []
+
+
+class VideoStatusResponse(BaseModel):
+    """Response with video generation status."""
+    content_package_id: int
+    video_status: str | None  # null | generating | success | failed
+    video_task_id: str | None
+    video_path: str | None
+    video_source: str | None
+    video_metadata: dict | None
+
+
+class VideoBudgetResponse(BaseModel):
+    """Response with remaining daily video budget."""
+    daily_budget_usd: float
+    spent_today_usd: float
+    remaining_usd: float
+    videos_remaining_estimate: int  # at current duration
