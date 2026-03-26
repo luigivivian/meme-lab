@@ -1,17 +1,18 @@
 """Repository for atomic API usage tracking (Phase 8 — QUOT-02, QUOT-03).
 
 Provides dialect-aware upsert (MySQL/SQLite), configurable daily limits
-via env vars, and per-user usage aggregation.
+via env vars (or plan-aware via billing/plans.py), and per-user usage aggregation.
 
-Phase 16 additions: get_usage_history and get_cost_breakdown for dashboard analytics.
+Phase 17 update: limits are now plan-aware. If a user_plan is provided,
+limits come from billing/plans.py instead of hardcoded defaults.
 """
 
 import logging
 import os
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select, cast, Date
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import DATABASE_URL
@@ -44,12 +45,18 @@ def _is_sqlite() -> bool:
     return "sqlite" in DATABASE_URL
 
 
-def get_daily_limit(service: str, tier: str) -> int:
-    """Read daily limit from env var, falling back to hardcoded defaults.
+def get_daily_limit(service: str, tier: str, user_plan: str | None = None) -> int:
+    """Read daily limit, with plan-aware support (Phase 17).
+
+    Priority:
+    1. Env var override: {SERVICE}_DAILY_LIMIT_{TIER}
+    2. Plan-aware limit from billing/plans.py (if user_plan provided)
+    3. Hardcoded _DEFAULT_LIMITS fallback
 
     Env var pattern: {SERVICE}_DAILY_LIMIT_{TIER}  (e.g. GEMINI_IMAGE_DAILY_LIMIT_FREE)
     Value 0 means unlimited (no limit enforced).
     """
+    # 1. Env var override always wins
     env_key = f"{service.upper()}_DAILY_LIMIT_{tier.upper()}"
     env_val = os.getenv(env_key)
     if env_val is not None:
@@ -57,6 +64,13 @@ def get_daily_limit(service: str, tier: str) -> int:
             return int(env_val)
         except ValueError:
             logger.warning("Invalid limit env var %s=%r, using default", env_key, env_val)
+
+    # 2. Plan-aware limit (Phase 17)
+    if user_plan:
+        from src.billing.plans import get_plan_limit
+        return get_plan_limit(user_plan, service, tier)
+
+    # 3. Hardcoded default
     return _DEFAULT_LIMITS.get((service, tier), 50)
 
 
@@ -169,15 +183,22 @@ class UsageRepository:
         user_id: int,
         service: str,
         tier: str,
+        user_plan: str | None = None,
     ) -> tuple[bool, dict]:
         """Check if user is within daily limit for service/tier.
+
+        Args:
+            user_id: User ID
+            service: Service name (gemini_image, etc.)
+            tier: Service tier (free/paid)
+            user_plan: User's subscription plan (free/pro/enterprise) for plan-aware limits
 
         Returns (allowed, info_dict).
         If rejected, inserts a status='rejected' row (D-03).
         """
         today_utc = self._get_pt_today_start_utc()
         current = await self._get_current_count(user_id, service, tier, today_utc)
-        limit = get_daily_limit(service, tier)
+        limit = get_daily_limit(service, tier, user_plan=user_plan)
         resets_at = self._next_pt_midnight_iso()
 
         # 0 = unlimited
@@ -217,8 +238,12 @@ class UsageRepository:
             "resets_at": resets_at,
         })
 
-    async def get_user_usage(self, user_id: int) -> dict:
+    async def get_user_usage(self, user_id: int, user_plan: str | None = None) -> dict:
         """Get per-service usage breakdown for today.
+
+        Args:
+            user_id: User ID
+            user_plan: User's subscription plan for plan-aware limits (Phase 17)
 
         Returns dict matching UsageResponse schema:
         {"services": [...], "resets_at": "..."}
@@ -244,7 +269,7 @@ class UsageRepository:
         seen: set[tuple[str, str]] = set()
         for svc, tier in _KNOWN_SERVICES:
             used = usage_map.get((svc, tier), 0)
-            limit = get_daily_limit(svc, tier)
+            limit = get_daily_limit(svc, tier, user_plan=user_plan)
             remaining = limit - used if limit > 0 else -1
             services.append({
                 "service": svc,
@@ -258,7 +283,7 @@ class UsageRepository:
         # Include any extra services from actual usage
         for (svc, tier), used in usage_map.items():
             if (svc, tier) not in seen:
-                limit = get_daily_limit(svc, tier)
+                limit = get_daily_limit(svc, tier, user_plan=user_plan)
                 remaining = limit - used if limit > 0 else -1
                 services.append({
                     "service": svc,
@@ -318,98 +343,3 @@ class UsageRepository:
         )
         total = result.scalar_one_or_none()
         return float(total) if total is not None else 0.0
-
-    # -- Dashboard analytics (Phase 16) ----------------------------------------
-
-    async def get_usage_history(self, user_id: int, days: int = 30) -> list[dict]:
-        """Get daily usage counts grouped by service for the last N days.
-
-        Returns list of dicts sorted by date ascending, with zero-filled
-        missing dates:
-            [{"date": "2026-03-01", "gemini_text": 45, "gemini_image": 3, ...}, ...]
-        """
-        today_utc = self._get_pt_today_start_utc()
-        start_date = today_utc - timedelta(days=days)
-
-        result = await self.session.execute(
-            select(
-                ApiUsage.date,
-                ApiUsage.service,
-                func.sum(ApiUsage.usage_count).label("count"),
-            )
-            .where(
-                ApiUsage.user_id == user_id,
-                ApiUsage.status == "success",
-                ApiUsage.date >= start_date,
-            )
-            .group_by(ApiUsage.date, ApiUsage.service)
-        )
-        rows = result.all()
-
-        # Collect all services seen
-        services_seen: set[str] = set()
-        date_service_map: dict[str, dict[str, int]] = {}
-        for row in rows:
-            d = row.date
-            date_str = d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d)[:10]
-            service = row.service
-            count = int(row.count)
-            services_seen.add(service)
-            if date_str not in date_service_map:
-                date_service_map[date_str] = {}
-            date_service_map[date_str][service] = count
-
-        # Always include common services
-        for svc in ("gemini_text", "gemini_image", "kie_video"):
-            services_seen.add(svc)
-
-        # Generate all dates in range, fill zeros
-        history: list[dict] = []
-        for i in range(days + 1):
-            d = start_date + timedelta(days=i)
-            date_str = d.strftime("%Y-%m-%d")
-            entry: dict = {"date": date_str}
-            svc_data = date_service_map.get(date_str, {})
-            for svc in sorted(services_seen):
-                entry[svc] = svc_data.get(svc, 0)
-            history.append(entry)
-
-        return history
-
-    async def get_cost_breakdown(self, user_id: int, days: int = 30) -> list[dict]:
-        """Get cost aggregation by service for the last N days.
-
-        Returns list of dicts:
-            [{"service": "gemini_text", "cost_usd": 0.45, "calls": 120}, ...]
-        Only includes services with cost > 0 or calls > 0.
-        """
-        today_utc = self._get_pt_today_start_utc()
-        start_date = today_utc - timedelta(days=days)
-
-        result = await self.session.execute(
-            select(
-                ApiUsage.service,
-                func.sum(ApiUsage.cost_usd).label("total_cost"),
-                func.sum(ApiUsage.usage_count).label("total_calls"),
-            )
-            .where(
-                ApiUsage.user_id == user_id,
-                ApiUsage.status == "success",
-                ApiUsage.date >= start_date,
-            )
-            .group_by(ApiUsage.service)
-        )
-        rows = result.all()
-
-        breakdown: list[dict] = []
-        for row in rows:
-            cost = float(row.total_cost or 0)
-            calls = int(row.total_calls or 0)
-            if cost > 0 or calls > 0:
-                breakdown.append({
-                    "service": row.service,
-                    "cost_usd": round(cost, 6),
-                    "calls": calls,
-                })
-
-        return breakdown

@@ -101,17 +101,21 @@ PIPELINE_PHRASES_PER_TOPIC = 1
 # Geo para Google Trends (BR = Brasil)
 PIPELINE_GOOGLE_TRENDS_GEO = "BR"
 
-# Subreddits para monitorar (legacy — RedditMemesAgent uses own DEFAULT_SUBREDDITS)
+# Subreddits para monitorar
 PIPELINE_REDDIT_SUBREDDITS = [
     "brasil",
     "eu_nvr",
     "DiretoDoZapZap",
     "memes",
     "dankmemes",
+    "meirl",
 ]
 
-# RSS feeds de humor (legacy — RSSFeedAgent uses own DEFAULT_FEEDS)
+# RSS feeds de humor
 PIPELINE_RSS_FEEDS = [
+    "https://www.reddit.com/r/brasil/hot/.rss",
+    "https://www.reddit.com/r/eu_nvr/hot/.rss",
+    "https://www.reddit.com/r/memes/hot/.rss",
     "https://www.sensacionalista.com.br/feed/",
 ]
 
@@ -245,7 +249,7 @@ YOUTUBE_RSS_MAX_PER_CATEGORY = 30
 GEMINI_TRENDS_MODEL = "gemini-2.5-flash"
 
 # Quantos topicos virais pedir ao Gemini por fetch
-GEMINI_TRENDS_MAX_TOPICS = 25
+GEMINI_TRENDS_MAX_TOPICS = 15
 
 # ===== BlueSky Trends Agent =====
 
@@ -260,6 +264,15 @@ BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD", "")
 # Max itens por feed curado de memes BR
 BRAZIL_VIRAL_RSS_MAX_PER_FEED = 10
 
+# ===== Lemmy Communities Agent =====
+
+# Max posts por comunidade Lemmy
+LEMMY_MAX_POSTS = 15
+
+# ===== HackerNews Agent =====
+
+# Max stories para buscar do HN top stories
+HACKERNEWS_MAX_STORIES = 20
 
 # ===== Dedup Cross-Run =====
 
@@ -339,14 +352,14 @@ KIE_API_KEY = os.getenv("KIE_API_KEY", "")
 # Default video duration in seconds: 10 or 15 (per D-08)
 VIDEO_DURATION = int(os.getenv("VIDEO_DURATION", "10"))
 
-# Sora 2 model ID — stable tier (best quality: $0.175/10s, $0.20/15s)
-VIDEO_MODEL = os.getenv("VIDEO_MODEL", "sora-2-image-to-video-stable")
+# Sora 2 model ID (per D-07: standard tier by default)
+VIDEO_MODEL = os.getenv("VIDEO_MODEL", "sora-2-image-to-video")
 
-# Hard daily budget cap in USD (per D-09: $3.00 default = ~17 stable videos/day)
+# Hard daily budget cap in USD (per D-09: $3.00 default = ~20 standard videos/day)
 VIDEO_DAILY_BUDGET_USD = float(os.getenv("VIDEO_DAILY_BUDGET_USD", "3.0"))
 
-# Cost per second for Sora 2 stable tier ($0.175 / 10s = $0.0175/s)
-VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.0175"))
+# Cost per second for standard Sora 2 tier
+VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.015"))
 
 # Concurrency limiter for Kie.ai API calls
 KIE_MAX_CONCURRENT = int(os.getenv("KIE_MAX_CONCURRENT", "3"))
@@ -367,13 +380,21 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "clipflow-video-uploads")
 # Signed URL expiry in seconds (1 hour — video gen takes 30-120s)
 GCS_SIGNED_URL_EXPIRY = int(os.getenv("GCS_SIGNED_URL_EXPIRY", "3600"))
 
-# ===== Facebook / Instagram OAuth — Phase 14 =====
+# ===== Billing & Stripe — Phase 17 =====
 
-FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID", "")
-FACEBOOK_APP_SECRET = os.getenv("FACEBOOK_APP_SECRET", "")
-FACEBOOK_OAUTH_REDIRECT_URI = os.getenv("FACEBOOK_OAUTH_REDIRECT_URI", "http://localhost:3000/settings/instagram/callback")
-FACEBOOK_GRAPH_API_VERSION = "v21.0"
-FACEBOOK_GRAPH_API_BASE = f"https://graph.facebook.com/{FACEBOOK_GRAPH_API_VERSION}"
+# Stripe API secret key (sk_test_... or sk_live_...)
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 
-# Fernet encryption key for Instagram tokens (derived from SECRET_KEY or standalone)
-INSTAGRAM_TOKEN_ENCRYPTION_KEY = os.getenv("INSTAGRAM_TOKEN_ENCRYPTION_KEY", "")
+# Stripe webhook endpoint signing secret (whsec_...)
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+# Stripe Price IDs for each plan (created in Stripe Dashboard)
+STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "")
+STRIPE_ENTERPRISE_PRICE_ID = os.getenv("STRIPE_ENTERPRISE_PRICE_ID", "")
+
+# URLs for Stripe Checkout redirect
+STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "http://localhost:3000/billing?session_id={CHECKOUT_SESSION_ID}")
+STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "http://localhost:3000/billing?canceled=true")
+
+# Grace period in days after failed payment before auto-downgrade to Free
+STRIPE_GRACE_PERIOD_DAYS = int(os.getenv("STRIPE_GRACE_PERIOD_DAYS", "7"))
