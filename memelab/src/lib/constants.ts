@@ -9,6 +9,7 @@ import {
   Palette,
   Layers,
   Send,
+  Settings,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -22,6 +23,7 @@ export const NAV_ITEMS = [
   { label: "Temas", href: "/themes", icon: Palette },
   { label: "Jobs", href: "/jobs", icon: Layers },
   { label: "Publicar", href: "/publishing", icon: Send },
+  { label: "Settings", href: "/settings", icon: Settings },
 ] as const;
 
 export const AGENT_TYPE_COLORS: Record<string, string> = {

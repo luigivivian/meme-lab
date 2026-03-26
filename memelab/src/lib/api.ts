@@ -1147,6 +1147,42 @@ export const getVideoStatus = (contentPackageId: number) =>
 export const getVideoBudget = () =>
   request<VideoBudgetResponse>("/generate/video/budget");
 
+// --- Instagram Connection ---
+export interface InstagramStatus {
+  connected: boolean;
+  ig_username?: string;
+  status?: string;
+  token_expires_at?: string;
+  connected_at?: string;
+}
+
+export interface InstagramAuthUrl {
+  auth_url: string;
+  state: string;
+}
+
+export interface InstagramCallbackResult {
+  success: boolean;
+  ig_username: string;
+  connected_at: string;
+}
+
+export async function getInstagramStatus(): Promise<InstagramStatus> {
+  return request("/instagram/status");
+}
+
+export async function getInstagramAuthUrl(): Promise<InstagramAuthUrl> {
+  return request("/instagram/auth-url");
+}
+
+export async function instagramCallback(code: string): Promise<InstagramCallbackResult> {
+  return request(`/instagram/callback?code=${encodeURIComponent(code)}`);
+}
+
+export async function disconnectInstagram(): Promise<{ success: boolean }> {
+  return request("/instagram/disconnect", { method: "POST" });
+}
+
 // --- Content Export ---
 export const exportContentPack = (packageId: number) =>
   `${BASE}/content/${packageId}/export`;
