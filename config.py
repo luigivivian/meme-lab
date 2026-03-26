@@ -366,3 +366,14 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "clipflow-video-uploads")
 
 # Signed URL expiry in seconds (1 hour — video gen takes 30-120s)
 GCS_SIGNED_URL_EXPIRY = int(os.getenv("GCS_SIGNED_URL_EXPIRY", "3600"))
+
+# ===== Facebook / Instagram OAuth — Phase 14 =====
+
+FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID", "")
+FACEBOOK_APP_SECRET = os.getenv("FACEBOOK_APP_SECRET", "")
+FACEBOOK_OAUTH_REDIRECT_URI = os.getenv("FACEBOOK_OAUTH_REDIRECT_URI", "http://localhost:3000/settings/instagram/callback")
+FACEBOOK_GRAPH_API_VERSION = "v21.0"
+FACEBOOK_GRAPH_API_BASE = f"https://graph.facebook.com/{FACEBOOK_GRAPH_API_VERSION}"
+
+# Fernet encryption key for Instagram tokens (derived from SECRET_KEY or standalone)
+INSTAGRAM_TOKEN_ENCRYPTION_KEY = os.getenv("INSTAGRAM_TOKEN_ENCRYPTION_KEY", "")
