@@ -91,16 +91,33 @@ MOTION_TEMPLATES: dict[str, str] = {
 
 _SYSTEM_PROMPT = (
     "You generate SHORT motion/animation prompts for Sora 2 image-to-video AI. "
-    "You receive context about a wizard character meme and must describe the MOTION and CAMERA movement.\n\n"
-    "RULES:\n"
+    "You receive an image of a wizard character meme and must describe ONLY the animation/motion.\n\n"
+    "CRITICAL RULES:\n"
     "- Output ONLY the motion prompt (1-3 sentences, max 200 chars)\n"
-    "- Describe character MOVEMENT (gestures, expressions, body language)\n"
-    "- Describe CAMERA movement (slow zoom, pan, static, push in)\n"
-    "- Describe AMBIENT motion (particles, wind, magical effects)\n"
-    "- Keep the cartoon cel-shading art style\n"
-    "- Portrait 4:5 aspect ratio composition\n"
-    "- NEVER describe the character's appearance (that's in the image)\n"
-    "- NEVER include text or dialogue"
+    "- ANIMATION ONLY: subtle character movement, ambient effects, camera motion\n"
+    "- PRESERVE the original scene: same background, same lighting, same colors, same environment\n"
+    "- NO speech, NO dialogue, NO mouth movement, NO text, NO words\n"
+    "- NO scene changes, NO transitions, NO new elements, NO lighting changes\n"
+    "- Camera: prefer static or very slow push-in. NO fast zooms, NO pans, NO rotations\n"
+    "- Movement must be SUBTLE: gentle sway, particle drift, hair/cloth flow, breathing\n"
+    "- Keep the cartoon cel-shading art style of the original image\n"
+    "- Portrait 4:5 aspect ratio\n"
+    "- NEVER describe the character appearance (it's already in the image)\n"
+    "- Think of it as a LIVING PHOTO — the scene comes alive with minimal, elegant motion"
+)
+
+_ENHANCE_PROMPT = (
+    "You are a prompt engineer for Sora 2 image-to-video AI. "
+    "The user provided a brief animation description. Enhance it into an optimal Sora 2 prompt.\n\n"
+    "RULES:\n"
+    "- Keep the user's INTENT but make it technically precise for Sora 2\n"
+    "- Output 1-3 sentences, max 200 chars\n"
+    "- Add: camera instruction (static or slow push-in), ambient particle effects\n"
+    "- PRESERVE: original background, lighting, colors, environment — NO changes\n"
+    "- NO speech, NO dialogue, NO mouth movement, NO text\n"
+    "- Movement must be SUBTLE and elegant\n"
+    "- Keep cartoon cel-shading art style\n"
+    "- Output ONLY the enhanced prompt, nothing else"
 )
 
 
@@ -203,6 +220,62 @@ class VideoPromptBuilder:
                 theme_key, e,
             )
             return self.get_fallback_prompt(theme_key)
+
+    def enhance_user_prompt(self, user_input: str, theme_key: str = "") -> str:
+        """Enhance a user-provided animation description into an optimal Sora 2 prompt.
+
+        Takes the user's brief description and applies prompt engineering to make
+        it technically precise for Sora 2, preserving original scene and adding
+        subtle motion details.
+
+        Args:
+            user_input: User's animation description (e.g., "mago mexendo no cajado").
+            theme_key: Optional theme key for context.
+
+        Returns:
+            Enhanced Sora 2 prompt.
+        """
+        try:
+            from src.llm_client import generate
+
+            base_motion = MOTION_TEMPLATES.get(theme_key, MOTION_TEMPLATES.get("generico", ""))
+            user_message = (
+                f"User's animation idea: {user_input}\n"
+                f"Theme context: {theme_key or 'general'}\n"
+                f"Reference motion style: {base_motion}"
+            )
+
+            raw = generate(
+                system_prompt=_ENHANCE_PROMPT,
+                user_message=user_message,
+                max_tokens=200,
+                tier="lite",
+            )
+            prompt = self._clean_llm_response(raw)
+
+            if not prompt or len(prompt) < 10:
+                return self._build_safe_prompt(user_input)
+
+            if len(prompt) > 500:
+                prompt = prompt[:500].rsplit(" ", 1)[0]
+
+            logger.info("Enhanced user prompt: %s → %s", user_input[:40], prompt[:80])
+            return prompt
+
+        except Exception as e:
+            logger.warning("LLM enhance failed: %s — using safe wrapper", e)
+            return self._build_safe_prompt(user_input)
+
+    @staticmethod
+    def _build_safe_prompt(user_input: str) -> str:
+        """Wrap user input with safe Sora 2 directives when LLM is unavailable."""
+        return (
+            f"{user_input}. "
+            "Static camera, very slow push-in. "
+            "Preserve original scene, lighting, and background. "
+            "No speech, no text. Subtle animation only. "
+            "Maintain cartoon cel-shading art style."
+        )
 
     def get_fallback_prompt(self, theme_key: str) -> str:
         """Return a static fallback motion prompt when LLM is unavailable.

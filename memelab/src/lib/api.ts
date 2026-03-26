@@ -1107,6 +1107,7 @@ export interface VideoGenerateRequest {
   content_package_id: number;
   duration: number; // 10 or 15
   character_ids?: string[];
+  custom_prompt?: string; // User animation description (enhanced by LLM)
 }
 
 export interface VideoStatusResponse {

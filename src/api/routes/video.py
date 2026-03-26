@@ -81,6 +81,7 @@ async def _generate_video_task(
     duration: int,
     character_ids: list[str],
     user_id: int,
+    custom_prompt: str = "",
 ):
     """Background task: generate video for a content package.
 
@@ -127,13 +128,16 @@ async def _generate_video_task(
                 theme_key = pkg.image_metadata.get("theme_key", theme_key)
                 theme_key = pkg.image_metadata.get("situacao_key", theme_key)
 
-            # Build motion prompt (per D-02)
+            # Build motion prompt — use custom prompt if provided, else auto-generate
             prompt_builder = VideoPromptBuilder()
-            motion_prompt = prompt_builder.build_motion_prompt(
-                theme_key=theme_key,
-                phrase_context=pkg.phrase or "",
-                video_prompt_notes=theme_notes,
-            )
+            if custom_prompt:
+                motion_prompt = prompt_builder.enhance_user_prompt(custom_prompt, theme_key)
+            else:
+                motion_prompt = prompt_builder.build_motion_prompt(
+                    theme_key=theme_key,
+                    phrase_context=pkg.phrase or "",
+                    video_prompt_notes=theme_notes,
+                )
 
             # Upload background image to GCS for public URL (per D-04)
             bg_path = pkg.background_path or pkg.image_path
@@ -286,6 +290,7 @@ async def generate_video(
         duration=req.duration,
         character_ids=req.character_ids,
         user_id=current_user.id,
+        custom_prompt=req.custom_prompt,
     )
 
     return VideoStatusResponse(
@@ -507,6 +512,24 @@ async def serve_video_file(
         media_type="video/mp4",
         filename=f"memelab_video_{content_package_id}.mp4",
     )
+
+
+@router.post("/enhance-prompt", summary="Enhance user animation description into Sora 2 prompt")
+async def enhance_video_prompt(
+    req: dict,
+    current_user=Depends(get_current_user),
+):
+    """Take user's brief animation description and enhance it for Sora 2."""
+    from src.video_gen.video_prompt_builder import VideoPromptBuilder
+
+    user_input = req.get("user_input", "").strip()
+    theme_key = req.get("theme_key", "")
+    if not user_input:
+        raise HTTPException(status_code=400, detail="user_input is required")
+
+    builder = VideoPromptBuilder()
+    enhanced = builder.enhance_user_prompt(user_input, theme_key)
+    return {"original": user_input, "enhanced": enhanced}
 
 
 @router.get(

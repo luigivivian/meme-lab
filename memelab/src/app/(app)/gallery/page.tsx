@@ -95,6 +95,7 @@ export default function GalleryPage() {
   const { data: videoListData } = useVideoList();
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
   const [videoDuration, setVideoDuration] = useState<10 | 15>(10);
+  const [videoPrompt, setVideoPrompt] = useState("");
   const [videoGenerating, setVideoGenerating] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoSuccess, setVideoSuccess] = useState(false);
@@ -117,7 +118,7 @@ export default function GalleryPage() {
     setVideoError(null);
     setVideoSuccess(false);
     try {
-      await generateVideo({ content_package_id: videoTarget.id, duration: videoDuration });
+      await generateVideo({ content_package_id: videoTarget.id, duration: videoDuration, custom_prompt: videoPrompt || undefined });
     } catch (err) {
       setVideoGenerating(false);
       setVideoError(err instanceof Error ? err.message : "Erro ao gerar video");
@@ -778,7 +779,7 @@ export default function GalleryPage() {
                         )}
 
                         {isApproved && !pkg.video_status && (
-                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={() => { setVideoTarget(pkg); setVideoError(null); setVideoSuccess(false); setVideoDuration(10); }}>
+                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={() => { setVideoTarget(pkg); setVideoError(null); setVideoSuccess(false); setVideoDuration(10); setVideoPrompt(""); }}>
                             <Video className="h-3 w-3" />
                             Gerar Video
                           </Button>
@@ -791,7 +792,7 @@ export default function GalleryPage() {
                         )}
 
                         {isApproved && pkg.video_status === "failed" && (
-                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1 text-rose-400 border-rose-500/20" onClick={() => { setVideoTarget(pkg); setVideoError(null); setVideoSuccess(false); setVideoDuration(10); }}>
+                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1 text-rose-400 border-rose-500/20" onClick={() => { setVideoTarget(pkg); setVideoError(null); setVideoSuccess(false); setVideoDuration(10); setVideoPrompt(""); }}>
                             <Video className="h-3 w-3" /> Tentar novamente
                           </Button>
                         )}
@@ -938,6 +939,18 @@ export default function GalleryPage() {
                   </div>
                 </div>
               )}
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Como animar? (opcional)</label>
+                <Textarea
+                  placeholder="Ex: mago mexendo no cajado com particulas magicas flutuando..."
+                  value={videoPrompt}
+                  onChange={(e) => setVideoPrompt(e.target.value)}
+                  rows={2}
+                  disabled={videoGenerating}
+                  className="text-xs"
+                />
+                <p className="text-[10px] text-muted-foreground">Descreva a animacao desejada. Sera aprimorado por IA antes de enviar ao Sora 2. Deixe vazio para animacao automatica.</p>
+              </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Duracao</label>
                 <div className="flex gap-2">
