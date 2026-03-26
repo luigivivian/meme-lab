@@ -25,8 +25,6 @@ class TrendSource(Enum):
     GEMINI_TRENDS = "gemini_trends"
     BRAZIL_VIRAL = "brazil_viral"
     BLUESKY = "bluesky"
-    HACKERNEWS = "hackernews"
-    LEMMY = "lemmy"
 
 
 @dataclass

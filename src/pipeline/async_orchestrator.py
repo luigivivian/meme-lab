@@ -11,8 +11,6 @@ from datetime import datetime
 
 from config import (
     PIPELINE_GOOGLE_TRENDS_GEO,
-    PIPELINE_REDDIT_SUBREDDITS,
-    PIPELINE_RSS_FEEDS,
     PIPELINE_PHRASES_PER_TOPIC,
 )
 from src.pipeline.agents.async_base import SyncAgentAdapter
@@ -23,8 +21,6 @@ from src.pipeline.agents.youtube_rss import YouTubeRSSAgent
 from src.pipeline.agents.gemini_web_trends import GeminiWebTrendsAgent
 from src.pipeline.agents.brazil_viral_rss import BrazilViralRSSAgent
 from src.pipeline.agents.bluesky_trends import BlueSkyTrendsAgent
-from src.pipeline.agents.hackernews import HackerNewsAgent
-from src.pipeline.agents.lemmy_communities import LemmyCommunitiesAgent
 from src.pipeline.monitoring import MonitoringLayer
 from src.pipeline.broker import TrendBroker
 from src.pipeline.curator import CuratorAgent
@@ -72,6 +68,8 @@ class AsyncPipelineOrchestrator:
         background_mode: str = "auto",
         # Temas manuais — pula L1/L2/L3
         manual_topics: list[dict] | None = None,
+        # Slug do personagem para auto-save de backgrounds gerados
+        character_slug: str | None = None,
     ):
         self.images_per_run = images_per_run
         self.phrases_per_topic = phrases_per_topic or PIPELINE_PHRASES_PER_TOPIC
@@ -82,12 +80,13 @@ class AsyncPipelineOrchestrator:
         self._cost_mode = cost_mode
         self._background_mode = background_mode
         self._manual_topics = manual_topics
+        self._character_slug = character_slug
 
         # Layer 1: Monitoring — wrapa agentes sync existentes
         sync_agents = [
             GoogleTrendsAgent(geo=PIPELINE_GOOGLE_TRENDS_GEO),
-            RedditMemesAgent(subreddits=PIPELINE_REDDIT_SUBREDDITS),
-            RSSFeedAgent(feeds=PIPELINE_RSS_FEEDS),
+            RedditMemesAgent(),
+            RSSFeedAgent(),
         ]
         async_agents = [SyncAgentAdapter(a) for a in sync_agents]
 
@@ -96,8 +95,6 @@ class AsyncPipelineOrchestrator:
             YouTubeRSSAgent(),
             BrazilViralRSSAgent(),
             BlueSkyTrendsAgent(),
-            HackerNewsAgent(),
-            LemmyCommunitiesAgent(),
         ]
 
         # Ultra-eco: pula GeminiWebTrends (usa Gemini API, custa dinheiro)
@@ -139,6 +136,7 @@ class AsyncPipelineOrchestrator:
                 refs_priority=character_refs_priority,
                 watermark_text=character_watermark,
                 background_mode=background_mode,
+                character_slug=character_slug,
             ),
             phrases_per_topic=self.phrases_per_topic,
             cost_mode=cost_mode,
