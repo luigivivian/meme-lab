@@ -153,7 +153,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
 | 14. Instagram Connection & CDN | 1/3 | Complete    | 2026-03-26 |
 | 15. Publishing & Scheduling | 1/2 | Complete    | 2026-03-26 |
-| 16. Dashboard v2 | 2/2 | Complete   | 2026-03-26 |
+| 16. Dashboard v2 | 2/2 | Complete    | 2026-03-26 |
 | 17. Billing & Stripe | 0/? | Not started | - |
 
 ## Backlog
