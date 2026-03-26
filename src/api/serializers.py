@@ -27,6 +27,11 @@ def content_package_to_dict(pkg) -> dict:
         "phrase_alternatives": getattr(pkg, "phrase_alternatives", None) or [],
         "carousel_slides": getattr(pkg, "carousel_slides", None) or [],
         "is_carousel": bool(getattr(pkg, "carousel_slides", None)),
+        # Video (Phase 999.1)
+        "video_status": getattr(pkg, "video_status", None),
+        "video_path": getattr(pkg, "video_path", None),
+        "video_task_id": getattr(pkg, "video_task_id", None),
+        "video_metadata": getattr(pkg, "video_metadata", None),
     }
 
 
