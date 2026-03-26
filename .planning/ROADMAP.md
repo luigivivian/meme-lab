@@ -16,9 +16,9 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 12: Pipeline Simplification** - Manual pipeline mode with static backgrounds and Pillow composition, zero Gemini Image calls (completed 2026-03-26)
+- [x] **Phase 12: Pipeline Simplification** - Manual pipeline mode with static backgrounds and Pillow composition, zero Gemini Image calls (completed 2026-03-26)
 - [x] **Phase 13: Tenant Isolation** - Per-user data scoping across all resources with admin bypass (completed 2026-03-25)
-- [ ] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, CDN image upload, token lifecycle management
+- [ ] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, GCS CDN image upload, token lifecycle management
 - [ ] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts
 - [ ] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history
 - [ ] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement
@@ -77,19 +77,20 @@ Plans:
 - [ ] 13-03-PLAN.md — Route wiring: all 9 route files pass current_user to repos, catch PermissionError as 403
 
 ### Phase 14: Instagram Connection & CDN
-**Goal**: Users can connect their Instagram Business Account and have their images uploaded to a CDN with public URLs ready for Instagram publishing
+**Goal**: Users can connect their Instagram Business Account and have their images uploaded to GCS CDN with public signed URLs ready for Instagram publishing
 **Depends on**: Phase 13
 **Requirements**: PUB-01, PUB-02, PUB-07
 **Success Criteria** (what must be TRUE):
   1. User can connect an Instagram Business Account via Facebook OAuth flow and see the connected account in their settings
-  2. Composed meme images are automatically uploaded to Cloudflare R2 CDN and assigned public URLs accessible by Instagram's servers
+  2. Composed meme images are uploaded to GCS (meme-lab-bucket) and assigned signed public URLs accessible by Instagram's servers
   3. Instagram access tokens auto-refresh before the 60-day expiry — user never has to manually reconnect due to token expiration
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 14-01: TBD
-- [ ] 14-02: TBD
+- [ ] 14-01-PLAN.md — Backend foundation: DB migration (instagram_connections), ORM model, config, InstagramOAuthService (token exchange, encryption, refresh)
+- [ ] 14-02-PLAN.md — API routes: 5 Instagram endpoints (auth-url, callback, status, disconnect, upload-media) + token refresh scheduler job
+- [ ] 14-03-PLAN.md — Frontend: Settings page with Instagram connection card, OAuth popup flow, sidebar nav entry
 
 ### Phase 15: Publishing & Scheduling
 **Goal**: Users can schedule posts to specific times, have them auto-published via Instagram Graph API, manage the queue, and view everything in a content calendar
@@ -150,7 +151,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 12. Pipeline Simplification | 2/3 | Complete    | 2026-03-26 |
 | 12.1 Viral Content Engine | 3/4 | Complete    | 2026-03-26 |
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
-| 14. Instagram Connection & CDN | 0/? | Not started | - |
+| 14. Instagram Connection & CDN | 0/3 | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
 | 17. Billing & Stripe | 0/? | Not started | - |
