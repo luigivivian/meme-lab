@@ -1,4 +1,4 @@
-"""ORM models — 14 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+"""ORM models — 15 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
 
 from datetime import datetime
 from typing import Optional
@@ -542,13 +542,21 @@ class User(TimestampMixin, Base):
     gemini_paid_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     active_key_tier: Mapped[str] = mapped_column(String(20), default="free", server_default="free")
 
+    # Billing (Phase 17 — Stripe)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, unique=True)
+    subscription_plan: Mapped[str] = mapped_column(String(20), default="free", server_default="free")
+    subscription_status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
+    plan_period_end: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Relationships
     characters: Mapped[list["Character"]] = relationship(back_populates="owner")
     api_usage_records: Mapped[list["ApiUsage"]] = relationship(back_populates="user")
+    subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="user")
 
     __table_args__ = (
         Index("idx_users_role", "role"),
         Index("idx_users_is_active", "is_active"),
+        Index("idx_users_stripe_customer_id", "stripe_customer_id"),
     )
 
 
@@ -598,4 +606,36 @@ class ApiUsage(TimestampMixin, Base):
         Index("idx_api_usage_user_id", "user_id"),
         Index("idx_api_usage_date", "date"),
         Index("idx_api_usage_service", "service"),
+    )
+
+
+# ============================================================
+# 15. subscriptions
+# ============================================================
+
+class Subscription(TimestampMixin, Base):
+    __tablename__ = "subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    stripe_subscription_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    stripe_price_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    plan: Mapped[str] = mapped_column(String(20), nullable=False)  # free | pro | enterprise
+    status: Mapped[str] = mapped_column(
+        String(30), default="active", server_default="active", nullable=False
+    )  # active | past_due | canceled | trialing | incomplete
+    current_period_start: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    current_period_end: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    canceled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="subscriptions")
+
+    __table_args__ = (
+        Index("idx_sub_user_id", "user_id"),
+        Index("idx_sub_status", "status"),
+        Index("idx_sub_stripe_subscription_id", "stripe_subscription_id"),
     )
