@@ -458,7 +458,7 @@ async def _run_manual_pipeline_task(run_id: str, request: ManualRunRequest):
                     text=phrase,
                     background_path=bg_path,
                     output_path=output_path,
-                    watermark_text=character_watermark,
+                    watermark_text="",  # watermark so no download/export
                     layout=request.layout,
                 )
                 results.append({

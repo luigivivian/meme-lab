@@ -286,7 +286,7 @@ async def swap_phrase(
     layout = (pkg.image_metadata or {}).get("layout", "bottom")
 
     new_image_path = await asyncio.to_thread(
-        create_image, new_phrase, bg_path, None, None, layout,
+        create_image, new_phrase, bg_path, None, "", layout,
     )
 
     # Atualizar package no DB
