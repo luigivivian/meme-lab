@@ -127,13 +127,13 @@ export default function GalleryPage() {
   const [approving, setApproving] = useState<number | null>(null);
 
   const allPackages = contentData?.packages ?? [];
-  const visiblePackages = allPackages.filter((p) => p.approval_status !== "rejected");
   const filteredPackages = statusFilter
-    ? visiblePackages.filter((p) => p.approval_status === statusFilter)
-    : visiblePackages;
+    ? allPackages.filter((p) => p.approval_status === statusFilter)
+    : allPackages.filter((p) => p.approval_status !== "rejected");
 
   const pendingCount = allPackages.filter((p) => p.approval_status === "pending").length;
   const approvedCount = allPackages.filter((p) => p.approval_status === "approved").length;
+  const rejectedCount = allPackages.filter((p) => p.approval_status === "rejected").length;
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -638,9 +638,10 @@ export default function GalleryPage() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1 rounded-lg bg-white/[0.02] p-0.5">
                 {([
-                  { key: "", label: "Todos", count: visiblePackages.length },
+                  { key: "", label: "Todos", count: allPackages.length - rejectedCount },
                   { key: "pending", label: "Pendentes", count: pendingCount },
                   { key: "approved", label: "Aprovados", count: approvedCount },
+                  { key: "rejected", label: "Rejeitados", count: rejectedCount },
                 ] as const).map((tab) => (
                   <button
                     key={tab.key}
