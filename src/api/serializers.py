@@ -188,10 +188,24 @@ def character_to_detail(char, refs_counts: dict, themes_count: int) -> dict:
 
 def scheduled_post_to_dict(post) -> dict:
     """Converte ScheduledPost ORM para dict de resposta."""
+    # Safe access for eagerly-loaded relationships
+    content_pkg = getattr(post, "content_package", None)
+    character = getattr(post, "character", None)
+
+    content_summary = None
+    if content_pkg:
+        content_summary = {
+            "phrase": content_pkg.phrase,
+            "topic": content_pkg.topic,
+            "image_path": content_pkg.image_path,
+            "quality_score": content_pkg.quality_score,
+        }
+
     return {
         "id": post.id,
         "content_package_id": post.content_package_id,
         "character_id": post.character_id,
+        "character_name": character.name if character else None,
         "platform": post.platform,
         "status": post.status,
         "scheduled_at": post.scheduled_at.isoformat() if post.scheduled_at else None,
@@ -200,6 +214,7 @@ def scheduled_post_to_dict(post) -> dict:
         "retry_count": post.retry_count,
         "max_retries": post.max_retries,
         "error_message": post.error_message,
+        "content_summary": content_summary,
         "created_at": post.created_at.isoformat() if post.created_at else None,
         "updated_at": post.updated_at.isoformat() if post.updated_at else None,
     }
@@ -207,6 +222,16 @@ def scheduled_post_to_dict(post) -> dict:
 
 def scheduled_post_calendar_item(post) -> dict:
     """Versao resumida de ScheduledPost para a view de calendario."""
+    content_pkg = getattr(post, "content_package", None)
+    content_summary = None
+    if content_pkg:
+        content_summary = {
+            "phrase": content_pkg.phrase,
+            "topic": content_pkg.topic,
+            "quality_score": content_pkg.quality_score,
+            "image_path": content_pkg.image_path,
+        }
+
     return {
         "post_id": post.id,
         "time": post.scheduled_at.strftime("%H:%M") if post.scheduled_at else None,
@@ -214,6 +239,7 @@ def scheduled_post_calendar_item(post) -> dict:
         "status": post.status,
         "content_package_id": post.content_package_id,
         "character_id": post.character_id,
+        "content_summary": content_summary,
     }
 
 

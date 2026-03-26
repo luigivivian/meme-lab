@@ -5,6 +5,7 @@ from typing import Optional
 
 from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.database.models import ScheduledPost, Character, User
 
@@ -29,7 +30,10 @@ class ScheduledPostRepository:
         self, post_id: int, user: User | None = None
     ) -> ScheduledPost | None:
         """Busca post agendado por ID."""
-        stmt = select(ScheduledPost).where(ScheduledPost.id == post_id)
+        stmt = select(ScheduledPost).options(
+            selectinload(ScheduledPost.content_package),
+            selectinload(ScheduledPost.character),
+        ).where(ScheduledPost.id == post_id)
         result = await self.session.execute(stmt)
         post = result.scalar_one_or_none()
         if post and not _is_admin(user):
@@ -48,7 +52,10 @@ class ScheduledPostRepository:
         user: User | None = None,
     ) -> list[ScheduledPost]:
         """Lista posts agendados com filtros opcionais."""
-        stmt = select(ScheduledPost).order_by(ScheduledPost.scheduled_at.asc())
+        stmt = select(ScheduledPost).options(
+            selectinload(ScheduledPost.content_package),
+            selectinload(ScheduledPost.character),
+        ).order_by(ScheduledPost.scheduled_at.asc())
         if status is not None:
             stmt = stmt.where(ScheduledPost.status == status)
         if platform is not None:
@@ -88,6 +95,10 @@ class ScheduledPostRepository:
         now = datetime.utcnow()
         stmt = (
             select(ScheduledPost)
+            .options(
+                selectinload(ScheduledPost.content_package),
+                selectinload(ScheduledPost.character),
+            )
             .where(ScheduledPost.status == "queued")
             .where(ScheduledPost.scheduled_at <= now)
             .order_by(ScheduledPost.scheduled_at.asc())
@@ -175,6 +186,10 @@ class ScheduledPostRepository:
         """Retorna posts agendados entre duas datas (para calendario)."""
         stmt = (
             select(ScheduledPost)
+            .options(
+                selectinload(ScheduledPost.content_package),
+                selectinload(ScheduledPost.character),
+            )
             .where(ScheduledPost.scheduled_at >= start_date)
             .where(ScheduledPost.scheduled_at <= end_date)
             .order_by(ScheduledPost.scheduled_at.asc())

@@ -23,6 +23,23 @@ async def schedule_post(
 ):
     from src.services.publisher import PublishingService
 
+    # Validate Instagram connection before accepting schedule
+    if req.platform == "instagram":
+        from sqlalchemy import select as sa_select
+        from src.database.models import InstagramConnection
+
+        result = await session.execute(
+            sa_select(InstagramConnection).where(
+                InstagramConnection.user_id == current_user.id,
+                InstagramConnection.status == "active",
+            )
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=400,
+                detail="Instagram nao conectado. Conecte sua conta em Configuracoes antes de agendar.",
+            )
+
     service = PublishingService(session)
     try:
         post = await service.schedule_post(

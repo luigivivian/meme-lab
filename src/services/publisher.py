@@ -1,11 +1,12 @@
 """PublishingService — agendamento e publicacao de content packages.
 
 Gerencia a fila de publicacao: agendar, cancelar, processar posts pendentes.
-Publicadores por plataforma sao placeholders para integracao futura.
+Instagram publishing via Graph API with OAuth tokens from Phase 14.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -146,20 +147,137 @@ class PublishingService:
     async def _publish_instagram(self, post: ScheduledPost) -> dict:
         """Publica no Instagram via Graph API.
 
-        TODO: Integrar com Instagram Graph API.
-        Por enquanto, retorna placeholder indicando que precisa de implementacao.
+        Flow:
+        1. Resolve user_id from post's character or content_package chain
+        2. Load active InstagramConnection for that user
+        3. Decrypt OAuth token via InstagramOAuthService
+        4. Upload image to GCS for public URL
+        5. Build caption from content package
+        6. Publish via InstagramClient (image or carousel)
+        7. Return result with instagram_media_id and permalink
         """
-        logger.warning(
-            f"Instagram publisher ainda nao implementado — post {post.id} "
-            f"marcado como publicado (placeholder)"
+        from sqlalchemy import select as sa_select
+        from src.database.models import (
+            InstagramConnection, Character, ContentPackage,
         )
-        return {
-            "platform": "instagram",
-            "status": "placeholder",
-            "message": "Instagram Graph API nao configurada. Post marcado como publicado para teste.",
-            "post_id": post.id,
-            "content_package_id": post.content_package_id,
-        }
+        from src.services.instagram_oauth import InstagramOAuthService
+        from src.services.instagram_client import (
+            InstagramClient, InstagramAPIError, InstagramRateLimitError,
+        )
+        from src.video_gen.gcs_uploader import GCSUploader
+
+        # 1. Resolve user_id from character
+        user_id = None
+        if post.character_id:
+            character = await self.session.get(Character, post.character_id)
+            if character:
+                user_id = character.user_id
+
+        # Fallback: content_package -> character -> user_id
+        if user_id is None:
+            pkg = await self.session.get(ContentPackage, post.content_package_id)
+            if pkg and pkg.character_id:
+                character = await self.session.get(Character, pkg.character_id)
+                if character:
+                    user_id = character.user_id
+
+        if user_id is None:
+            raise Exception(
+                f"Nao foi possivel determinar user_id para post {post.id} "
+                f"(character_id={post.character_id}, content_package_id={post.content_package_id})"
+            )
+
+        # 2. Load active InstagramConnection for this user
+        result = await self.session.execute(
+            sa_select(InstagramConnection).where(
+                InstagramConnection.user_id == user_id,
+                InstagramConnection.status == "active",
+            )
+        )
+        connection = result.scalar_one_or_none()
+        if not connection:
+            raise Exception(f"No active Instagram connection for user {user_id}")
+
+        # 3. Decrypt access token
+        oauth_service = InstagramOAuthService(self.session)
+        decrypted_token = oauth_service._decrypt_token(connection.access_token_encrypted)
+        ig_user_id = connection.ig_user_id
+
+        # 4. Load content package for image and caption
+        package = await self.session.get(ContentPackage, post.content_package_id)
+        if not package:
+            raise Exception(f"Content package {post.content_package_id} nao encontrado")
+
+        # 5. Upload image to GCS for public URL
+        image_path = package.image_path
+        if not image_path or not Path(image_path).exists():
+            raise Exception(
+                f"Imagem nao encontrada: {image_path} "
+                f"(content_package_id={package.id})"
+            )
+
+        uploader = GCSUploader(bucket_name="meme-lab-bucket")
+        filename = Path(image_path).name
+        remote_name = f"instagram-media/{package.id}/{filename}"
+        signed_url = uploader.upload_image(str(image_path), remote_name=remote_name)
+        logger.info(f"Imagem enviada ao GCS: {remote_name}")
+
+        # 6. Build caption
+        caption_text = package.caption if package.caption else package.phrase
+        if package.hashtags:
+            hashtag_str = " ".join(
+                tag if tag.startswith("#") else f"#{tag}"
+                for tag in package.hashtags
+            )
+            caption_text = f"{caption_text}\n\n{hashtag_str}"
+
+        # 7. Publish via InstagramClient
+        client = InstagramClient(access_token=decrypted_token, business_id=ig_user_id)
+        try:
+            carousel_slides = getattr(package, "carousel_slides", None) or []
+            if len(carousel_slides) >= 2:
+                # Carousel: upload all slides to GCS
+                slide_urls = []
+                for i, slide in enumerate(carousel_slides):
+                    slide_path = slide.get("image_path", "") if isinstance(slide, dict) else str(slide)
+                    if slide_path and Path(slide_path).exists():
+                        slide_name = f"instagram-media/{package.id}/slide_{i}_{Path(slide_path).name}"
+                        slide_url = uploader.upload_image(str(slide_path), remote_name=slide_name)
+                        slide_urls.append(slide_url)
+                    else:
+                        # Use main image as fallback for broken slides
+                        slide_urls.append(signed_url)
+
+                ig_result = await client.publish_carousel(
+                    image_urls=slide_urls, caption=caption_text
+                )
+            else:
+                ig_result = await client.publish_image(
+                    image_url=signed_url, caption=caption_text
+                )
+
+            logger.info(
+                f"Post {post.id} publicado no Instagram: "
+                f"media_id={ig_result.get('id')} permalink={ig_result.get('permalink')}"
+            )
+            return {
+                "platform": "instagram",
+                "instagram_media_id": ig_result.get("id"),
+                "permalink": ig_result.get("permalink"),
+                "timestamp": ig_result.get("timestamp"),
+                "media_type": ig_result.get("media_type", "IMAGE"),
+                "post_id": post.id,
+                "content_package_id": post.content_package_id,
+            }
+
+        except InstagramRateLimitError as e:
+            raise Exception(
+                f"Instagram rate limit atingido — aguardar antes de retry: {e}"
+            ) from e
+        except InstagramAPIError as e:
+            raise Exception(f"Instagram API error: {e}") from e
+        finally:
+            await client.close()
 
     async def _publish_tiktok(self, post: ScheduledPost) -> dict:
         """Publica no TikTok.
@@ -178,18 +296,22 @@ class PublishingService:
             await self.content_repo.mark_published(post.content_package_id)
 
     async def _mark_failed(self, post_id: int, error: str) -> None:
-        """Marca post como falho com logica de retry."""
+        """Marca post como falho com logica de retry e exponential backoff."""
         post = await self.schedule_repo.get_by_id(post_id)
         if not post:
             return
 
         post.retry_count += 1
         if post.retry_count < post.max_retries:
-            # Ainda tem retentativas — volta pra fila
+            # Ainda tem retentativas — volta pra fila com backoff
             post.status = "queued"
             post.error_message = f"Tentativa {post.retry_count}/{post.max_retries}: {error}"
+            # Exponential backoff: retry_count * 120 seconds
+            backoff_seconds = post.retry_count * 120
+            post.scheduled_at = datetime.utcnow() + timedelta(seconds=backoff_seconds)
             logger.info(
-                f"Post {post_id} falhou, retentativa {post.retry_count}/{post.max_retries}"
+                f"Post {post_id} falhou, retentativa {post.retry_count}/{post.max_retries} "
+                f"em {backoff_seconds}s"
             )
         else:
             # Excedeu retentativas — marca como falho definitivo

@@ -105,7 +105,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 15-01-PLAN.md — Backend: Wire real Instagram publishing into scheduler, enrich serializers with content_summary
+- [x] 15-01-PLAN.md — Backend: Wire real Instagram publishing into scheduler, enrich serializers with content_summary
 - [ ] 15-02-PLAN.md — Frontend: Instagram connection status, month calendar view, permalink display, UI verification
 
 ### Phase 16: Dashboard v2
@@ -152,7 +152,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 12.1 Viral Content Engine | 3/4 | Complete    | 2026-03-26 |
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
 | 14. Instagram Connection & CDN | 1/3 | Complete    | 2026-03-26 |
-| 15. Publishing & Scheduling | 0/2 | Not started | - |
+| 15. Publishing & Scheduling | 1/2 | In progress | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
 | 17. Billing & Stripe | 0/? | Not started | - |
 
