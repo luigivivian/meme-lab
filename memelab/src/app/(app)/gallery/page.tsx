@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown, Download } from "lucide-react";
+import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown, Download, Play, XCircle } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { SOURCE_COLORS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { IndeterminateProgress } from "@/components/ui/progress";
-import { useDriveImages, useDriveThemes, useThemes, useContentPackages, useVideoBudget, useVideoStatus } from "@/hooks/use-api";
+import { useDriveImages, useDriveThemes, useThemes, useContentPackages, useVideoBudget, useVideoStatus, useVideoList } from "@/hooks/use-api";
 import {
   imageUrl,
   composeMeme,
@@ -22,6 +22,7 @@ import {
   refineImage,
   generateVideo,
   imageDownloadUrl,
+  videoFileUrl,
   approveContent,
   rejectContent,
   bulkApproveContent,
@@ -91,6 +92,7 @@ export default function GalleryPage() {
 
   // Content packages + video generation
   const { data: contentData, mutate: mutateContent } = useContentPackages(50);
+  const { data: videoListData } = useVideoList();
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
   const [videoDuration, setVideoDuration] = useState<10 | 15>(10);
   const [videoGenerating, setVideoGenerating] = useState(false);
@@ -803,6 +805,100 @@ export default function GalleryPage() {
                 <p className="text-sm text-muted-foreground">Nenhum conteudo {statusFilter ? `com status "${statusFilter}"` : ""}</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Video Gallery */}
+      {videoListData && videoListData.videos.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Video className="h-4 w-4 text-primary" />
+              Videos Gerados
+              <Badge variant="secondary" className="text-xs ml-auto">{videoListData.videos.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <motion.div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" variants={staggerContainer} initial="initial" animate="animate">
+              {videoListData.videos.filter((v) => v.video_status === "success").map((v) => {
+                const filename = v.image_path.split(/[/\\]/).pop() ?? "";
+                const cost = v.video_metadata?.cost_usd as number | undefined;
+                const duration = v.video_metadata?.duration as number | undefined;
+                const genTime = v.video_metadata?.generation_time_ms as number | undefined;
+                return (
+                  <motion.div key={v.content_package_id} className="group relative overflow-hidden rounded-xl border border-white/[0.04] hover:border-white/[0.08] bg-secondary" variants={staggerItem}>
+                    <div className="relative aspect-[4/5] overflow-hidden">
+                      <img src={imageUrl(filename)} alt={v.phrase} className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a href={videoFileUrl(v.content_package_id)} target="_blank" rel="noopener noreferrer">
+                          <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/90 hover:bg-primary transition-colors">
+                            <Play className="h-5 w-5 text-white ml-0.5" />
+                          </div>
+                        </a>
+                      </div>
+                      <div className="absolute top-2 right-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/80 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                          <Video className="h-2.5 w-2.5" />
+                          {duration ?? 10}s
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-2.5 space-y-1.5">
+                      <p className="line-clamp-2 text-xs leading-snug">{v.phrase}</p>
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span>{v.topic}</span>
+                        {cost != null && <span>${cost.toFixed(3)}</span>}
+                        {genTime != null && <span>{(genTime / 1000).toFixed(0)}s</span>}
+                      </div>
+                      <a href={videoFileUrl(v.content_package_id)} download>
+                        <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1">
+                          <Download className="h-3 w-3" /> Baixar video
+                        </Button>
+                      </a>
+                    </div>
+                  </motion.div>
+                );
+              })}
+              {/* Generating videos */}
+              {videoListData.videos.filter((v) => v.video_status === "generating").map((v) => {
+                const filename = v.image_path.split(/[/\\]/).pop() ?? "";
+                return (
+                  <motion.div key={v.content_package_id} className="relative overflow-hidden rounded-xl border border-amber-500/20 bg-secondary" variants={staggerItem}>
+                    <div className="relative aspect-[4/5] overflow-hidden">
+                      <img src={imageUrl(filename)} alt={v.phrase} className="h-full w-full object-cover opacity-60" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40">
+                        <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                        <p className="text-xs text-amber-400 mt-2">Gerando video...</p>
+                      </div>
+                    </div>
+                    <div className="p-2.5">
+                      <p className="line-clamp-1 text-xs">{v.phrase}</p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+              {/* Failed videos */}
+              {videoListData.videos.filter((v) => v.video_status === "failed").map((v) => {
+                const filename = v.image_path.split(/[/\\]/).pop() ?? "";
+                const error = v.video_metadata?.error as string | undefined;
+                return (
+                  <motion.div key={v.content_package_id} className="relative overflow-hidden rounded-xl border border-rose-500/20 bg-secondary opacity-60" variants={staggerItem}>
+                    <div className="relative aspect-[4/5] overflow-hidden">
+                      <img src={imageUrl(filename)} alt={v.phrase} className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
+                        <XCircle className="h-6 w-6 text-rose-400" />
+                        <p className="text-xs text-rose-400 mt-1">Falhou</p>
+                      </div>
+                    </div>
+                    <div className="p-2.5">
+                      <p className="line-clamp-1 text-xs">{v.phrase}</p>
+                      {error && <p className="text-[10px] text-rose-400 truncate">{error}</p>}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
           </CardContent>
         </Card>
       )}

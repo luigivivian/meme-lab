@@ -1125,6 +1125,35 @@ export interface VideoBudgetResponse {
   videos_remaining_estimate: number;
 }
 
+export interface VideoListItem {
+  content_package_id: number;
+  phrase: string;
+  topic: string;
+  image_path: string;
+  video_status: string;
+  video_path: string | null;
+  video_task_id: string | null;
+  video_source: string | null;
+  video_metadata: Record<string, unknown> | null;
+  video_prompt_used: string | null;
+  created_at: string | null;
+}
+
+export interface VideoListResponse {
+  total: number;
+  videos: VideoListItem[];
+}
+
+export const getVideoList = (status?: string) => {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  const qs = params.toString();
+  return request<VideoListResponse>(`/generate/video/list${qs ? `?${qs}` : ""}`);
+};
+
+export const videoFileUrl = (contentPackageId: number) =>
+  `${BASE}/generate/video/file/${contentPackageId}`;
+
 export const generateVideo = (params: VideoGenerateRequest) =>
   request<VideoStatusResponse>("/generate/video", {
     method: "POST",

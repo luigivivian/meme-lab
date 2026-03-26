@@ -443,6 +443,72 @@ async def get_video_status(
     )
 
 
+@router.get("/list", summary="List content packages with video status")
+async def list_videos(
+    status: str | None = None,
+    limit: int = 50,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """List content packages that have video generation activity."""
+    from sqlalchemy import desc
+
+    stmt = select(ContentPackage).where(ContentPackage.video_status.isnot(None))
+    if status:
+        stmt = stmt.where(ContentPackage.video_status == status)
+    stmt = stmt.order_by(desc(ContentPackage.id)).limit(limit)
+
+    result = await session.execute(stmt)
+    packages = result.scalars().all()
+
+    return {
+        "total": len(packages),
+        "videos": [
+            {
+                "content_package_id": pkg.id,
+                "phrase": pkg.phrase,
+                "topic": pkg.topic,
+                "image_path": pkg.image_path,
+                "video_status": pkg.video_status,
+                "video_path": pkg.video_path,
+                "video_task_id": pkg.video_task_id,
+                "video_source": pkg.video_source,
+                "video_metadata": pkg.video_metadata,
+                "video_prompt_used": pkg.video_prompt_used,
+                "created_at": pkg.created_at.isoformat() if pkg.created_at else None,
+            }
+            for pkg in packages
+        ],
+    }
+
+
+@router.get("/file/{content_package_id}", summary="Serve generated video file")
+async def serve_video_file(
+    content_package_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Serve the generated video file for playback/download."""
+    from fastapi.responses import FileResponse
+
+    result = await session.execute(
+        select(ContentPackage).where(ContentPackage.id == content_package_id)
+    )
+    pkg = result.scalar_one_or_none()
+    if not pkg or not pkg.video_path:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    video_path = Path(pkg.video_path)
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video file missing from disk")
+
+    return FileResponse(
+        str(video_path),
+        media_type="video/mp4",
+        filename=f"memelab_video_{content_package_id}.mp4",
+    )
+
+
 @router.get(
     "/budget",
     summary="Check remaining daily video budget",

@@ -163,6 +163,13 @@ export function useUsage() {
   });
 }
 
+export function useVideoList(status?: string) {
+  const key = `video-list-${status ?? "all"}`;
+  return useSWR(key, () => api.getVideoList(status), {
+    refreshInterval: 5000,
+  });
+}
+
 export function useVideoBudget() {
   return useSWR("video-budget", () => api.getVideoBudget(), {
     refreshInterval: 30000,
