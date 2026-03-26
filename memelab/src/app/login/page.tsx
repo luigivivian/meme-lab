@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const { login, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
@@ -69,7 +70,7 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("Invalid email or password")) {
@@ -143,6 +144,17 @@ export default function LoginPage() {
                 <p id="password-error" role="alert" className="text-sm text-destructive mt-1">{fieldErrors.password}</p>
               )}
             </div>
+
+            {/* Remember me */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded accent-primary"
+              />
+              <span className="text-sm text-muted-foreground">Lembrar de mim</span>
+            </label>
 
             {/* Server error area */}
             {error && (

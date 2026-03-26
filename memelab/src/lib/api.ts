@@ -6,7 +6,7 @@ async function request<T>(
 ): Promise<T> {
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("access_token")
+      ? (localStorage.getItem("access_token") ?? sessionStorage.getItem("access_token"))
       : null;
 
   const headers: Record<string, string> = {
@@ -32,6 +32,8 @@ async function request<T>(
     ) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
+      sessionStorage.removeItem("access_token");
+      sessionStorage.removeItem("refresh_token");
       window.location.href = "/login";
       throw new Error("Sessao expirada");
     }
