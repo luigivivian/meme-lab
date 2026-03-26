@@ -30,10 +30,10 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 - [x] **VIRAL-05**: YouTubeRSSAgent expanded with 5+ major Brazilian comedy/entertainment channels
 - [x] **VIRAL-06**: GeminiWebTrendsAgent requests 25 topics per fetch for broader coverage
 - [x] **VIRAL-07**: BlueSkyAgent uses specific BR humor keywords instead of generic terms
-- [ ] **VIRAL-08**: Google Trends traffic parsing uses regex with K/M/B suffix support
-- [ ] **VIRAL-09**: Trend scores apply temporal velocity decay (e^(-age_hours/24))
-- [ ] **VIRAL-10**: TrendAggregator applies multi-source boost (1 + 0.2*(sources-1), capped at 2.0x)
-- [ ] **VIRAL-11**: Reddit posts use engagement/position-based scoring instead of fixed 0.4
+- [x] **VIRAL-08**: Google Trends traffic parsing uses regex with K/M/B suffix support
+- [x] **VIRAL-09**: Trend scores apply temporal velocity decay (e^(-age_hours/24))
+- [x] **VIRAL-10**: TrendAggregator applies multi-source boost (1 + 0.2*(sources-1), capped at 2.0x)
+- [x] **VIRAL-11**: Reddit posts use engagement/position-based scoring instead of fixed 0.4
 - [ ] **VIRAL-12**: Curator uses LLM-based theme mapping instead of rigid KEYWORD_MAP
 - [ ] **VIRAL-13**: Curator processes 20+ trends and produces 10-15 WorkOrders per run
 - [ ] **VIRAL-14**: Curator filters topics with meme potential below 3 (LLM-rated 1-5)
@@ -143,10 +143,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VIRAL-05 | Phase 12.1 | Complete |
 | VIRAL-06 | Phase 12.1 | Complete |
 | VIRAL-07 | Phase 12.1 | Complete |
-| VIRAL-08 | Phase 12.1 | Pending |
-| VIRAL-09 | Phase 12.1 | Pending |
-| VIRAL-10 | Phase 12.1 | Pending |
-| VIRAL-11 | Phase 12.1 | Pending |
+| VIRAL-08 | Phase 12.1 | Complete |
+| VIRAL-09 | Phase 12.1 | Complete |
+| VIRAL-10 | Phase 12.1 | Complete |
+| VIRAL-11 | Phase 12.1 | Complete |
 | VIRAL-12 | Phase 12.1 | Pending |
 | VIRAL-13 | Phase 12.1 | Pending |
 | VIRAL-14 | Phase 12.1 | Pending |
