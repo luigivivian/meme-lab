@@ -2,14 +2,16 @@
 
 Provides dialect-aware upsert (MySQL/SQLite), configurable daily limits
 via env vars, and per-user usage aggregation.
+
+Phase 16 additions: get_usage_history and get_cost_breakdown for dashboard analytics.
 """
 
 import logging
 import os
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import DATABASE_URL
@@ -316,3 +318,98 @@ class UsageRepository:
         )
         total = result.scalar_one_or_none()
         return float(total) if total is not None else 0.0
+
+    # -- Dashboard analytics (Phase 16) ----------------------------------------
+
+    async def get_usage_history(self, user_id: int, days: int = 30) -> list[dict]:
+        """Get daily usage counts grouped by service for the last N days.
+
+        Returns list of dicts sorted by date ascending, with zero-filled
+        missing dates:
+            [{"date": "2026-03-01", "gemini_text": 45, "gemini_image": 3, ...}, ...]
+        """
+        today_utc = self._get_pt_today_start_utc()
+        start_date = today_utc - timedelta(days=days)
+
+        result = await self.session.execute(
+            select(
+                ApiUsage.date,
+                ApiUsage.service,
+                func.sum(ApiUsage.usage_count).label("count"),
+            )
+            .where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.status == "success",
+                ApiUsage.date >= start_date,
+            )
+            .group_by(ApiUsage.date, ApiUsage.service)
+        )
+        rows = result.all()
+
+        # Collect all services seen
+        services_seen: set[str] = set()
+        date_service_map: dict[str, dict[str, int]] = {}
+        for row in rows:
+            d = row.date
+            date_str = d.strftime("%Y-%m-%d") if isinstance(d, datetime) else str(d)[:10]
+            service = row.service
+            count = int(row.count)
+            services_seen.add(service)
+            if date_str not in date_service_map:
+                date_service_map[date_str] = {}
+            date_service_map[date_str][service] = count
+
+        # Always include common services
+        for svc in ("gemini_text", "gemini_image", "kie_video"):
+            services_seen.add(svc)
+
+        # Generate all dates in range, fill zeros
+        history: list[dict] = []
+        for i in range(days + 1):
+            d = start_date + timedelta(days=i)
+            date_str = d.strftime("%Y-%m-%d")
+            entry: dict = {"date": date_str}
+            svc_data = date_service_map.get(date_str, {})
+            for svc in sorted(services_seen):
+                entry[svc] = svc_data.get(svc, 0)
+            history.append(entry)
+
+        return history
+
+    async def get_cost_breakdown(self, user_id: int, days: int = 30) -> list[dict]:
+        """Get cost aggregation by service for the last N days.
+
+        Returns list of dicts:
+            [{"service": "gemini_text", "cost_usd": 0.45, "calls": 120}, ...]
+        Only includes services with cost > 0 or calls > 0.
+        """
+        today_utc = self._get_pt_today_start_utc()
+        start_date = today_utc - timedelta(days=days)
+
+        result = await self.session.execute(
+            select(
+                ApiUsage.service,
+                func.sum(ApiUsage.cost_usd).label("total_cost"),
+                func.sum(ApiUsage.usage_count).label("total_calls"),
+            )
+            .where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.status == "success",
+                ApiUsage.date >= start_date,
+            )
+            .group_by(ApiUsage.service)
+        )
+        rows = result.all()
+
+        breakdown: list[dict] = []
+        for row in rows:
+            cost = float(row.total_cost or 0)
+            calls = int(row.total_calls or 0)
+            if cost > 0 or calls > 0:
+                breakdown.append({
+                    "service": row.service,
+                    "cost_usd": round(cost, 6),
+                    "calls": calls,
+                })
+
+        return breakdown
