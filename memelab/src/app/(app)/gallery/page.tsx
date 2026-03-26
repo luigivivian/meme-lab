@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown, Download } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { SOURCE_COLORS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
   generateSingle,
   refineImage,
   generateVideo,
+  imageDownloadUrl,
   approveContent,
   rejectContent,
   bulkApproveContent,
@@ -351,6 +352,11 @@ export default function GalleryPage() {
                     <p className="text-[10px] text-white/50">{img.theme} | {img.size_kb.toFixed(0)}kb</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
+                    <a href={imageDownloadUrl(img.filename)} onClick={(e) => e.stopPropagation()}>
+                      <Button size="sm" variant="secondary" className="h-7 text-xs">
+                        <Download className="mr-1 h-3 w-3" /> Baixar
+                      </Button>
+                    </a>
                     {img.category !== "meme" && (
                       <>
                         <Button
@@ -749,7 +755,13 @@ export default function GalleryPage() {
                           <span className="text-[10px] text-muted-foreground tabular-nums">{(pkg.quality_score * 100).toFixed(0)}%</span>
                         </div>
 
-                        {/* Action buttons by status */}
+                        {/* Download + Action buttons */}
+                        <a href={imageDownloadUrl(filename)} className="block">
+                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1">
+                            <Download className="h-3 w-3" /> Baixar com watermark
+                          </Button>
+                        </a>
+
                         {isPending && (
                           <div className="flex gap-1.5">
                             <Button size="sm" variant="outline" className="flex-1 h-7 text-xs gap-1" onClick={() => handleApprove(pkg.id)} disabled={approving === pkg.id}>
