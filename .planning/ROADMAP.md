@@ -41,6 +41,16 @@ Plans:
 - [x] 12-02-PLAN.md — Frontend: API client, hooks, Pipeline page rewrite per UI-SPEC
 - [ ] 12-03-PLAN.md — Integration: migration + servers + human verification checkpoint
 
+### Phase 12.1: Viral Content Engine — Trend Agents & Content Quality Overhaul (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 12
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 12.1 to break down)
+
 ### Phase 13: Tenant Isolation
 **Goal**: Every user sees only their own data across all resources, with admin users able to bypass isolation
 **Depends on**: Phase 12

@@ -57,6 +57,10 @@ Plan: Not started
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 12.1 inserted after Phase 12: Viral Content Engine — Trend Agents & Content Quality Overhaul (URGENT)
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
