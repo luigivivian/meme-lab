@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.pinterest.com)",
+      "WebFetch(domain:imgflip.com)",
+      "WebFetch(domain:www.kapwing.com)",
+      "WebFetch(domain:br.pinterest.com)",
+      "Bash(pip install requests beautifulsoup4)",
+      "Bash(python -m pip install requests beautifulsoup4)",
+      "Bash(python -m src.scrape_assets --source imgflip)",
+      "Bash(python -m src.scrape_assets --source fonts)",
+      "Bash(python -m src.scrape_assets --source pixabay)",
+      "Bash(pip install playwright)",
+      "Bash(python -m pip install playwright)",
+      "Bash(python -m playwright install chromium)",
+      "Bash(python -c \"from playwright.sync_api import sync_playwright; p = sync_playwright\\(\\).start\\(\\); b = p.chromium.launch\\(headless=True\\); b.close\\(\\); p.stop\\(\\); print\\(''Playwright OK''\\)\")",
+      "Bash(python -c \":*)",
+      "WebFetch(domain:www.neolemon.com)",
+      "Bash(pip --version)",
+      "Bash(where python)",
+      "WebFetch(domain:github.com)",
+      "Bash(python -c \"from config import COMFYUI_ENABLED, COMFYUI_HOST, COMFYUI_PORT, GENERATED_BACKGROUNDS_DIR; print\\(f''COMFYUI_ENABLED={COMFYUI_ENABLED}''\\); print\\(f''HOST={COMFYUI_HOST}:{COMFYUI_PORT}''\\); print\\(f''BG_DIR={GENERATED_BACKGROUNDS_DIR}''\\)\")",
+      "Bash(git init)",
+      "Bash(git add -A)",
+      "Bash(git commit -m \"snapshot antes de estrutura-agents\" --allow-empty)",
+      "Bash(git checkout -b estrutura-agents)",
+      "Bash(git switch -c estrutura-agents)",
+      "Bash(python -c \"from src.pipeline.agents.async_base import AsyncSourceAgent, SyncAgentAdapter; print\\(''Fase 0 async_base OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.monitoring import MonitoringLayer; print\\(''Fase 1 monitoring OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.broker import TrendBroker; print\\(''Fase 2 broker OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.curator import CuratorAgent; print\\(''Fase 3 curator OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.workers.phrase_worker import PhraseWorker; from src.pipeline.workers.image_worker import ImageWorker; from src.pipeline.workers.generation_layer import GenerationLayer; print\\(''Fase 4 workers OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.workers.caption_worker import CaptionWorker; from src.pipeline.workers.hashtag_worker import HashtagWorker; from src.pipeline.workers.quality_worker import QualityWorker; from src.pipeline.workers.post_production import PostProductionLayer; print\\(''Fase 5 pos-producao OK''\\)\")",
+      "Bash(python -m pip install code-review-graph)"
+    ]
+  }
+}

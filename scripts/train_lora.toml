@@ -1,0 +1,58 @@
+# Configuracao kohya_ss para treino de LoRA Flux Dev
+# Otimizado para RTX 4060 Ti 8GB VRAM (~7.5 GB de uso)
+#
+# Uso com kohya_ss:
+#   accelerate launch --mixed_precision fp16 \
+#     sd-scripts/flux_train_network.py --config scripts/train_lora.toml
+#
+# Prerequisito: modelo Flux Dev COMPLETO (nao GGUF) para treino
+#   Baixar de: https://huggingface.co/black-forest-labs/FLUX.1-dev
+#   Arquivo: flux1-dev.safetensors (~23.8 GB)
+
+[model]
+# Caminho do modelo Flux Dev (ajustar se necessario)
+pretrained_model_name_or_path = "../flux1-dev.safetensors"
+clip_l = "../comfyui/models/clip/clip_l.safetensors"
+t5xxl = "../comfyui/models/clip/t5xxl_fp8_e4m3fn.safetensors"
+ae = "../comfyui/models/vae/ae.safetensors"
+
+[dataset]
+train_data_dir = "./lora_training/dataset"
+resolution = "768,768"
+batch_size = 1
+enable_bucket = true
+min_bucket_reso = 512
+max_bucket_reso = 1024
+
+[network]
+network_module = "networks.lora_flux"
+network_dim = 9
+network_alpha = 9
+
+[training]
+output_dir = "./lora_training/output"
+output_name = "mago_mestre_v1"
+save_every_n_epochs = 25
+max_train_epochs = 200
+learning_rate = 1e-4
+lr_scheduler = "constant"
+optimizer_type = "Adafactor"
+optimizer_args = ["scale_parameter=False", "relative_step=False", "warmup_init=False"]
+
+# Otimizacoes para 8GB VRAM
+mixed_precision = "fp16"
+save_precision = "fp16"
+gradient_checkpointing = true
+gradient_accumulation_steps = 1
+cache_latents = true
+cache_latents_to_disk = true
+cache_text_encoder_outputs = true
+cache_text_encoder_outputs_to_disk = true
+
+# CPU offloading — essencial para 8GB VRAM com Flux Dev (~22GB fp16)
+fp8_base = true
+blocks_to_swap = 35
+
+# Logging
+logging_dir = "./lora_training/logs"
+log_with = "tensorboard"
