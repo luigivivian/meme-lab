@@ -32,6 +32,98 @@ Frases para avaliar:
 """
 
 
+# ---------------------------------------------------------------------------
+# Phrase validation (D-15): length, language, and format checks
+# ---------------------------------------------------------------------------
+
+# Common English words that are OK in Brazilian Portuguese memes (Brazilianisms)
+_ALLOWED_ENGLISH = {
+    "fake", "hype", "crush", "stalker", "like", "selfie", "stories",
+    "delivery", "home office", "wifi", "online", "streaming",
+    "playlist", "lo-fi", "lofi", "spoiler", "meme", "trend",
+    "reels", "feed", "post", "hack", "top", "vibe", "mood",
+    "cringe", "ghosting", "match", "date", "ok", "sorry",
+}
+
+# Common Portuguese markers — if any appear, the text is likely PT
+_PT_MARKERS = {
+    "que", "nao", "com", "uma", "pra", "quando", "mas", "meu",
+    "minha", "voce", "essa", "esse", "aqui", "mais", "como",
+    "vai", "vou", "sou", "tem", "esta", "seu", "sua",
+    "pro", "tudo", "isso", "nada", "todo", "cada",
+    "ser", "ter", "ver", "dar", "por", "ate", "bem",
+    "sim", "nos", "eles", "ela", "ele", "nem", "sem",
+    "dia", "hoje", "vida", "mundo", "gente", "coisa",
+    "muito", "sobre", "sempre", "nunca", "outro", "todos",
+    "onde", "quem", "qual", "tipo", "pode", "quer", "fica",
+}
+
+# Common English-only words (unlikely in BR Portuguese informal text)
+_ENGLISH_ONLY = {
+    "the", "and", "you", "that", "this", "with", "for", "are",
+    "but", "not", "have", "from", "they", "been", "said",
+    "each", "which", "their", "will", "other", "about",
+    "would", "make", "just", "know", "take", "people",
+    "into", "year", "your", "good", "some", "could", "them",
+    "than", "first", "long", "little", "very", "over",
+    "after", "thing", "give", "most", "because", "where",
+    "should", "still", "before", "here", "through", "think",
+    "well", "also", "back", "only", "come", "every", "between",
+    "when", "what", "there", "can", "all", "were", "her",
+    "his", "one", "our", "out", "had", "has", "its",
+    "then", "being", "does", "did", "get", "got", "made",
+    "many", "much", "these", "those", "such", "keep",
+    "never", "always", "really", "again", "look", "want",
+    "right", "now", "find", "way", "may", "down", "who",
+}
+
+
+def _validate_phrase(phrase: str, max_chars: int = 120) -> tuple[bool, str]:
+    """Validate a phrase for image overlay suitability.
+
+    Returns (is_valid, reason). Reason is empty if valid.
+    """
+    # Check 1: Length
+    if len(phrase) > max_chars:
+        return False, f"too_long ({len(phrase)} > {max_chars})"
+
+    if len(phrase) < 10:
+        return False, f"too_short ({len(phrase)} chars)"
+
+    # Check 2: Language — ensure it's predominantly Portuguese
+    words = phrase.lower().split()
+    if len(words) < 3:
+        return False, "too_few_words"
+
+    # Strategy: check for Portuguese markers AND English-only words.
+    # If any non-ASCII character exists (accents), it's very likely Portuguese.
+    has_non_ascii = not phrase.isascii()
+    has_pt_marker = any(w in _PT_MARKERS for w in words)
+    has_allowed_en = any(w in _ALLOWED_ENGLISH for w in words)
+
+    if has_non_ascii or has_pt_marker:
+        # Very likely Portuguese — pass language check
+        pass
+    elif has_allowed_en:
+        # Has Brazilianisms (like "meme", "vibe") but no PT markers — likely PT slang
+        pass
+    else:
+        # All ASCII, no PT markers, no Brazilianisms — likely English
+        english_only_count = sum(1 for w in words if w in _ENGLISH_ONLY)
+        english_ratio = english_only_count / len(words) if words else 0
+        if english_ratio > 0.3:
+            return False, f"too_much_english ({english_only_count}/{len(words)} words)"
+        # Even without matching English keywords, no PT markers is suspicious
+        if len(words) >= 5:
+            return False, f"no_pt_markers (0 Portuguese markers in {len(words)} words)"
+
+    # Check 3: Not empty/placeholder
+    if phrase.strip().startswith("[") or phrase.strip().startswith("{"):
+        return False, "placeholder_text"
+
+    return True, ""
+
+
 def _generate_with_prompt(
     system_prompt: str,
     topic: str,
@@ -144,7 +236,34 @@ class PhraseWorker:
                 logger.info(
                     f"[{work_order.order_id}] {len(phrases)} frase(s) gerada(s)"
                 )
-                return phrases
+
+                # Validate phrases (per D-15)
+                max_chars = self._max_chars or 120
+                validated = []
+                for phrase in phrases:
+                    is_valid, reason = _validate_phrase(phrase, max_chars)
+                    if is_valid:
+                        validated.append(phrase)
+                    else:
+                        logger.info(f"[{work_order.order_id}] Phrase rejected ({reason}): '{phrase[:50]}...'")
+
+                # If too many rejected, retry once
+                if len(validated) < count and len(validated) < len(phrases):
+                    logger.info(f"[{work_order.order_id}] {len(phrases) - len(validated)} phrases rejected, regenerating...")
+                    retry_phrases = await asyncio.to_thread(
+                        _generate_with_prompt,
+                        self._system_prompt,
+                        work_order.gandalf_topic,
+                        count - len(validated),
+                        self._max_chars,
+                        work_order.humor_angle,
+                    )
+                    for phrase in retry_phrases:
+                        is_valid, reason = _validate_phrase(phrase, max_chars)
+                        if is_valid:
+                            validated.append(phrase)
+
+                return validated[:count]
             except Exception as e:
                 logger.error(
                     f"[{work_order.order_id}] Falha na geracao de frases: {e}"
@@ -187,6 +306,41 @@ class PhraseWorker:
                 logger.error(f"[{work_order.order_id}] A/B geracao falhou: {e}")
                 return [], []
 
+        if not all_phrases:
+            return [], []
+
+        # Validate phrases before scoring (per D-15)
+        max_chars = self._max_chars or 120
+        valid_phrases = []
+        for phrase in all_phrases:
+            is_valid, reason = _validate_phrase(phrase, max_chars)
+            if is_valid:
+                valid_phrases.append(phrase)
+            else:
+                logger.info(f"[{work_order.order_id}] A/B phrase rejected ({reason}): '{phrase[:50]}...'")
+
+        # If too many rejected, retry once for replacements
+        if len(valid_phrases) < total_to_generate and len(valid_phrases) < len(all_phrases):
+            needed = total_to_generate - len(valid_phrases)
+            logger.info(f"[{work_order.order_id}] A/B: {len(all_phrases) - len(valid_phrases)} rejected, regenerating {needed}...")
+            async with _gemini_semaphore:
+                try:
+                    retry_phrases = await asyncio.to_thread(
+                        _generate_with_prompt,
+                        self._system_prompt,
+                        work_order.gandalf_topic,
+                        needed,
+                        self._max_chars,
+                        work_order.humor_angle,
+                    )
+                    for phrase in retry_phrases:
+                        is_valid, reason = _validate_phrase(phrase, max_chars)
+                        if is_valid:
+                            valid_phrases.append(phrase)
+                except Exception as e:
+                    logger.warning(f"[{work_order.order_id}] A/B retry failed: {e}")
+
+        all_phrases = valid_phrases
         if not all_phrases:
             return [], []
 
