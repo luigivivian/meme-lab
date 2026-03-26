@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 13: Tenant Isolation** - Per-user data scoping across all resources with admin bypass (completed 2026-03-25)
 - [x] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, GCS CDN image upload, token lifecycle management (completed 2026-03-26)
 - [x] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts (completed 2026-03-26)
-- [x] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history (completed 2026-03-26)
+- [x] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history (completed 2026-03-26)
 - [ ] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement
 
 ## Phase Details
@@ -134,12 +134,13 @@ Plans:
   3. Stripe webhooks correctly handle subscription lifecycle events (create, renew, update, cancel) and the app reflects changes within seconds
   4. User can manage billing (update card, change plan, cancel subscription) via Stripe Customer Portal without leaving the flow
   5. Failed payments trigger a grace period and eventual automatic downgrade to Free tier
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 17-01: TBD
-- [ ] 17-02: TBD
+- [ ] 17-01-PLAN.md — Backend foundation: DB migration (billing fields on users), config constants, StripeBillingService (checkout, portal, webhooks)
+- [ ] 17-02-PLAN.md — API routes: 4 billing endpoints (status, checkout, webhook, portal) + tier-aware quota enforcement in UsageRepository
+- [ ] 17-03-PLAN.md — Frontend: billing page with plan cards, usage vs limits, Stripe Checkout redirect, portal link, sidebar nav
 
 ## Progress
 
@@ -154,7 +155,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 14. Instagram Connection & CDN | 1/3 | Complete    | 2026-03-26 |
 | 15. Publishing & Scheduling | 1/2 | Complete    | 2026-03-26 |
 | 16. Dashboard v2 | 2/2 | Complete    | 2026-03-26 |
-| 17. Billing & Stripe | 0/? | Not started | - |
+| 17. Billing & Stripe | 0/3 | Not started | - |
 
 ## Backlog
 
