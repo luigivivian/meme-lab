@@ -80,6 +80,7 @@ export interface ImageInfo {
   theme: string;
   size_kb: number;
   modified_at: string;
+  category?: "background" | "meme";
 }
 
 export interface DriveImagesResponse {
@@ -381,6 +382,10 @@ export interface ContentPackageDB {
   created_at: string | null;
   pipeline_run_id: number | null;
   character_id: number | null;
+  video_status: string | null;
+  video_path: string | null;
+  video_task_id: string | null;
+  video_metadata: Record<string, unknown> | null;
 }
 
 export interface ContentPackagesResponse {
@@ -644,12 +649,14 @@ export const getContentPackages = (params?: { limit?: number; offset?: number })
 // --- Drive ---
 export interface DriveQuery {
   theme?: string;
+  category?: "background" | "meme";
   limit?: number;
   offset?: number;
 }
 export const getDriveImages = (q?: DriveQuery) => {
   const params = new URLSearchParams();
   if (q?.theme) params.set("theme", q.theme);
+  if (q?.category) params.set("category", q.category);
   if (q?.limit) params.set("limit", String(q.limit));
   if (q?.offset) params.set("offset", String(q.offset));
   const qs = params.toString();
@@ -1089,6 +1096,51 @@ export const getPublishingCalendar = (startDate: string, endDate: string) =>
 
 export const getBestTimes = () =>
   request<BestTimesResponse>("/publishing/best-times");
+
+// --- Video Generation (Phase 999.1) ---
+export interface VideoGenerateRequest {
+  content_package_id: number;
+  duration: number; // 10 or 15
+  character_ids?: string[];
+}
+
+export interface VideoStatusResponse {
+  content_package_id: number;
+  video_status: string | null;
+  video_task_id: string | null;
+  video_path: string | null;
+  video_source: string | null;
+  video_metadata: Record<string, unknown> | null;
+}
+
+export interface VideoBudgetResponse {
+  daily_budget_usd: number;
+  spent_today_usd: number;
+  remaining_usd: number;
+  videos_remaining_estimate: number;
+}
+
+export const generateVideo = (params: VideoGenerateRequest) =>
+  request<VideoStatusResponse>("/generate/video", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+
+export const generateVideoBatch = (params: {
+  content_package_ids: number[];
+  duration?: number;
+  character_ids?: string[];
+}) =>
+  request<VideoStatusResponse[]>("/generate/video/batch", {
+    method: "POST",
+    body: JSON.stringify({ duration: 10, ...params }),
+  });
+
+export const getVideoStatus = (contentPackageId: number) =>
+  request<VideoStatusResponse>(`/generate/video/status/${contentPackageId}`);
+
+export const getVideoBudget = () =>
+  request<VideoBudgetResponse>("/generate/video/budget");
 
 // --- Content Export ---
 export const exportContentPack = (packageId: number) =>

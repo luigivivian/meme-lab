@@ -27,7 +27,7 @@ export function useLatestImages(count = 4) {
 }
 
 export function useDriveImages(query?: api.DriveQuery) {
-  const key = `drive-images-${query?.theme ?? ""}-${query?.limit ?? 20}-${query?.offset ?? 0}`;
+  const key = `drive-images-${query?.theme ?? ""}-${query?.category ?? ""}-${query?.limit ?? 20}-${query?.offset ?? 0}`;
   return useSWR(key, () => api.getDriveImages(query), {
     refreshInterval: 30000,
   });
@@ -161,4 +161,19 @@ export function useUsage() {
   return useSWR("usage", () => api.getUsage(), {
     refreshInterval: 30000,
   });
+}
+
+export function useVideoBudget() {
+  return useSWR("video-budget", () => api.getVideoBudget(), {
+    refreshInterval: 30000,
+    errorRetryCount: 1,
+  });
+}
+
+export function useVideoStatus(contentPackageId: number | null, enabled = false) {
+  return useSWR(
+    contentPackageId && enabled ? `video-status-${contentPackageId}` : null,
+    () => (contentPackageId ? api.getVideoStatus(contentPackageId) : null),
+    { refreshInterval: 3000 }
+  );
 }

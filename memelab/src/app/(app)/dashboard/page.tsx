@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Image, Bot, Workflow, TrendingUp, Play, HardDrive, Palette,
   Loader2, CheckCircle2, Clock, Package, Send, Activity, Zap, Gauge,
+  Video, DollarSign,
 } from "lucide-react";
 import { staggerContainer, staggerItem, fadeInUp, fastStaggerContainer, fastStaggerItem } from "@/lib/animations";
 import { StatsCard } from "@/components/panels/stats-card";
@@ -13,12 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton, SkeletonCard, SkeletonList } from "@/components/ui/skeleton";
 import { Progress, IndeterminateProgress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   useStatus, useAgents, useLatestImages, usePipelineRuns,
   useDriveHealth, useJobs, useContentPackages, useQueueSummary, useUsage,
+  useVideoBudget, useVideoStatus,
 } from "@/hooks/use-api";
 import { usePipeline } from "@/hooks/use-pipeline";
-import { imageUrl, type ContentPackageDB } from "@/lib/api";
+import { imageUrl, generateVideo, type ContentPackageDB } from "@/lib/api";
 import { SOURCE_COLORS, AGENT_TYPE_COLORS, PUBLISH_STATUS_COLORS } from "@/lib/constants";
 
 const DISTRIBUTION_BAR_COLORS: Record<string, string> = {
@@ -46,6 +49,18 @@ function getSourceLabel(pkg: ContentPackageDB): string {
   return pkg.background_source || "static";
 }
 
+const VIDEO_STATUS_STYLES: Record<string, string> = {
+  generating: "bg-amber-500/80 animate-pulse",
+  success: "bg-cyan-500/80",
+  failed: "bg-rose-500/80",
+};
+
+const VIDEO_STATUS_LABELS: Record<string, string> = {
+  generating: "Gerando video...",
+  success: "Video pronto",
+  failed: "Video falhou",
+};
+
 export default function DashboardPage() {
   const { data: status, isLoading: statusLoading } = useStatus();
   const { data: agents } = useAgents();
@@ -53,10 +68,50 @@ export default function DashboardPage() {
   const { data: runs } = usePipelineRuns();
   const { data: driveHealth } = useDriveHealth();
   const { data: jobsData } = useJobs();
-  const { data: contentData } = useContentPackages(6);
+  const { data: contentData, mutate: mutateContent } = useContentPackages(6);
   const { data: queueSummary } = useQueueSummary();
   const { data: usageData, isLoading: usageLoading } = useUsage();
   const pipeline = usePipeline();
+
+  // Video generation state
+  const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
+  const [videoDuration, setVideoDuration] = useState<10 | 15>(10);
+  const [videoGenerating, setVideoGenerating] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoSuccess, setVideoSuccess] = useState(false);
+  const { data: budgetData } = useVideoBudget();
+  const { data: pollingStatus } = useVideoStatus(
+    videoTarget?.id ?? null,
+    videoGenerating,
+  );
+
+  // Auto-detect when video generation finishes
+  if (videoGenerating && pollingStatus?.video_status && pollingStatus.video_status !== "generating") {
+    setVideoGenerating(false);
+    if (pollingStatus.video_status === "success") {
+      setVideoSuccess(true);
+      mutateContent();
+    } else {
+      setVideoError("Geracao de video falhou");
+    }
+  }
+
+  const handleGenerateVideo = async () => {
+    if (!videoTarget) return;
+    setVideoGenerating(true);
+    setVideoError(null);
+    setVideoSuccess(false);
+    try {
+      await generateVideo({
+        content_package_id: videoTarget.id,
+        duration: videoDuration,
+      });
+      // Polling via useVideoStatus will detect completion
+    } catch (err) {
+      setVideoGenerating(false);
+      setVideoError(err instanceof Error ? err.message : "Erro ao gerar video");
+    }
+  };
 
   const activeAgents = agents ? agents.filter((a) => a.available).length : 0;
   const totalImages = status?.total_images_generated ?? 0;
@@ -255,12 +310,38 @@ export default function DashboardPage() {
                                 {themeKey}
                               </span>
                             )}
+                            {pkg.video_status && (
+                              <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm ${VIDEO_STATUS_STYLES[pkg.video_status] ?? "bg-zinc-500/80"}`}>
+                                <Video className="h-2.5 w-2.5" />
+                                {VIDEO_STATUS_LABELS[pkg.video_status] ?? pkg.video_status}
+                              </span>
+                            )}
                             {pkg.is_published && (
                               <span className="inline-flex items-center rounded-full bg-emerald-500/80 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
                                 Publicado
                               </span>
                             )}
                           </div>
+                          {/* Video generate button on hover — only for approved packages without video */}
+                          {pkg.approval_status === "approved" && !pkg.video_status && (
+                            <div className="absolute bottom-2 right-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 text-[10px] gap-1 backdrop-blur-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setVideoTarget(pkg);
+                                  setVideoError(null);
+                                  setVideoSuccess(false);
+                                  setVideoDuration(10);
+                                }}
+                              >
+                                <Video className="h-3 w-3" />
+                                Gerar Video
+                              </Button>
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-1.5 p-2.5">
                           <p className="line-clamp-2 text-sm leading-snug">{pkg.phrase}</p>
@@ -576,6 +657,134 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Video Generation Dialog */}
+      <Dialog
+        open={!!videoTarget}
+        onOpenChange={() => {
+          if (!videoGenerating) {
+            setVideoTarget(null);
+            setVideoError(null);
+            setVideoSuccess(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Video className="h-4 w-4 text-primary" />
+              Gerar Video
+            </DialogTitle>
+          </DialogHeader>
+          {videoTarget && (
+            <div className="space-y-4">
+              {/* Preview */}
+              <div className="flex gap-3 items-start">
+                <div className="w-20 aspect-[4/5] overflow-hidden rounded-lg bg-secondary shrink-0">
+                  <img
+                    src={imageUrl(videoTarget.image_path.split(/[/\\]/).pop() ?? "")}
+                    alt={videoTarget.phrase}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm line-clamp-2">{videoTarget.phrase}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{videoTarget.topic}</p>
+                </div>
+              </div>
+
+              {/* Budget info */}
+              {budgetData && (
+                <div className="flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Orcamento hoje</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-medium tabular-nums">
+                      ${budgetData.remaining_usd.toFixed(2)} restante
+                    </span>
+                    <span className="text-[10px] text-muted-foreground ml-1">
+                      (~{budgetData.videos_remaining_estimate} videos)
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Duration selection */}
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Duracao</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={videoDuration === 10 ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setVideoDuration(10)}
+                    disabled={videoGenerating}
+                  >
+                    10s — $0.15
+                  </Button>
+                  <Button
+                    variant={videoDuration === 15 ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setVideoDuration(15)}
+                    disabled={videoGenerating}
+                  >
+                    15s — $0.23
+                  </Button>
+                </div>
+              </div>
+
+              {/* Generate button */}
+              <Button
+                onClick={handleGenerateVideo}
+                disabled={videoGenerating || videoSuccess}
+                className={`w-full gap-2 ${videoGenerating ? "pulse-glow" : ""}`}
+              >
+                {videoGenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : videoSuccess ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <Video className="h-4 w-4" />
+                )}
+                {videoGenerating
+                  ? "Gerando video..."
+                  : videoSuccess
+                  ? "Video gerado!"
+                  : "Gerar Video"}
+              </Button>
+
+              {/* Progress */}
+              {videoGenerating && (
+                <div className="space-y-2 animate-fade-in">
+                  <IndeterminateProgress />
+                  <p className="text-xs text-muted-foreground text-center">
+                    Processando via Kie.ai Sora 2 (30-120s)...
+                  </p>
+                </div>
+              )}
+
+              {/* Success */}
+              {videoSuccess && (
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 animate-fade-in">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  <p className="text-sm text-emerald-400">Video gerado com sucesso!</p>
+                </div>
+              )}
+
+              {/* Error */}
+              {videoError && (
+                <div className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-2 animate-fade-in">
+                  <div className="h-2 w-2 rounded-full bg-destructive" />
+                  <p className="text-sm text-destructive">{videoError}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
