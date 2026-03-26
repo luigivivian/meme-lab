@@ -388,6 +388,7 @@ export default function GalleryPage() {
       {/* Preview Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden">
+          <DialogTitle className="sr-only">Preview</DialogTitle>
           {previewImage && (
             <img src={imageUrl(previewImage)} alt={previewImage} className="w-full animate-fade-in" />
           )}
