@@ -17,6 +17,10 @@ import {
   AlertCircle,
   Ban,
   Zap,
+  ExternalLink,
+  Link as LinkIcon,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { StatsCard } from "@/components/panels/stats-card";
@@ -38,6 +42,7 @@ import {
   usePublishingCalendar,
   useBestTimes,
   useContentPackages,
+  useInstagramStatus,
 } from "@/hooks/use-api";
 import {
   schedulePost,
@@ -49,7 +54,7 @@ import {
 } from "@/lib/api";
 import { PUBLISH_STATUS_COLORS, PLATFORM_COLORS } from "@/lib/constants";
 
-// ── Helpers ─────────────────────────────────────────────────────
+// -- Helpers -----------------------------------------------------------------
 
 function extractFilename(path: string) {
   return path.split("/").pop()?.split("\\").pop() ?? path;
@@ -86,6 +91,14 @@ function getWeekRange(offset: number) {
   return { start: monday, end: sunday };
 }
 
+function getMonthRange(offset: number) {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  last.setHours(23, 59, 59, 999);
+  return { start: first, end: last };
+}
+
 function toISODate(d: Date) {
   return d.toISOString().split("T")[0];
 }
@@ -109,7 +122,15 @@ const STATUS_ICON: Record<string, typeof Clock> = {
   cancelled: Ban,
 };
 
-// ── Tab button ──────────────────────────────────────────────────
+const STATUS_DOT_COLOR: Record<string, string> = {
+  queued: "bg-amber-400",
+  publishing: "bg-blue-400",
+  published: "bg-emerald-400",
+  failed: "bg-red-400",
+  cancelled: "bg-zinc-400",
+};
+
+// -- Tab button --------------------------------------------------------------
 
 function TabButton({
   label,
@@ -135,7 +156,7 @@ function TabButton({
   );
 }
 
-// ── Status Badge ────────────────────────────────────────────────
+// -- Status Badge ------------------------------------------------------------
 
 function StatusBadge({ status }: { status: string }) {
   const colors = PUBLISH_STATUS_COLORS[status] ?? "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
@@ -159,7 +180,54 @@ function PlatformBadge({ platform }: { platform: string }) {
   );
 }
 
-// ── Queue Tab ───────────────────────────────────────────────────
+// -- Instagram Connection Banner ---------------------------------------------
+
+function InstagramStatusBanner() {
+  const { data: igStatus, isLoading } = useInstagramStatus();
+
+  if (isLoading) return null;
+
+  if (!igStatus?.connected) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+        <WifiOff className="h-4 w-4 text-amber-400 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-amber-300">
+            Instagram nao conectado
+          </p>
+          <p className="text-xs text-amber-400/70">
+            Conecte sua conta para publicar automaticamente
+          </p>
+        </div>
+        <a
+          href="/settings"
+          className="shrink-0 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/30 transition-colors"
+        >
+          Configuracoes
+        </a>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function InstagramConnectedIndicator() {
+  const { data: igStatus } = useInstagramStatus();
+
+  if (!igStatus?.connected) return null;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="h-2 w-2 rounded-full bg-emerald-400" />
+      <span className="text-xs text-emerald-400">
+        @{igStatus.ig_username ?? "conectado"}
+      </span>
+    </div>
+  );
+}
+
+// -- Queue Tab ---------------------------------------------------------------
 
 function QueueTab() {
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -249,6 +317,9 @@ function QueueTab() {
             const summary = post.content_summary;
             const filename = summary ? extractFilename(summary.image_path) : null;
             const Icon = STATUS_ICON[post.status] ?? Clock;
+            const permalink = post.status === "published" && post.publish_result
+              ? (post.publish_result as Record<string, unknown>)?.permalink as string | undefined
+              : undefined;
             return (
               <motion.div
                 key={post.id}
@@ -291,6 +362,18 @@ function QueueTab() {
                       <span>| Publicado: {formatDateTimeBR(post.published_at)}</span>
                     )}
                   </div>
+                  {/* Permalink for published posts */}
+                  {permalink && (
+                    <a
+                      href={permalink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span className="truncate max-w-[200px]">Ver no Instagram</span>
+                    </a>
+                  )}
                   {post.error_message && (
                     <p className="text-[10px] text-destructive line-clamp-1">
                       {post.error_message}
@@ -349,20 +432,31 @@ function QueueTab() {
   );
 }
 
-// ── Calendar Tab ────────────────────────────────────────────────
+// -- Calendar Tab ------------------------------------------------------------
 
 function CalendarTab() {
+  const [viewMode, setViewMode] = useState<"week" | "month">("week");
   const [weekOffset, setWeekOffset] = useState(0);
-  const { start, end } = getWeekRange(weekOffset);
-  const { data, isLoading } = usePublishingCalendar(toISODate(start), toISODate(end));
+  const [monthOffset, setMonthOffset] = useState(0);
 
-  // Build 7-day array
-  const days = useMemo(() => {
+  // Compute date range based on view mode
+  const range = useMemo(() => {
+    if (viewMode === "week") {
+      return getWeekRange(weekOffset);
+    }
+    return getMonthRange(monthOffset);
+  }, [viewMode, weekOffset, monthOffset]);
+
+  const { data, isLoading } = usePublishingCalendar(toISODate(range.start), toISODate(range.end));
+
+  // Build week view days
+  const weekDays = useMemo(() => {
+    if (viewMode !== "week") return [];
     const calPosts = data?.dates ?? {};
     const arr: { date: Date; key: string; label: string; posts: CalendarDay[] }[] = [];
     for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
+      const d = new Date(range.start);
+      d.setDate(range.start.getDate() + i);
       const key = toISODate(d);
       arr.push({
         date: d,
@@ -372,44 +466,121 @@ function CalendarTab() {
       });
     }
     return arr;
-  }, [data, start]);
+  }, [data, range, viewMode]);
 
-  const weekLabel = `${formatDateBR(start.toISOString())} - ${formatDateBR(end.toISOString())}`;
+  // Build month view grid
+  const monthGrid = useMemo(() => {
+    if (viewMode !== "month") return [];
+    const calPosts = data?.dates ?? {};
+    const first = new Date(range.start);
+    const year = first.getFullYear();
+    const month = first.getMonth();
+
+    // Day of week for first day (0=Sun, adjust so Mon=0)
+    let firstDow = first.getDay() - 1;
+    if (firstDow < 0) firstDow = 6;
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+
+    const cells: { date: Date; key: string; dayNum: number; inMonth: boolean; posts: CalendarDay[] }[] = [];
+    for (let i = 0; i < totalCells; i++) {
+      const d = new Date(year, month, 1 - firstDow + i);
+      const key = toISODate(d);
+      const inMonth = d.getMonth() === month;
+      cells.push({
+        date: d,
+        key,
+        dayNum: d.getDate(),
+        inMonth,
+        posts: calPosts[key] ?? [],
+      });
+    }
+    return cells;
+  }, [data, range, viewMode]);
+
+  const weekLabel = viewMode === "week"
+    ? `${formatDateBR(range.start.toISOString())} - ${formatDateBR(range.end.toISOString())}`
+    : range.start.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  const handlePrev = () => {
+    if (viewMode === "week") setWeekOffset((w) => w - 1);
+    else setMonthOffset((m) => m - 1);
+  };
+
+  const handleNext = () => {
+    if (viewMode === "week") setWeekOffset((w) => w + 1);
+    else setMonthOffset((m) => m + 1);
+  };
+
+  const handleReset = () => {
+    if (viewMode === "week") setWeekOffset(0);
+    else setMonthOffset(0);
+  };
+
+  const isOffsetZero = viewMode === "week" ? weekOffset === 0 : monthOffset === 0;
 
   return (
     <div className="space-y-4">
-      {/* Navigation */}
+      {/* Navigation + View Toggle */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => setWeekOffset((w) => w - 1)}>
+        <Button variant="ghost" size="sm" onClick={handlePrev}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <div className="text-center">
-          <p className="text-sm font-medium">{weekLabel}</p>
-          {weekOffset !== 0 && (
+        <div className="text-center flex flex-col items-center gap-1">
+          <p className="text-sm font-medium capitalize">{weekLabel}</p>
+          {!isOffsetZero && (
             <button
               type="button"
-              onClick={() => setWeekOffset(0)}
+              onClick={handleReset}
               className="text-[10px] text-primary hover:underline"
             >
-              Voltar para esta semana
+              {viewMode === "week" ? "Voltar para esta semana" : "Voltar para este mes"}
             </button>
           )}
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setWeekOffset((w) => w + 1)}>
+        <Button variant="ghost" size="sm" onClick={handleNext}>
           <ChevronRight className="h-4 w-4" />
         </Button>
+      </div>
+
+      {/* View mode toggle */}
+      <div className="flex items-center gap-1 rounded-lg bg-secondary/50 p-0.5 w-fit mx-auto">
+        <button
+          type="button"
+          onClick={() => setViewMode("week")}
+          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+            viewMode === "week"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Semana
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("month")}
+          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+            viewMode === "month"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Mes
+        </button>
       </div>
 
       {/* Grid */}
       {isLoading ? (
         <div className="grid grid-cols-7 gap-2">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
+          {Array.from({ length: viewMode === "week" ? 7 : 35 }).map((_, i) => (
+            <Skeleton key={i} className={`${viewMode === "week" ? "h-32" : "h-20"} rounded-xl`} />
           ))}
         </div>
-      ) : (
+      ) : viewMode === "week" ? (
+        /* Week view */
         <div className="grid grid-cols-7 gap-2">
-          {days.map((day) => {
+          {weekDays.map((day) => {
             const isToday = toISODate(new Date()) === day.key;
             return (
               <div
@@ -433,31 +604,81 @@ function CalendarTab() {
                   </span>
                 </div>
                 <div className="space-y-1 max-h-24 overflow-auto">
-                  {day.posts.map(
-                    (post) => {
-                      const statusColor = PUBLISH_STATUS_COLORS[post.status] ?? "";
-                      return (
-                        <div
-                          key={post.post_id}
-                          className={`rounded-md border px-1.5 py-0.5 text-[9px] font-semibold truncate ${statusColor}`}
-                          title={post.content_summary?.phrase ?? `#${post.post_id}`}
-                        >
-                          {post.time.slice(0, 5)} {post.platform}
-                        </div>
-                      );
-                    }
-                  )}
+                  {day.posts.map((post) => {
+                    const dotColor = STATUS_DOT_COLOR[post.status] ?? "bg-zinc-400";
+                    const statusColor = PUBLISH_STATUS_COLORS[post.status] ?? "";
+                    return (
+                      <div
+                        key={post.post_id}
+                        className={`flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold truncate ${statusColor}`}
+                        title={post.content_summary?.phrase ?? `#${post.post_id}`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`} />
+                        {post.time.slice(0, 5)} {post.platform}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
+        </div>
+      ) : (
+        /* Month view */
+        <div>
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {DAY_LABELS.map((label) => (
+              <div key={label} className="text-center text-[10px] font-medium text-muted-foreground">
+                {label}
+              </div>
+            ))}
+          </div>
+          {/* Day cells */}
+          <div className="grid grid-cols-7 gap-2">
+            {monthGrid.map((cell) => {
+              const isToday = toISODate(new Date()) === cell.key;
+              return (
+                <div
+                  key={cell.key}
+                  className={`min-h-[72px] rounded-lg border p-1.5 transition-colors ${
+                    !cell.inMonth
+                      ? "opacity-30 bg-secondary/10"
+                      : isToday
+                      ? "border-primary/50 bg-primary/5"
+                      : "bg-secondary/30 hover:bg-secondary/50"
+                  }`}
+                >
+                  <span
+                    className={`text-[10px] font-bold block mb-1 ${
+                      isToday ? "text-primary" : "text-foreground"
+                    }`}
+                  >
+                    {cell.dayNum}
+                  </span>
+                  <div className="flex flex-wrap gap-0.5">
+                    {cell.posts.map((post) => {
+                      const dotColor = STATUS_DOT_COLOR[post.status] ?? "bg-zinc-400";
+                      return (
+                        <span
+                          key={post.post_id}
+                          className={`h-2 w-2 rounded-full ${dotColor}`}
+                          title={`${post.time.slice(0, 5)} ${post.platform} - ${post.content_summary?.phrase ?? `#${post.post_id}`}`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ── Best Times Tab ──────────────────────────────────────────────
+// -- Best Times Tab ----------------------------------------------------------
 
 function BestTimesTab() {
   const { data, isLoading } = useBestTimes();
@@ -521,7 +742,7 @@ function BestTimesTab() {
   );
 }
 
-// ── Schedule Dialog ─────────────────────────────────────────────
+// -- Schedule Dialog ---------------------------------------------------------
 
 function ScheduleDialog({
   open,
@@ -533,6 +754,7 @@ function ScheduleDialog({
   onSuccess: () => void;
 }) {
   const { data: contentData } = useContentPackages(20);
+  const { data: igStatus } = useInstagramStatus();
   const packages = contentData?.packages ?? [];
 
   const [selectedPkgId, setSelectedPkgId] = useState<number | null>(null);
@@ -542,8 +764,10 @@ function ScheduleDialog({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const igNotConnected = platform === "instagram" && !igStatus?.connected;
+
   const handleSubmit = async () => {
-    if (!selectedPkgId || !scheduledAt) return;
+    if (!selectedPkgId || !scheduledAt || igNotConnected) return;
     setSubmitting(true);
     setError(null);
     setSuccess(false);
@@ -642,6 +866,20 @@ function ScheduleDialog({
                 </button>
               ))}
             </div>
+            {/* Instagram connection status in dialog */}
+            {platform === "instagram" && (
+              igStatus?.connected ? (
+                <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+                  <Wifi className="h-3 w-3" />
+                  Conectado como @{igStatus.ig_username ?? "instagram"}
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-400 flex items-center gap-1">
+                  <WifiOff className="h-3 w-3" />
+                  Conecte sua conta Instagram em Configuracoes primeiro
+                </p>
+              )
+            )}
           </div>
 
           {/* Date/Time */}
@@ -672,7 +910,7 @@ function ScheduleDialog({
           {/* Submit */}
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !selectedPkgId || !scheduledAt}
+            disabled={submitting || !selectedPkgId || !scheduledAt || igNotConnected}
             className={`w-full gap-2 ${submitting ? "pulse-glow" : ""}`}
           >
             {submitting ? (
@@ -688,7 +926,7 @@ function ScheduleDialog({
   );
 }
 
-// ── Main Page ───────────────────────────────────────────────────
+// -- Main Page ---------------------------------------------------------------
 
 export default function PublishingPage() {
   const [activeTab, setActiveTab] = useState<"fila" | "calendario" | "horarios">("fila");
@@ -703,6 +941,9 @@ export default function PublishingPage() {
 
   return (
     <div className="space-y-6">
+      {/* Instagram connection warning banner */}
+      <InstagramStatusBanner />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -710,7 +951,10 @@ export default function PublishingPage() {
             <Send className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold">Publicacao</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-semibold">Publicacao</h2>
+              <InstagramConnectedIndicator />
+            </div>
             <p className="text-sm text-muted-foreground">
               {summary?.total ?? 0} posts na fila
             </p>

@@ -129,6 +129,13 @@ export function useCharacterValidation(slug: string | null) {
   );
 }
 
+export function useInstagramStatus() {
+  return useSWR("instagram-status", () => api.getInstagramStatus(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}
+
 export function usePublishingQueue(params?: { status?: string; platform?: string; limit?: number }) {
   const key = `publishing-queue-${params?.status ?? ""}-${params?.platform ?? ""}-${params?.limit ?? 20}`;
   return useSWR(key, () => api.getPublishingQueue(params), {
