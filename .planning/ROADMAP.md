@@ -139,28 +139,29 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 
 ### Phase 999.1: Video Generation — Kie.ai Sora 2 (BACKLOG)
 
-**Goal:** Convert generated meme images into 10-second portrait videos using Kie.ai Sora 2 image-to-video API, with contextual motion prompts that improve per-theme over time. Store video prompt improvement metadata for iterative quality gains.
+**Goal:** Convert generated meme images into 10-15 second portrait videos using Kie.ai Sora 2 image-to-video API, with LLM-generated motion prompts that improve per-theme over time via manual feedback. GCS for public image URLs, daily budget cap, opt-in per content package.
 
 **Scope:**
 - New service: `src/video_gen/kie_client.py` — KieSora2Client (httpx async, create task + poll + download)
-- New module: `src/video_gen/prompt_builder.py` — 13 motion templates per theme + prompt improvement metadata
-- New worker: `src/pipeline/workers/video_worker.py` — optional L4.5 step after image composition
-- DB migration: Add `video_path`, `video_source`, `video_prompt_used`, `video_task_id`, `video_metadata`, `video_status` to `content_packages`
-- API: `POST /generate/video`, `POST /generate/video/batch`, `GET /generate/video/status/{task_id}`
-- Config: `KIE_API_KEY`, `VIDEO_ENABLED=false`, `VIDEO_DURATION=10`, `VIDEO_MODEL`, `VIDEO_DAILY_BUDGET_USD=3.0`
+- New module: `src/video_gen/video_prompt_builder.py` — 15 motion templates per theme + LLM prompt generation + per-theme notes
+- New module: `src/video_gen/gcs_uploader.py` — GCS upload for public image URLs (per D-04)
+- DB migration: Add `video_path`, `video_source`, `video_prompt_used`, `video_task_id`, `video_metadata`, `video_status` to `content_packages` + `video_prompt_notes` to `themes`
+- API: `POST /generate/video`, `POST /generate/video/batch`, `GET /generate/video/status/{id}`, `GET /generate/video/budget`
+- Config: `KIE_API_KEY`, `VIDEO_ENABLED=false`, `VIDEO_DURATION=10`, `VIDEO_MODEL`, `VIDEO_DAILY_BUDGET_USD=3.0`, `GCS_BUCKET_NAME`
 - Cost tracking: Extend `api_usage` table with `kie_video` service
-- Image upload: Reuse CDN/public URL pattern from Phase 14 (Cloudflare R2)
-- Publishes via existing `instagram_client.publish_reel()`
+- Image upload: GCS for public URLs (independent of Phase 14)
 
-**Key integration:** After Pillow composition (L4), before post-production (L5). Feature-flagged via `VIDEO_ENABLED`.
+**Key integration:** Feature-flagged via `VIDEO_ENABLED`. Opt-in per content package via API.
 **Cost:** ~$0.15 per 10s video (standard tier), ~$45/month at 10 videos/day.
-**Depends on:** Phase 14 (CDN for public image URLs)
+**Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
-**Requirements:** TBD
-**Plans:** 0 plans
+**Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+- [ ] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
+- [ ] 999.1-02-PLAN.md — Core modules: KieSora2Client (async API client) + VideoPromptBuilder (LLM motion prompts)
+- [ ] 999.1-03-PLAN.md — API routes: video generation endpoints, cost tracking, app wiring
 
 ### Phase 999.2: Video Legends & Subtitles (BACKLOG)
 
