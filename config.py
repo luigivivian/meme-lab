@@ -379,3 +379,11 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "clipflow-video-uploads")
 
 # Signed URL expiry in seconds (1 hour — video gen takes 30-120s)
 GCS_SIGNED_URL_EXPIRY = int(os.getenv("GCS_SIGNED_URL_EXPIRY", "3600"))
+
+# ===== Stripe Billing — Phase 17 =====
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "")
+STRIPE_ENTERPRISE_PRICE_ID = os.getenv("STRIPE_ENTERPRISE_PRICE_ID", "")

@@ -542,6 +542,13 @@ class User(TimestampMixin, Base):
     gemini_paid_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     active_key_tier: Mapped[str] = mapped_column(String(20), default="free", server_default="free")
 
+    # Billing (Phase 17 — Stripe)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    plan_tier: Mapped[str] = mapped_column(String(20), default="free", server_default="free")
+    subscription_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    subscription_ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Relationships
     characters: Mapped[list["Character"]] = relationship(back_populates="owner")
     api_usage_records: Mapped[list["ApiUsage"]] = relationship(back_populates="user")
@@ -549,6 +556,8 @@ class User(TimestampMixin, Base):
     __table_args__ = (
         Index("idx_users_role", "role"),
         Index("idx_users_is_active", "is_active"),
+        Index("idx_users_plan_tier", "plan_tier"),
+        Index("idx_users_stripe_customer_id", "stripe_customer_id"),
     )
 
 
