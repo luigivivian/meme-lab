@@ -339,14 +339,14 @@ KIE_API_KEY = os.getenv("KIE_API_KEY", "")
 # Default video duration in seconds: 10 or 15 (per D-08)
 VIDEO_DURATION = int(os.getenv("VIDEO_DURATION", "10"))
 
-# Sora 2 model ID (per D-07: standard tier by default)
-VIDEO_MODEL = os.getenv("VIDEO_MODEL", "sora-2-image-to-video")
+# Sora 2 model ID — stable tier (best quality: $0.175/10s, $0.20/15s)
+VIDEO_MODEL = os.getenv("VIDEO_MODEL", "sora-2-image-to-video-stable")
 
-# Hard daily budget cap in USD (per D-09: $3.00 default = ~20 standard videos/day)
+# Hard daily budget cap in USD (per D-09: $3.00 default = ~17 stable videos/day)
 VIDEO_DAILY_BUDGET_USD = float(os.getenv("VIDEO_DAILY_BUDGET_USD", "3.0"))
 
-# Cost per second for standard Sora 2 tier
-VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.015"))
+# Cost per second for Sora 2 stable tier ($0.175 / 10s = $0.0175/s)
+VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.0175"))
 
 # Concurrency limiter for Kie.ai API calls
 KIE_MAX_CONCURRENT = int(os.getenv("KIE_MAX_CONCURRENT", "3"))

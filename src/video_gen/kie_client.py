@@ -22,8 +22,8 @@ logger = logging.getLogger("clip-flow.kie_client")
 # ── Config defaults (overridden by config module when available) ────────
 
 _KIE_API_KEY = os.getenv("KIE_API_KEY", "")
-_VIDEO_MODEL = os.getenv("VIDEO_MODEL", "sora-2-image-to-video")
-_VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.015"))
+_VIDEO_MODEL = os.getenv("VIDEO_MODEL", "sora-2-image-to-video-stable")
+_VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.0175"))
 _GENERATED_VIDEOS_DIR = os.getenv("GENERATED_VIDEOS_DIR", "output/videos")
 _KIE_POLL_INITIAL_INTERVAL = int(os.getenv("KIE_POLL_INITIAL_INTERVAL", "5"))
 _KIE_POLL_MAX_INTERVAL = int(os.getenv("KIE_POLL_MAX_INTERVAL", "30"))

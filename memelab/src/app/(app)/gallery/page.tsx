@@ -954,8 +954,8 @@ export default function GalleryPage() {
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Duracao</label>
                 <div className="flex gap-2">
-                  <Button variant={videoDuration === 10 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(10)} disabled={videoGenerating}>10s — $0.15</Button>
-                  <Button variant={videoDuration === 15 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(15)} disabled={videoGenerating}>15s — $0.23</Button>
+                  <Button variant={videoDuration === 10 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(10)} disabled={videoGenerating}>10s — $0.175</Button>
+                  <Button variant={videoDuration === 15 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(15)} disabled={videoGenerating}>15s — $0.20</Button>
                 </div>
               </div>
               <Button onClick={handleGenerateVideo} disabled={videoGenerating || videoSuccess} className={`w-full gap-2 ${videoGenerating ? "pulse-glow" : ""}`}>
