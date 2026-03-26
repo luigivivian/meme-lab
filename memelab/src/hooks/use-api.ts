@@ -184,3 +184,10 @@ export function useVideoStatus(contentPackageId: number | null, enabled = false)
     { refreshInterval: 3000 }
   );
 }
+
+export function useInstagramStatus() {
+  return useSWR("instagram-status", () => api.getInstagramStatus(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}
