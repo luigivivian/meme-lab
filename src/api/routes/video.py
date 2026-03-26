@@ -490,10 +490,9 @@ async def list_videos(
 @router.get("/file/{content_package_id}", summary="Serve generated video file")
 async def serve_video_file(
     content_package_id: int,
-    current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
-    """Serve the generated video file for playback/download."""
+    """Serve the generated video file for playback/download. No auth required (like image serving)."""
     from fastapi.responses import FileResponse
 
     result = await session.execute(
