@@ -673,6 +673,9 @@ export const getDriveHealth = () =>
 export const imageUrl = (filename: string) =>
   `${BASE}/drive/images/${encodeURIComponent(filename)}`;
 
+export const imageDownloadUrl = (filename: string) =>
+  `${BASE}/drive/images/${encodeURIComponent(filename)}/download`;
+
 // --- Characters ---
 export interface CharacterRefsStats {
   approved: number;

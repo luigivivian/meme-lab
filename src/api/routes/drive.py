@@ -1,6 +1,7 @@
 """Rotas do Drive Browser (lista e serve imagens geradas) + Status."""
 
 import logging
+import re
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,6 +17,26 @@ router = APIRouter(tags=["Drive"])
 
 # ── Drive helpers ────────────────────────────────────────────────────────────
 
+# Background filenames always contain a numeric timestamp (8+ digits in sequence):
+#   api_{theme}_{YYYYMMDD_HHMMSS}.png    — API single generation
+#   bg_{theme}_{YYYYMMDD_HHMMSS}.png     — Gemini background
+#   mago_{theme}_{YYYYMMDD_HHMMSS}.png   — Gemini via batch
+#   mago_{unix_ts}_{NNN}.png             — ComfyUI generation
+#   single_{theme}_{YYYYMMDD_HHMMSS}.png — single generation
+#   gemini_{theme}_{YYYYMMDD_HHMMSS}.png — Gemini direct
+#   lote_{N}_{theme}_{YYYYMMDD_HHMMSS}.png — batch generation
+# Meme filenames are phrase slugs (from create_image): lowercase words joined by
+# underscores, no numeric timestamp. Also manual_{id}_{N}.png are composed memes.
+_BG_FILENAME_RE = re.compile(
+    r"^(api|bg|mago|single|gemini|lote)_.+\d{8,}.*\.png$"
+)
+
+
+def _is_background_filename(filename: str) -> bool:
+    """Check if filename matches known background naming patterns."""
+    return bool(_BG_FILENAME_RE.match(filename))
+
+
 def _parse_theme_from_filename(stem: str) -> str:
     parts = stem.split("_")
     if len(parts) >= 3 and parts[0] in ("api", "mago", "single", "gemini"):
@@ -29,10 +50,17 @@ def _list_drive_images(theme_filter: str | None = None, category: str | None = N
     from config import OUTPUT_DIR, GENERATED_MEMES_DIR
     bg_dir = output_dir()  # backgrounds_generated/
 
-    # Backgrounds (sem frase)
-    bg_files = {f: "background" for f in bg_dir.glob("*.png")}
+    # Classify files in backgrounds_generated/ by filename pattern.
+    # Files whose names don't match known background patterns are reclassified
+    # as memes (they are composed images with text that ended up here).
+    bg_files = {}
+    for f in bg_dir.glob("*.png"):
+        if _is_background_filename(f.name):
+            bg_files[f] = "background"
+        else:
+            bg_files[f] = "meme"
 
-    # Memes (compostos com frase)
+    # Memes (compostos com frase) — from dedicated memes/ directory
     meme_files = {}
     if GENERATED_MEMES_DIR.exists():
         meme_files = {f: "meme" for f in GENERATED_MEMES_DIR.glob("*.png")}
@@ -94,6 +122,28 @@ def get_image(filename: str):
             return FileResponse(
                 str(path), media_type="image/png", filename=filename,
                 headers={"Cache-Control": "no-cache, must-revalidate"},
+            )
+    raise HTTPException(status_code=404, detail=f"Imagem '{filename}' nao encontrada")
+
+
+@router.get("/drive/images/{filename}/download", summary="Download imagem com watermark")
+def download_image(filename: str, current_user=Depends(get_current_user)):
+    """Serve imagem com watermark aplicada dinamicamente para download."""
+    validate_filename(filename)
+    from config import OUTPUT_DIR, GENERATED_MEMES_DIR
+    from src.image_maker import stamp_watermark
+    from fastapi.responses import Response
+
+    for directory in [output_dir(), OUTPUT_DIR, GENERATED_MEMES_DIR]:
+        path = directory / filename
+        if path.exists():
+            img_bytes = stamp_watermark(str(path))
+            return Response(
+                content=img_bytes,
+                media_type="image/png",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                },
             )
     raise HTTPException(status_code=404, detail=f"Imagem '{filename}' nao encontrada")
 

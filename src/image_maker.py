@@ -182,7 +182,7 @@ def create_image(
     text: str,
     background_path: str,
     output_path: str | None = None,
-    watermark_text: str | None = None,
+    watermark_text: str = "",
     layout: str | None = None,
 ) -> str:
     """Cria imagem com texto sobreposto usando layout configuravel.
@@ -200,7 +200,7 @@ def create_image(
     Returns:
         Caminho do arquivo gerado.
     """
-    wm = watermark_text if watermark_text is not None else WATERMARK_TEXT
+    wm = watermark_text
 
     # Resolver layout template
     layout_name = layout or LAYOUT_DEFAULT
