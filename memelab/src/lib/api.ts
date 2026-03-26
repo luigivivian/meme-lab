@@ -1147,6 +1147,57 @@ export const getVideoStatus = (contentPackageId: number) =>
 export const getVideoBudget = () =>
   request<VideoBudgetResponse>("/generate/video/budget");
 
+// --- Billing (Phase 17) ---
+export interface BillingService {
+  service: string;
+  tier: string;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface BillingStatus {
+  plan: string;
+  plan_name: string;
+  subscription_status: string | null;
+  subscription_ends_at: string | null;
+  stripe_configured: boolean;
+  services: BillingService[];
+  resets_at: string;
+}
+
+export interface CheckoutResponse {
+  checkout_url: string;
+}
+
+export interface PortalResponse {
+  portal_url: string;
+}
+
+export async function getBillingStatus(): Promise<BillingStatus> {
+  return request<BillingStatus>("/billing/status");
+}
+
+export async function createCheckoutSession(
+  price_id: string,
+  success_url: string,
+  cancel_url: string
+): Promise<CheckoutResponse> {
+  return request<CheckoutResponse>("/billing/create-checkout", {
+    method: "POST",
+    body: JSON.stringify({ price_id, success_url, cancel_url }),
+  });
+}
+
+export async function createPortalSession(
+  return_url: string
+): Promise<PortalResponse> {
+  return request<PortalResponse>("/billing/portal", {
+    method: "POST",
+    body: JSON.stringify({ return_url }),
+  });
+}
+
 // --- Content Export ---
 export const exportContentPack = (packageId: number) =>
   `${BASE}/content/${packageId}/export`;

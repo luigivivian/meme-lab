@@ -177,3 +177,10 @@ export function useVideoStatus(contentPackageId: number | null, enabled = false)
     { refreshInterval: 3000 }
   );
 }
+
+export function useBillingStatus() {
+  return useSWR("billing-status", () => api.getBillingStatus(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}
