@@ -1,9 +1,13 @@
 """Curator Agent — cerebro decisor do pipeline multi-agente.
 
 Wrapa ClaudeAnalyzer existente e emite WorkOrders com situacao_key
-mapeada via KEYWORD_MAP + pool de temas (SITUACOES + themes.yaml).
+mapeada via LLM (Gemini flash-lite) com KEYWORD_MAP como fallback.
 
-Garante diversidade visual: quando keyword nao bate, sorteia do pool
+Per D-12: LLM-based theme mapping replaces rigid keyword matching.
+Per D-13: Increased throughput (default 15 WorkOrders).
+Per D-14: Relevance filter via meme_potential scoring in analyzer.
+
+Garante diversidade visual: quando LLM/keyword nao bate, sorteia do pool
 completo sem repetir situacoes dentro do mesmo run.
 """
 
@@ -21,8 +25,86 @@ from config import LAYOUT_TEMPLATES, LAYOUT_RANDOM
 from src.pipeline.processors.analyzer import ClaudeAnalyzer
 from src.image_gen.prompt_builder import KEYWORD_MAP
 from src.image_gen.gemini_client import SITUACOES
+from src.llm_client import generate
 
 logger = logging.getLogger("clip-flow.curator")
+
+# In-memory cache for LLM theme mappings (topic|humor_angle -> situacao_key)
+_theme_cache: dict[str, str] = {}
+
+# Theme descriptions for LLM context — maps each situacao_key to a visual scene description
+_THEME_DESCRIPTIONS = {
+    "sabedoria": "wise contemplation, reading ancient books, giving advice",
+    "confusao": "bewildered, confused, scratching head, question marks",
+    "segunda_feira": "tired monday morning, sleepy with coffee, dark circles",
+    "vitoria": "triumphant celebration, staff raised high, golden particles",
+    "tecnologia": "holding smartphone/device, digital runes, blue glow",
+    "cafe": "holding coffee mug, content expression, golden steam",
+    "comida": "cooking cauldron, floating ingredients, hungry expression",
+    "trabalho": "at desk with laptop, focused/stressed, office setting",
+    "relaxando": "sleeping in chair, hat over eyes, peaceful",
+    "meditando": "cross-legged meditation, serene aura, ethereal glow",
+    "relacionamento": "holding heart crystal, romantic mood, love sparkles",
+    "confronto": "stern expression, staff with energy, dramatic wind",
+    "surpresa": "wide eyes, shocked expression, hands raised, exclamation",
+    "cotidiano": "relaxed casual pose, holding ale mug, warm smile",
+    "descanso": "peaceful sleeping, chair, floating particles, blissful",
+    "internet": "looking at crystal ball like screen, amused, blue glow",
+    "generico": "standing with staff, wise serious expression, neutral",
+}
+
+_THEME_MAPPING_PROMPT = """You are a visual theme selector for a Brazilian meme generator featuring "O Mago Mestre" (a wise old wizard).
+Given a trending topic and humor angle, select the single best visual theme from this list:
+
+{theme_list}
+
+Rules:
+- Return ONLY the theme key (e.g., "cafe"), nothing else
+- Match the topic's mood and context to the theme's visual scene
+- "segunda_feira" = tired/monday/exhaustion vibes
+- "tecnologia" = tech, apps, wifi, digital stuff
+- "relacionamento" = love, crush, dating, ex
+- "trabalho" = work, boss, office, employment
+- "cafe" = coffee, morning energy, caffeine
+- When in doubt, prefer "cotidiano" or "generico" over a bad match
+"""
+
+
+def _llm_map_theme(topic: str, humor_angle: str, all_keys: list[str]) -> str | None:
+    """Map a topic to the best situacao_key via LLM. Returns None on failure.
+
+    Per D-12: Uses Gemini flash-lite for cheap theme mapping (~$0.001/call).
+    Results are cached in-memory per topic+humor_angle pair.
+    """
+    cache_key = f"{topic}|{humor_angle}".lower().strip()
+    if cache_key in _theme_cache:
+        logger.debug(f"  Theme cache hit: '{topic}' -> {_theme_cache[cache_key]}")
+        return _theme_cache[cache_key]
+
+    theme_list = "\n".join(
+        f"- {key}: {_THEME_DESCRIPTIONS.get(key, key)}"
+        for key in all_keys
+    )
+
+    try:
+        result = generate(
+            system_prompt=_THEME_MAPPING_PROMPT.format(theme_list=theme_list),
+            user_message=f"Topic: {topic}\nHumor angle: {humor_angle}\n\nBest theme key:",
+            max_tokens=20,
+            tier="lite",
+        ).strip().lower().replace('"', '').replace("'", "")
+
+        # Validate result is a known key
+        if result in all_keys:
+            _theme_cache[cache_key] = result
+            logger.debug(f"  LLM theme mapping: '{topic}' -> {result}")
+            return result
+        else:
+            logger.warning(f"LLM returned unknown theme '{result}' for '{topic}', falling back")
+            return None
+    except Exception as e:
+        logger.warning(f"LLM theme mapping failed for '{topic}': {e}")
+        return None
 
 
 def _load_all_situacao_keys() -> list[str]:
@@ -59,7 +141,7 @@ class CuratorAgent:
     async def curate(
         self,
         events: list[TrendEvent],
-        count: int = 5,
+        count: int = 15,
         on_step=None,
         theme_tags: list[str] | None = None,
         exclude_topics: list[str] | None = None,
@@ -189,24 +271,31 @@ class CuratorAgent:
     ) -> str:
         """Mapeia tema para situacao visual com diversidade garantida.
 
-        1. Tenta KEYWORD_MAP (match semantico direto)
-        2. Se ja usada ou nao encontrada, sorteia do pool sem repetir
-        """
-        combined = f"{topic} {humor_angle}".lower()
+        Per D-12: LLM-based mapping first, KEYWORD_MAP as fallback, random as last resort.
 
-        # Tentar match por keyword
+        1. Tenta LLM mapping via Gemini flash-lite (cached)
+        2. Fallback: KEYWORD_MAP (match semantico direto, for offline/error resilience)
+        3. Last resort: sorteia do pool sem repetir
+        """
+        # Try LLM mapping first (per D-12)
+        llm_key = _llm_map_theme(topic, humor_angle, self._all_keys)
+        if llm_key and llm_key not in used_keys:
+            logger.debug(f"  Situacao via LLM: '{topic}' -> {llm_key}")
+            return llm_key
+
+        # Fallback: keyword match (kept for offline/error resilience)
+        combined = f"{topic} {humor_angle}".lower()
         for keyword, situacao_key in KEYWORD_MAP.items():
             if keyword in combined and situacao_key not in used_keys:
-                logger.debug(f"  Situacao match: keyword='{keyword}' -> {situacao_key}")
+                logger.debug(f"  Situacao via keyword fallback: '{keyword}' -> {situacao_key}")
                 return situacao_key
 
-        # Sortear do pool — pegar proxima nao usada
+        # Last resort: random from pool
         for key in shuffled_pool:
             if key not in used_keys:
-                logger.debug(f"  Situacao sorteada (sem keyword match): {key}")
+                logger.debug(f"  Situacao random (no LLM/keyword match): {key}")
                 return key
 
-        # Pool esgotado — sortear qualquer um
         key = random.choice(self._all_keys)
-        logger.debug(f"  Situacao random (pool esgotado): {key}")
+        logger.debug(f"  Situacao random (pool exhausted): {key}")
         return key

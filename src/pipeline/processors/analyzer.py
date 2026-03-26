@@ -51,9 +51,13 @@ Responda APENAS em JSON válido:
     "original_title": "título original do trend (ou 'cliche' se inventado)",
     "gandalf_topic": "tema adaptado para o mago sábio",
     "humor_angle": "ângulo engraçado e relatable",
-    "relevance_score": 0.9
+    "relevance_score": 0.9,
+    "meme_potential": 4
   }}
-]"""
+]
+
+meme_potential: 1-5 (1=boring/irrelevant, 2=weak, 3=ok, 4=good meme, 5=pure meme gold for Brazilian Instagram)
+Only include topics with meme_potential >= 3."""
 
 
 OLLAMA_SINGLE_PROMPT = """Voce e o curador de conteudo para o "Mago Mestre" — um bruxo velho e sabio que posta memes virais com humor brasileiro.
@@ -66,7 +70,9 @@ TEMAS CLICHE (use se o trend nao presta): fome de madrugada, segunda-feira, canc
 EVITE: politica, religiao, tragedias, violencia, noticias serias.
 
 Responda com UM objeto JSON:
-{{"original_title": "titulo original", "gandalf_topic": "tema adaptado", "humor_angle": "angulo engraçado", "relevance_score": 0.9}}"""
+{{"original_title": "titulo original", "gandalf_topic": "tema adaptado", "humor_angle": "angulo engraçado", "relevance_score": 0.9, "meme_potential": 4}}
+
+meme_potential: 1-5 (1=boring, 3=ok, 5=pure meme gold for Brazilian Instagram)"""
 
 
 class ClaudeAnalyzer:
@@ -179,7 +185,21 @@ class ClaudeAnalyzer:
     def _selections_to_topics(
         self, selections: list[dict], trends: list[TrendItem], backend_used: str
     ) -> list[AnalyzedTopic]:
-        """Converte dicts parseados em AnalyzedTopic com matching de trends."""
+        """Converte dicts parseados em AnalyzedTopic com matching de trends.
+
+        Per D-14: Filters out topics with meme_potential < 3 before creating AnalyzedTopics.
+        """
+        # Per D-14: Filter out low meme potential topics
+        original_selections = selections
+        selections = [s for s in selections if s.get("meme_potential", 3) >= 3]
+        filtered_count = len(original_selections) - len(selections)
+        if filtered_count > 0:
+            logger.info(f"Meme potential filter: {filtered_count} topics discarded (meme_potential < 3)")
+        if not selections:
+            logger.warning("All topics filtered by meme_potential < 3, using top original selections")
+            # Fallback: keep all if filtering removes everything
+            selections = original_selections
+
         trend_map = {t.title.lower().strip(): t for t in trends}
         analyzed = []
         for sel in selections:

@@ -342,9 +342,13 @@ class AsyncPipelineOrchestrator:
             t0 = time.perf_counter()
             logger.info("[L3] Curador — selecionando temas...")
             self._notify("L3", "running", "Selecionando temas via LLM")
-            trend_events = await self.broker.drain(max_items=20)
-            topics_count = min(self.images_per_run, len(trend_events))
-            logger.info(f"[L3] Drained {len(trend_events)} eventos, selecionando {topics_count} temas")
+            # Per D-13: Drain more trends for broader curator analysis
+            trend_events = await self.broker.drain(max_items=30)
+            # Curator produces more WorkOrders than images_per_run for better selection
+            # The relevance filter (D-14) may discard low-potential topics
+            curator_count = max(self.images_per_run * 3, 15)
+            topics_count = min(curator_count, len(trend_events))
+            logger.info(f"[L3] Drained {len(trend_events)} eventos, requesting {topics_count} temas from curator")
 
             try:
                 work_orders = await self.curator.curate(
