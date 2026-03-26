@@ -413,63 +413,6 @@ export interface UsageResponse {
 
 export const getUsage = () => request<UsageResponse>("/auth/me/usage");
 
-// --- Dashboard Analytics (Phase 16) ---
-export interface UsageHistoryDay {
-  date: string;
-  gemini_text: number;
-  gemini_image: number;
-  kie_video: number;
-  [key: string]: string | number;
-}
-
-export interface UsageHistoryResponse {
-  days: number;
-  history: UsageHistoryDay[];
-}
-
-export interface CostBreakdownService {
-  service: string;
-  cost_usd: number;
-  calls: number;
-}
-
-export interface CostBreakdownResponse {
-  days: number;
-  services: CostBreakdownService[];
-  total_cost_usd: number;
-}
-
-export interface PipelineActivityDay {
-  date: string;
-  runs: number;
-  packages: number;
-}
-
-export interface PipelineActivityResponse {
-  days: number;
-  activity: PipelineActivityDay[];
-}
-
-export interface PublishingStatsResponse {
-  total: number;
-  published: number;
-  queued: number;
-  failed: number;
-  cancelled: number;
-}
-
-export const getDashboardUsageHistory = (days = 30) =>
-  request<UsageHistoryResponse>(`/dashboard/usage-history?days=${days}`);
-
-export const getDashboardCostBreakdown = (days = 30) =>
-  request<CostBreakdownResponse>(`/dashboard/cost-breakdown?days=${days}`);
-
-export const getDashboardPipelineActivity = (days = 30) =>
-  request<PipelineActivityResponse>(`/dashboard/pipeline-activity?days=${days}`);
-
-export const getDashboardPublishingStats = () =>
-  request<PublishingStatsResponse>("/dashboard/publishing-stats");
-
 // --- Status ---
 export const getStatus = () => request<StatusResponse>("/status");
 
@@ -1047,17 +990,6 @@ export const testCharacterCompose = (slug: string, topic = "segunda-feira", situ
     body: JSON.stringify({ topic, situacao }),
   });
 
-// --- Instagram Status ---
-export interface InstagramStatus {
-  connected: boolean;
-  ig_username?: string;
-  status?: string;
-  token_expires_at?: string;
-}
-
-export const getInstagramStatus = () =>
-  request<InstagramStatus>("/instagram/status");
-
 // --- Publishing / Scheduling ---
 export interface ScheduledPost {
   id: number;
@@ -1175,7 +1107,6 @@ export interface VideoGenerateRequest {
   content_package_id: number;
   duration: number; // 10 or 15
   character_ids?: string[];
-  custom_prompt?: string; // User animation description (enhanced by LLM)
 }
 
 export interface VideoStatusResponse {
@@ -1193,42 +1124,6 @@ export interface VideoBudgetResponse {
   remaining_usd: number;
   videos_remaining_estimate: number;
 }
-
-export interface VideoListItem {
-  content_package_id: number;
-  phrase: string;
-  topic: string;
-  image_path: string;
-  video_status: string;
-  video_path: string | null;
-  video_task_id: string | null;
-  video_source: string | null;
-  video_metadata: Record<string, unknown> | null;
-  video_prompt_used: string | null;
-  created_at: string | null;
-  is_published: boolean;
-}
-
-export interface VideoListResponse {
-  total: number;
-  videos: VideoListItem[];
-}
-
-export const getVideoList = (status?: string) => {
-  const params = new URLSearchParams();
-  if (status) params.set("status", status);
-  const qs = params.toString();
-  return request<VideoListResponse>(`/generate/video/list${qs ? `?${qs}` : ""}`);
-};
-
-export const videoFileUrl = (contentPackageId: number) =>
-  `${BASE}/generate/video/file/${contentPackageId}`;
-
-export const deleteVideo = (contentPackageId: number) =>
-  request<{ deleted: boolean; content_package_id: number }>(
-    `/generate/video/${contentPackageId}`,
-    { method: "DELETE" }
-  );
 
 export const generateVideo = (params: VideoGenerateRequest) =>
   request<VideoStatusResponse>("/generate/video", {
@@ -1252,40 +1147,55 @@ export const getVideoStatus = (contentPackageId: number) =>
 export const getVideoBudget = () =>
   request<VideoBudgetResponse>("/generate/video/budget");
 
-// --- Instagram Connection ---
-export interface InstagramStatus {
-  connected: boolean;
-  ig_username?: string;
-  status?: string;
-  token_expires_at?: string;
-  connected_at?: string;
+// --- Billing (Phase 17) ---
+export interface BillingService {
+  service: string;
+  tier: string;
+  used: number;
+  limit: number;
+  remaining: number;
 }
 
-export interface InstagramAuthUrl {
-  auth_url: string;
-  state: string;
+export interface BillingStatus {
+  plan: string;
+  plan_name: string;
+  subscription_status: string | null;
+  subscription_ends_at: string | null;
+  stripe_configured: boolean;
+  services: BillingService[];
+  resets_at: string;
 }
 
-export interface InstagramCallbackResult {
-  success: boolean;
-  ig_username: string;
-  connected_at: string;
+export interface CheckoutResponse {
+  checkout_url: string;
 }
 
-export async function getInstagramStatus(): Promise<InstagramStatus> {
-  return request("/instagram/status");
+export interface PortalResponse {
+  portal_url: string;
 }
 
-export async function getInstagramAuthUrl(): Promise<InstagramAuthUrl> {
-  return request("/instagram/auth-url");
+export async function getBillingStatus(): Promise<BillingStatus> {
+  return request<BillingStatus>("/billing/status");
 }
 
-export async function instagramCallback(code: string): Promise<InstagramCallbackResult> {
-  return request(`/instagram/callback?code=${encodeURIComponent(code)}`);
+export async function createCheckoutSession(
+  price_id: string,
+  success_url: string,
+  cancel_url: string
+): Promise<CheckoutResponse> {
+  return request<CheckoutResponse>("/billing/create-checkout", {
+    method: "POST",
+    body: JSON.stringify({ price_id, success_url, cancel_url }),
+  });
 }
 
-export async function disconnectInstagram(): Promise<{ success: boolean }> {
-  return request("/instagram/disconnect", { method: "POST" });
+export async function createPortalSession(
+  return_url: string
+): Promise<PortalResponse> {
+  return request<PortalResponse>("/billing/portal", {
+    method: "POST",
+    body: JSON.stringify({ return_url }),
+  });
 }
 
 // --- Content Export ---

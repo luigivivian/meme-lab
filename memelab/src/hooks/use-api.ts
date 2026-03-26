@@ -178,30 +178,9 @@ export function useVideoStatus(contentPackageId: number | null, enabled = false)
   );
 }
 
-// --- Dashboard Analytics (Phase 16) ---
-
-export function useDashboardUsageHistory(days = 30) {
-  return useSWR(`dashboard-usage-history-${days}`, () => api.getDashboardUsageHistory(days), {
+export function useBillingStatus() {
+  return useSWR("billing-status", () => api.getBillingStatus(), {
     refreshInterval: 60000,
-    revalidateOnFocus: false,
-  });
-}
-
-export function useDashboardCostBreakdown(days = 30) {
-  return useSWR(`dashboard-cost-breakdown-${days}`, () => api.getDashboardCostBreakdown(days), {
-    refreshInterval: 60000,
-    revalidateOnFocus: false,
-  });
-}
-
-export function useDashboardPipelineActivity(days = 30) {
-  return useSWR(`dashboard-pipeline-activity-${days}`, () => api.getDashboardPipelineActivity(days), {
-    refreshInterval: 30000,
-  });
-}
-
-export function useDashboardPublishingStats() {
-  return useSWR("dashboard-publishing-stats", () => api.getDashboardPublishingStats(), {
-    refreshInterval: 30000,
+    errorRetryCount: 1,
   });
 }
