@@ -25,16 +25,27 @@ def _parse_theme_from_filename(stem: str) -> str:
     return "unknown"
 
 
-def _list_drive_images(theme_filter: str | None = None) -> list[dict]:
-    from config import OUTPUT_DIR
-    out = output_dir()
-    bg_files = set(out.glob("*.png"))
-    out_files = set(OUTPUT_DIR.glob("*.png"))
-    all_files = bg_files | out_files
-    files = sorted(all_files, key=lambda f: f.stat().st_mtime, reverse=True)
+def _list_drive_images(theme_filter: str | None = None, category: str | None = None) -> list[dict]:
+    from config import OUTPUT_DIR, GENERATED_MEMES_DIR
+    bg_dir = output_dir()  # backgrounds_generated/
+
+    # Backgrounds (sem frase)
+    bg_files = {f: "background" for f in bg_dir.glob("*.png")}
+
+    # Memes (compostos com frase)
+    meme_files = {}
+    if GENERATED_MEMES_DIR.exists():
+        meme_files = {f: "meme" for f in GENERATED_MEMES_DIR.glob("*.png")}
+
+    all_files = {**bg_files, **meme_files}
+    files = sorted(all_files.keys(), key=lambda f: f.stat().st_mtime, reverse=True)
+
     result = []
     for f in files:
-        theme = _parse_theme_from_filename(f.stem)
+        cat = all_files[f]
+        if category and cat != category:
+            continue
+        theme = _parse_theme_from_filename(f.stem) if cat == "background" else "meme"
         if theme_filter and theme != theme_filter:
             continue
         stat = f.stat()
@@ -43,6 +54,7 @@ def _list_drive_images(theme_filter: str | None = None) -> list[dict]:
             "theme": theme,
             "size_kb": round(stat.st_size / 1024, 1),
             "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "category": cat,
         })
     return result
 
@@ -52,11 +64,12 @@ def _list_drive_images(theme_filter: str | None = None) -> list[dict]:
 @router.get("/drive/images", summary="Lista todas as imagens geradas")
 def list_images(
     theme: str | None = Query(default=None),
+    category: str | None = Query(default=None, pattern="^(background|meme)$"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current_user=Depends(get_current_user),
 ):
-    imgs = _list_drive_images(theme)
+    imgs = _list_drive_images(theme, category)
     return {"total": len(imgs), "offset": offset, "limit": limit, "images": imgs[offset:offset + limit]}
 
 
@@ -72,15 +85,17 @@ def images_by_theme(theme_key: str, current_user=Depends(get_current_user)):
 
 
 @router.get("/drive/images/{filename}", summary="Serve imagem PNG")
-def get_image(filename: str, current_user=Depends(get_current_user)):
+def get_image(filename: str):
     validate_filename(filename)
-    path = output_dir() / filename
-    if not path.exists():
-        from config import OUTPUT_DIR
-        path = OUTPUT_DIR / filename
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Imagem '{filename}' nao encontrada")
-    return FileResponse(str(path), media_type="image/png", filename=filename)
+    from config import OUTPUT_DIR, GENERATED_MEMES_DIR
+    for directory in [output_dir(), OUTPUT_DIR, GENERATED_MEMES_DIR]:
+        path = directory / filename
+        if path.exists():
+            return FileResponse(
+                str(path), media_type="image/png", filename=filename,
+                headers={"Cache-Control": "no-cache, must-revalidate"},
+            )
+    raise HTTPException(status_code=404, detail=f"Imagem '{filename}' nao encontrada")
 
 
 @router.get("/drive/themes", summary="Temas nas imagens geradas")
