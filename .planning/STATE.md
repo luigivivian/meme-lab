@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to execute
-stopped_at: Completed 999.1-01-PLAN.md
-last_updated: "2026-03-26T05:48:00.868Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 999.1-03-PLAN.md
+last_updated: "2026-03-26T05:56:19.482Z"
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 8
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 ## Current Position
 
 Phase: 999.1 (video-generation-kie-sora2) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -52,6 +52,8 @@ Plan: 2 of 3
 | Phase 13 P02 | 3min | 2 tasks | 5 files |
 | Quick 260325-qhl | 6min | 3 tasks | 7 files |
 | Phase 999.1 P01 | 2min | 2 tasks | 6 files |
+| Phase 999.1 P02 | 3min | 2 tasks | 3 files |
+| Phase 999.1 P03 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -75,6 +77,10 @@ Recent decisions affecting current work:
 - [Quick 260325-qhl]: Tile-based token estimation: ceil(w/768)*ceil(h/768)*258 per input image
 - [Quick 260325-qhl]: cost_usd accumulated via upsert per day/service/tier bucket in api_usage
 - [Phase 999.1]: Migration 012 chains from 011 (sequential pattern); all video columns nullable; GCSUploader lazy client init
+- [Phase 999.1]: Config fallback chain (param -> config module -> env var) for video_gen modules
+- [Phase 999.1]: 17 motion templates for full theme coverage (15 core + cotidiano + descanso)
+- [Phase 999.1]: Background video task uses get_session_factory() for independent DB sessions (request session unavailable in BackgroundTasks)
+- [Phase 999.1]: Budget enforcement: pre-check estimated cost before generation, track actual cost after completion via kie_video service
 
 ### Pending Todos
 
@@ -88,6 +94,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T05:48:00.865Z
-Stopped at: Completed 999.1-01-PLAN.md
+Last session: 2026-03-26T05:56:19.479Z
+Stopped at: Completed 999.1-03-PLAN.md
 Resume file: None
