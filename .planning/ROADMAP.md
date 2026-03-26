@@ -58,7 +58,7 @@ Plans:
 - [x] 12.1-01-PLAN.md — Agent cleanup: remove HN/Lemmy, simplify RSS, improve Reddit/YouTube/Gemini/BlueSky agents
 - [x] 12.1-02-PLAN.md — Scoring engine: fix Google Trends parsing, temporal decay, multi-source boost, engagement scoring
 - [ ] 12.1-03-PLAN.md — Curator intelligence: LLM theme mapping, relevance filter, throughput increase
-- [ ] 12.1-04-PLAN.md — Content guardrails: phrase validation, topic-image coherence check
+- [x] 12.1-04-PLAN.md — Content guardrails: phrase validation, topic-image coherence check
 
 ### Phase 13: Tenant Isolation
 **Goal**: Every user sees only their own data across all resources, with admin users able to bypass isolation
@@ -148,7 +148,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 12. Pipeline Simplification | 2/3 | In Progress|  |
-| 12.1 Viral Content Engine | 2/4 | In Progress|  |
+| 12.1 Viral Content Engine | 3/4 | In Progress|  |
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |

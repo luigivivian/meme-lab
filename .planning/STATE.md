@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Ready to execute
-stopped_at: Completed 12.1-02-PLAN.md
-last_updated: "2026-03-26T17:21:23.978Z"
+stopped_at: Completed 12.1-04-PLAN.md
+last_updated: "2026-03-26T17:28:06Z"
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 13
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-24)
 ## Current Position
 
 Phase: 12.1 (viral-content-engine-trend-agents-content-quality-overhaul) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Plan: 3 of 4
 | Phase 999.1 P01 | 2min | 2 tasks | 6 files |
 | Phase 999.1 P02 | 3min | 2 tasks | 3 files |
 | Phase 999.1 P03 | 3min | 2 tasks | 4 files |
+| Phase 12.1 P04 | 4min | 2 tasks | 2 files |
 | Phase 12.1 P02 | 3min | 2 tasks | 3 files |
 | Phase 12.1 P01 | 2min | 2 tasks | 9 files |
 
@@ -91,6 +92,9 @@ Recent decisions affecting current work:
 - [Phase 12.1]: Agents own their curated data sources (DEFAULT_SUBREDDITS/DEFAULT_FEEDS) instead of config.py overrides
 - [Phase 12.1]: Regex-based traffic parsing with K/M/B suffix support replaces brittle char-by-char iteration
 - [Phase 12.1]: Exponential decay e^(-age/24) for temporal freshness; multi-source boost min(1+0.2*(n-1), 2.0)
+- [Phase 12.1]: Language detection via PT markers + English-only words instead of per-word dictionary -- handles accent-less informal BR text
+- [Phase 12.1]: Coherence check uses _OBVIOUS_MATCHES shortcut for 13 themes to avoid unnecessary LLM calls
+- [Phase 12.1]: Created _remap_theme inline in generation_layer.py because _llm_map_theme from plan 12.1-03 not yet available
 
 ### Pending Todos
 
@@ -104,6 +108,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T17:21:23.975Z
-Stopped at: Completed 12.1-02-PLAN.md
+Last session: 2026-03-26T17:28:06Z
+Stopped at: Completed 12.1-04-PLAN.md
 Resume file: None

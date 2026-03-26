@@ -1,7 +1,7 @@
 """GenerationLayer — processa WorkOrders em paralelo.
 
 Coordena PhraseWorker e ImageWorker para gerar ContentPackages.
-Suporta A/B testing de frases e carousel mode.
+Suporta A/B testing de frases, carousel mode, e topic-image coherence check.
 """
 
 import asyncio
@@ -12,8 +12,100 @@ from config import PHRASE_AB_ENABLED
 from src.pipeline.models_v2 import WorkOrder, ContentPackage
 from src.pipeline.workers.phrase_worker import PhraseWorker
 from src.pipeline.workers.image_worker import ImageWorker
+from src.llm_client import generate as llm_generate
 
 logger = logging.getLogger("clip-flow.generation")
+
+
+# ---------------------------------------------------------------------------
+# Topic-image coherence check (D-16)
+# ---------------------------------------------------------------------------
+
+# Known good topic-theme matches — skip LLM for these
+_OBVIOUS_MATCHES: dict[str, list[str]] = {
+    "cafe": ["cafe", "coffee", "cafeina", "cappuccino", "espresso"],
+    "trabalho": ["trabalho", "emprego", "chefe", "escritorio", "home office", "reuniao"],
+    "segunda_feira": ["segunda", "monday", "começo de semana", "segunda-feira"],
+    "tecnologia": ["wifi", "internet", "celular", "app", "rede social", "algoritmo"],
+    "comida": ["comida", "cozinha", "fome", "almoco", "jantar", "miojo", "lanche"],
+    "relacionamento": ["namoro", "crush", "ex", "casal", "amor", "namorada", "namorado"],
+    "relaxando": ["relaxar", "descanso", "tranquilo", "paz", "preguica", "folga"],
+    "meditando": ["meditar", "zen", "calma", "equilibrio", "universo"],
+    "sabedoria": ["sabedoria", "sabio", "conselho", "verdade", "filosofia"],
+    "confusao": ["confusao", "caos", "bagunca", "desespero", "panico"],
+    "vitoria": ["vitoria", "sucesso", "conquista", "ganhar", "campeao"],
+    "surpresa": ["surpresa", "choque", "inacreditavel", "nao acredito"],
+    "confronto": ["confronto", "briga", "discussao", "treta", "debate"],
+}
+
+
+def _check_coherence(topic: str, humor_angle: str, situacao_key: str) -> bool:
+    """Check if the visual theme matches the phrase topic.
+
+    Uses a quick LLM check: 'Does {situacao_key} theme make sense for {topic}?'
+    Returns True if coherent, False if mismatch detected.
+    """
+    combined = f"{topic} {humor_angle}".lower()
+
+    # Check obvious matches first (skip LLM call)
+    if situacao_key in _OBVIOUS_MATCHES:
+        for kw in _OBVIOUS_MATCHES[situacao_key]:
+            if kw in combined:
+                return True  # Obvious match, skip LLM
+
+    # For non-obvious cases, use LLM quick check
+    try:
+        result = llm_generate(
+            system_prompt="Answer only YES or NO.",
+            user_message=(
+                f"Does the visual theme '{situacao_key}' make sense for a meme about: '{topic}'?\n"
+                f"Humor angle: '{humor_angle}'\n"
+                f"Answer YES if the theme fits the topic, NO if there's a disconnect."
+            ),
+            max_tokens=5,
+            tier="lite",
+        ).strip().upper()
+        return result.startswith("YES") or result.startswith("SIM")
+    except Exception as e:
+        logger.debug(f"Coherence LLM check failed: {e}, assuming coherent")
+        return True  # On error, assume coherent (don't block generation)
+
+
+def _remap_theme(topic: str, humor_angle: str, all_keys: list[str]) -> str | None:
+    """Use LLM to find a better theme for a topic when coherence fails.
+
+    Returns a new situacao_key or None if remap fails.
+    """
+    try:
+        keys_str = ", ".join(all_keys)
+        result = llm_generate(
+            system_prompt=(
+                "You are a visual theme selector for Brazilian meme images. "
+                "Given a topic and available themes, pick the SINGLE best theme. "
+                "Reply with ONLY the theme key, nothing else."
+            ),
+            user_message=(
+                f"Topic: {topic}\nHumor angle: {humor_angle}\n"
+                f"Available themes: {keys_str}\n"
+                f"Best theme key:"
+            ),
+            max_tokens=20,
+            tier="lite",
+        ).strip().lower().replace('"', '').replace("'", '')
+
+        # Validate the result is actually one of the available keys
+        if result in all_keys:
+            return result
+
+        # Try partial match
+        for key in all_keys:
+            if key in result:
+                return key
+
+        return None
+    except Exception as e:
+        logger.debug(f"Theme remap LLM failed: {e}")
+        return None
 
 
 class GenerationLayer:
@@ -83,6 +175,26 @@ class GenerationLayer:
                 f"[{wo.order_id}] {len(phrases)} frase(s) em {phrase_elapsed:.1f}s "
                 f"(A/B: {len(phrase_alternatives)} alts)"
             )
+
+            # Per D-16: Topic-image coherence check before image generation
+            if not await asyncio.to_thread(
+                _check_coherence, wo.gandalf_topic, wo.humor_angle, wo.situacao_key
+            ):
+                logger.info(
+                    f"[{wo.order_id}] Coherence mismatch: "
+                    f"'{wo.gandalf_topic}' vs theme '{wo.situacao_key}', remapping..."
+                )
+                try:
+                    from src.pipeline.curator import _load_all_situacao_keys
+                    all_keys = _load_all_situacao_keys()
+                    new_key = await asyncio.to_thread(
+                        _remap_theme, wo.gandalf_topic, wo.humor_angle, all_keys
+                    )
+                    if new_key and new_key != wo.situacao_key:
+                        logger.info(f"[{wo.order_id}] Remapped: {wo.situacao_key} -> {new_key}")
+                        wo.situacao_key = new_key
+                except Exception as e:
+                    logger.warning(f"[{wo.order_id}] Remap failed: {e}, keeping original theme")
 
             if on_step and images_done == 0:
                 on_step("images", "running", f"0/{total}")

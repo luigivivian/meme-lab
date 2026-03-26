@@ -37,8 +37,8 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 - [ ] **VIRAL-12**: Curator uses LLM-based theme mapping instead of rigid KEYWORD_MAP
 - [ ] **VIRAL-13**: Curator processes 20+ trends and produces 10-15 WorkOrders per run
 - [ ] **VIRAL-14**: Curator filters topics with meme potential below 3 (LLM-rated 1-5)
-- [ ] **VIRAL-15**: Generated phrases validated for length (<120 chars), language, and format before use
-- [ ] **VIRAL-16**: Topic-image coherence checked before generation, with LLM-based theme remapping on mismatch
+- [x] **VIRAL-15**: Generated phrases validated for length (<120 chars), language, and format before use
+- [x] **VIRAL-16**: Topic-image coherence checked before generation, with LLM-based theme remapping on mismatch
 
 ### Instagram Auto-Publishing
 
@@ -150,8 +150,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VIRAL-12 | Phase 12.1 | Pending |
 | VIRAL-13 | Phase 12.1 | Pending |
 | VIRAL-14 | Phase 12.1 | Pending |
-| VIRAL-15 | Phase 12.1 | Pending |
-| VIRAL-16 | Phase 12.1 | Pending |
+| VIRAL-15 | Phase 12.1 | Complete |
+| VIRAL-16 | Phase 12.1 | Complete |
 | PUB-01 | Phase 14 | Pending |
 | PUB-02 | Phase 14 | Pending |
 | PUB-07 | Phase 14 | Pending |
