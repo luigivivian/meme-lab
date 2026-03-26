@@ -16,7 +16,9 @@ Plataforma de geração e publicação automatizada de memes para Instagram. Pip
 - Dashboard v2: histórico 30 dias, alertas de limite, relatório de custos
 - Multi-tenant: isolamento por usuário, API keys por usuário, billing
 
-## Current State (updated 2026-03-25)
+## Current State (updated 2026-03-26)
+
+**Video generation module complete (Phase 999.1).** Kie.ai Sora 2 image-to-video integration with async client, LLM-powered motion prompts (Gemini flash-lite), GCS upload for public URLs, daily budget enforcement, and 4 new API endpoints. Opt-in per content package, 10/15s duration selection, character consistency via character_id_list.
 
 **Tenant isolation complete (Phase 13).** Every API route now enforces user-scoped data access. All 5 repositories have user-aware read methods with admin bypass. Character creation sets user_id. PermissionError from repos is caught as 403 at the HTTP layer. 16/16 must-haves verified, TENANT-01 through TENANT-04 satisfied.
 
@@ -43,6 +45,7 @@ Pipeline compõe e publica memes automaticamente — simples, rápido, sem depen
 - **Backend:** Python 3.14, FastAPI, SQLAlchemy 2.0 async, MySQL, Alembic (8 migrations)
 - **Frontend:** Next.js 15, TypeScript, Tailwind CSS
 - **AI:** Google Gemini API (text only for phrases), Ollama/Gemma3 (local fallback)
+- **Video:** Kie.ai Sora 2 image-to-video (opt-in, budget-capped), GCS for public URLs
 - **Image:** Composição Pillow com backgrounds existentes (lisos/estáticos)
 - **DB:** 14 tables ORM (incl. users, refresh_tokens, api_usage)
 
@@ -99,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 — v2.0 milestone started*
+*Last updated: 2026-03-26 — Phase 999.1 (Video Generation) complete*
