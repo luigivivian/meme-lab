@@ -161,3 +161,24 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.2: Video Legends & Subtitles (BACKLOG)
+
+**Goal:** Add text overlays (meme phrase + watermark) to generated videos using FFmpeg, matching the existing Pillow text style. Produces ready-to-publish Instagram Reels with burned-in captions.
+
+**Scope:**
+- New module: `src/video_gen/legend_renderer.py` — FFmpeg `drawtext` filter chain (white text, black stroke, watermark)
+- New worker: `src/pipeline/workers/legend_worker.py` — runs in L5 post-production after video generation
+- 3 modes: `static` (default, full duration), `fade` (in/out), `typewriter` (char-by-char)
+- API: `POST /generate/video/legend`, `POST /generate/video/legend/batch`
+- Config: `VIDEO_LEGEND_ENABLED=true`, `VIDEO_LEGEND_MODE=static`, `VIDEO_LEGEND_FONT_SIZE=48`
+- Dep: `ffmpeg-python` (pip) + FFmpeg system binary
+- Port word-wrap logic from `src/image_maker.py` for video text rendering
+
+**Cost:** Zero (local FFmpeg processing).
+**Depends on:** Phase 999.1 (needs videos to overlay)
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
