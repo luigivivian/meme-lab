@@ -6,9 +6,27 @@ interface AuthContextType {
   user: { email: string; role: string } | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+}
+
+function getStorage(): Storage {
+  if (typeof window === "undefined") return localStorage;
+  return localStorage.getItem("_remember") === "session" ? sessionStorage : localStorage;
+}
+
+function getToken(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(key) ?? sessionStorage.getItem(key);
+}
+
+function clearTokens() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("refresh_token");
+  localStorage.removeItem("_remember");
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Hydration: validate stored token on mount
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = getToken("access_token");
     if (!token) {
       setIsLoading(false);
       return;
@@ -45,8 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser({ email: data.email, role: data.role });
       })
       .catch(() => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
+        clearTokens();
         setUser(null);
       })
       .finally(() => {
@@ -54,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, rememberMe = true) => {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -69,8 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const { access_token, refresh_token } = await res.json();
-    localStorage.setItem("access_token", access_token);
-    localStorage.setItem("refresh_token", refresh_token);
+
+    // Remember flag: localStorage persists, sessionStorage expires on close
+    clearTokens();
+    const store = rememberMe ? localStorage : sessionStorage;
+    store.setItem("access_token", access_token);
+    store.setItem("refresh_token", refresh_token);
+    localStorage.setItem("_remember", rememberMe ? "persist" : "session");
 
     // Fetch user data with the new token
     const meRes = await fetch("/api/auth/me", {
@@ -106,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const refresh_token = localStorage.getItem("refresh_token");
+    const refresh_token = getToken("refresh_token");
 
     // Best-effort server-side invalidation
     if (refresh_token) {
@@ -117,8 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }).catch(() => {});
     }
 
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    clearTokens();
     setUser(null);
 
     window.location.href = "/login";
