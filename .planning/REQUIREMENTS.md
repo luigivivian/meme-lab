@@ -52,15 +52,15 @@ Tracked for backlog phases. Not in current milestone but planned and allocated.
 
 ### Video Generation (Phase 999.1)
 
-- [ ] **VID-01**: ContentPackage table has video columns (video_path, video_source, video_prompt_used, video_task_id, video_metadata, video_status)
-- [ ] **VID-02**: Theme table has video_prompt_notes for per-theme motion prompt improvement
+- [x] **VID-01**: ContentPackage table has video columns (video_path, video_source, video_prompt_used, video_task_id, video_metadata, video_status)
+- [x] **VID-02**: Theme table has video_prompt_notes for per-theme motion prompt improvement
 - [ ] **VID-03**: KieSora2Client can create video tasks, poll status, and download results via Kie.ai API
 - [ ] **VID-04**: VideoPromptBuilder generates unique LLM motion prompts per video via Gemini
 - [ ] **VID-05**: Motion prompts incorporate per-theme video_prompt_notes for iterative quality improvement
 - [ ] **VID-06**: User can trigger video generation for approved content packages via POST /generate/video
 - [ ] **VID-07**: User can check video status and view completed videos via GET /generate/video/status/{id}
 - [ ] **VID-08**: User can generate videos in batch via POST /generate/video/batch
-- [ ] **VID-09**: Daily video budget cap enforced via VIDEO_DAILY_BUDGET_USD with cost tracking in api_usage
+- [x] **VID-09**: Daily video budget cap enforced via VIDEO_DAILY_BUDGET_USD with cost tracking in api_usage
 - [ ] **VID-10**: Character consistency via Kie.ai character_id_list registration
 
 ## Future Requirements
@@ -133,15 +133,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BILL-03 | Phase 17 | Pending |
 | BILL-04 | Phase 17 | Pending |
 | BILL-05 | Phase 17 | Pending |
-| VID-01 | Phase 999.1 | Pending |
-| VID-02 | Phase 999.1 | Pending |
+| VID-01 | Phase 999.1 | Complete |
+| VID-02 | Phase 999.1 | Complete |
 | VID-03 | Phase 999.1 | Pending |
 | VID-04 | Phase 999.1 | Pending |
 | VID-05 | Phase 999.1 | Pending |
 | VID-06 | Phase 999.1 | Pending |
 | VID-07 | Phase 999.1 | Pending |
 | VID-08 | Phase 999.1 | Pending |
-| VID-09 | Phase 999.1 | Pending |
+| VID-09 | Phase 999.1 | Complete |
 | VID-10 | Phase 999.1 | Pending |
 
 **Coverage:**

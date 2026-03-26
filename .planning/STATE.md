@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to plan
-stopped_at: Phase 999.1 context gathered
-last_updated: "2026-03-26T05:23:02.152Z"
+status: Ready to execute
+stopped_at: Completed 999.1-01-PLAN.md
+last_updated: "2026-03-26T05:48:00.868Z"
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 5
+  total_plans: 9
+  completed_plans: 6
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 13 — tenant-isolation
+**Current focus:** Phase 999.1 — video-generation-kie-sora2
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
+Phase: 999.1 (video-generation-kie-sora2) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Plan: Not started
 | Phase 13 P01 | 3min | 2 tasks | 5 files |
 | Phase 13 P02 | 3min | 2 tasks | 5 files |
 | Quick 260325-qhl | 6min | 3 tasks | 7 files |
+| Phase 999.1 P01 | 2min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ Recent decisions affecting current work:
 - [Phase 13]: ThemeRepository hybrid ownership: global themes public, user themes by user_id, character themes by Character.user_id
 - [Quick 260325-qhl]: Tile-based token estimation: ceil(w/768)*ceil(h/768)*258 per input image
 - [Quick 260325-qhl]: cost_usd accumulated via upsert per day/service/tier bucket in api_usage
+- [Phase 999.1]: Migration 012 chains from 011 (sequential pattern); all video columns nullable; GCSUploader lazy client init
 
 ### Pending Todos
 
@@ -86,6 +88,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T05:23:02.150Z
-Stopped at: Phase 999.1 context gathered
-Resume file: .planning/phases/999.1-video-generation-kie-sora2/999.1-CONTEXT.md
+Last session: 2026-03-26T05:48:00.865Z
+Stopped at: Completed 999.1-01-PLAN.md
+Resume file: None
