@@ -10,7 +10,9 @@ Usa Semaphore para serializar acessos a recursos limitados.
 import asyncio
 import logging
 import random
+import shutil
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,6 +55,7 @@ class ImageWorker:
         refs_priority: list[str] | None = None,
         watermark_text: str | None = None,
         background_mode: str = "auto",
+        character_slug: str | None = None,
     ):
         self._generator = ContentGenerator(use_comfyui=use_comfyui)
         self._watermark_text = watermark_text
@@ -61,6 +64,7 @@ class ImageWorker:
         self._background_mode = background_mode
         self._gemini_client = None
         self._reference_dir = reference_dir
+        self._character_slug = character_slug
         self._character_dna = character_dna
         self._negative_traits = negative_traits
         self._composition = composition
@@ -103,6 +107,21 @@ class ImageWorker:
         except Exception as e:
             logger.warning(f"Erro ao inicializar Gemini Image: {e}")
 
+    def _save_to_character_library(self, bg_path: str) -> None:
+        """Copia background gerado para assets/backgrounds/{slug}/ para reutilizacao futura."""
+        if not self._character_slug:
+            return
+        try:
+            src = Path(bg_path)
+            dest_dir = Path("assets/backgrounds") / self._character_slug
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / src.name
+            if not dest.exists():
+                shutil.copy2(src, dest)
+                logger.info(f"Background salvo na biblioteca do personagem: {dest}")
+        except Exception as e:
+            logger.warning(f"Nao foi possivel salvar background na biblioteca: {e}")
+
     async def _try_gemini(self, work_order: WorkOrder, phrase: str, situacao_key: str) -> tuple:
         """Tenta gerar background via Gemini Image API."""
         if not self._gemini_client:
@@ -127,6 +146,8 @@ class ImageWorker:
                 }
                 ctx_label = " (com contexto da frase)" if phrase_ctx else ""
                 logger.info(f"[{work_order.order_id}] Background via Gemini [{situacao_key}]{ctx_label}: {gen_result.path}")
+                # Auto-save: copy raw background to character library for future reuse
+                self._save_to_character_library(gen_result.path)
                 return gen_result.path, "gemini", metadata
         except Exception as e:
             logger.warning(f"[{work_order.order_id}] Gemini Image falhou: {e}")
@@ -141,6 +162,7 @@ class ImageWorker:
                 )
             if bg:
                 logger.info(f"[{work_order.order_id}] Background via ComfyUI [{situacao_key}]: {bg}")
+                self._save_to_character_library(bg)
                 return bg, "comfyui", {"theme_key": situacao_key}
         except Exception as e:
             logger.warning(f"[{work_order.order_id}] ComfyUI falhou: {e}")
@@ -241,9 +263,10 @@ class ImageWorker:
                 logger.warning(f"[{work_order.order_id}] Failed to increment usage: {e}")
 
         # Compor imagem final com Pillow (layout do WorkOrder)
+        # watermark_text="" — watermark so e aplicada no export/download
         layout = getattr(work_order, "layout", "bottom")
         image_path = await asyncio.to_thread(
-            create_image, phrase, bg, None, self._watermark_text, layout,
+            create_image, phrase, bg, None, "", layout,
         )
         gen_metadata["layout"] = layout
         if resolved_tier and resolved_tier != "exhausted":

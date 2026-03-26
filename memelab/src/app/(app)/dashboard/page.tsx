@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  Image, Bot, Workflow, TrendingUp, Play, HardDrive, Palette,
-  Loader2, CheckCircle2, Clock, Package, Send, Activity, Zap, Gauge,
+  Image, Bot, Workflow, TrendingUp, HardDrive, Palette,
+  Loader2, CheckCircle2, Clock, Package, Send, Activity, Gauge,
   Video, DollarSign,
 } from "lucide-react";
-import { staggerContainer, staggerItem, fadeInUp, fastStaggerContainer, fastStaggerItem } from "@/lib/animations";
+import { staggerContainer, staggerItem, fastStaggerContainer, fastStaggerItem } from "@/lib/animations";
 import { StatsCard } from "@/components/panels/stats-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ import {
   useDriveHealth, useJobs, useContentPackages, useQueueSummary, useUsage,
   useVideoBudget, useVideoStatus,
 } from "@/hooks/use-api";
-import { usePipeline } from "@/hooks/use-pipeline";
 import { imageUrl, generateVideo, type ContentPackageDB } from "@/lib/api";
 import { SOURCE_COLORS, AGENT_TYPE_COLORS, PUBLISH_STATUS_COLORS } from "@/lib/constants";
 
@@ -71,7 +70,6 @@ export default function DashboardPage() {
   const { data: contentData, mutate: mutateContent } = useContentPackages(6);
   const { data: queueSummary } = useQueueSummary();
   const { data: usageData, isLoading: usageLoading } = useUsage();
-  const pipeline = usePipeline();
 
   // Video generation state
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
@@ -130,85 +128,15 @@ export default function DashboardPage() {
     return { counts, total };
   }, [contentData]);
 
-  const handleQuickRun = () => {
-    pipeline.run({ count: 5, use_gemini_image: true, use_phrase_context: true });
-  };
-
   return (
     <div className="space-y-6">
-      {/* Welcome + Quick Action */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-sm text-muted-foreground/70 mt-1">
-            Visao geral do pipeline de memes
-          </p>
-        </div>
-        <Button
-          onClick={handleQuickRun}
-          disabled={pipeline.isRunning}
-          size="lg"
-          className={pipeline.isRunning ? "pulse-glow" : ""}
-        >
-          {pipeline.isRunning ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Zap className="h-4 w-4" />
-          )}
-          {pipeline.isRunning ? "Executando..." : "Quick Run"}
-        </Button>
+      {/* Welcome */}
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
+        <p className="text-sm text-muted-foreground/70 mt-1">
+          Visao geral do pipeline de memes
+        </p>
       </div>
-
-      {/* Pipeline status banners */}
-      <AnimatePresence mode="wait">
-        {pipeline.isRunning && (
-          <motion.div
-            key="running"
-            variants={fadeInUp}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="rounded-xl bg-primary/[0.04] border border-primary/15 p-4 space-y-3"
-          >
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <p className="text-sm font-medium">Pipeline em execucao...</p>
-            </div>
-            <IndeterminateProgress />
-          </motion.div>
-        )}
-        {pipeline.error && !pipeline.isRunning && (
-          <motion.div
-            key="error"
-            variants={fadeInUp}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="flex items-center gap-2 rounded-xl bg-rose-500/[0.06] border border-rose-500/15 px-4 py-3"
-          >
-            <div className="h-2 w-2 rounded-full bg-rose-500" />
-            <p className="text-sm text-rose-400">{pipeline.error}</p>
-          </motion.div>
-        )}
-        {pipeline.status && !pipeline.isRunning && !pipeline.error && (
-          <motion.div
-            key="done"
-            variants={fadeInUp}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="rounded-xl bg-emerald-500/[0.04] border border-emerald-500/15 p-4"
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <p className="text-sm font-medium">
-                Pipeline concluido — {pipeline.status.images_generated} imgs, {pipeline.status.packages_produced} pacotes
-                {pipeline.status.duration_seconds > 0 && ` em ${pipeline.status.duration_seconds.toFixed(1)}s`}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Stats Grid */}
       {statusLoading ? (
@@ -376,10 +304,12 @@ export default function DashboardPage() {
                     <p className="text-sm font-medium text-muted-foreground">Nenhum conteudo gerado ainda</p>
                     <p className="text-xs text-muted-foreground/50 mt-1">Execute o pipeline para gerar seus primeiros memes</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleQuickRun} disabled={pipeline.isRunning} className="gap-2 mt-1">
-                    <Play className="h-3.5 w-3.5" />
-                    Gerar primeiro conteudo
-                  </Button>
+                  <a href="/pipeline">
+                    <Button variant="outline" size="sm" className="gap-2 mt-1">
+                      <Workflow className="h-3.5 w-3.5" />
+                      Ir para Pipeline
+                    </Button>
+                  </a>
                 </div>
               )}
             </CardContent>
