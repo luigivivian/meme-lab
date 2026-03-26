@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, CDN image upload, token lifecycle management
 - [ ] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts
 - [ ] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history
-- [ ] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement
+- [x] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement (completed 2026-03-26)
 
 ## Phase Details
 
@@ -133,7 +133,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
 | 16. Dashboard v2 | 0/? | Not started | - |
-| 17. Billing & Stripe | 1/2 | In Progress | - |
+| 17. Billing & Stripe | 1/2 | Complete    | 2026-03-26 |
 
 ## Backlog
 
