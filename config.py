@@ -340,3 +340,42 @@ INSTAGRAM_BEST_TIMES_BR = {
     "saturday": ["10:00", "14:00", "20:00"],
     "sunday": ["10:00", "14:00", "20:00"],
 }
+
+# ===== Video Generation (Kie.ai Sora 2) — Phase 999.1 =====
+
+# Feature flag — video generation disabled by default (per D-05: opt-in only)
+VIDEO_ENABLED = os.getenv("VIDEO_ENABLED", "false").lower() == "true"
+
+# Kie.ai API key (get from https://kie.ai/api-key)
+KIE_API_KEY = os.getenv("KIE_API_KEY", "")
+
+# Default video duration in seconds: 10 or 15 (per D-08)
+VIDEO_DURATION = int(os.getenv("VIDEO_DURATION", "10"))
+
+# Sora 2 model ID (per D-07: standard tier by default)
+VIDEO_MODEL = os.getenv("VIDEO_MODEL", "sora-2-image-to-video")
+
+# Hard daily budget cap in USD (per D-09: $3.00 default = ~20 standard videos/day)
+VIDEO_DAILY_BUDGET_USD = float(os.getenv("VIDEO_DAILY_BUDGET_USD", "3.0"))
+
+# Cost per second for standard Sora 2 tier
+VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.015"))
+
+# Concurrency limiter for Kie.ai API calls
+KIE_MAX_CONCURRENT = int(os.getenv("KIE_MAX_CONCURRENT", "3"))
+
+# Polling config
+KIE_POLL_INITIAL_INTERVAL = int(os.getenv("KIE_POLL_INITIAL_INTERVAL", "5"))
+KIE_POLL_MAX_INTERVAL = int(os.getenv("KIE_POLL_MAX_INTERVAL", "30"))
+KIE_POLL_TIMEOUT = int(os.getenv("KIE_POLL_TIMEOUT", "600"))
+
+# Generated videos output directory
+GENERATED_VIDEOS_DIR = OUTPUT_DIR / "videos"
+
+# ===== GCS Upload (for Kie.ai public URLs) — Phase 999.1 =====
+
+# GCS bucket name for temporary image uploads (per D-04)
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "clipflow-video-uploads")
+
+# Signed URL expiry in seconds (1 hour — video gen takes 30-120s)
+GCS_SIGNED_URL_EXPIRY = int(os.getenv("GCS_SIGNED_URL_EXPIRY", "3600"))
