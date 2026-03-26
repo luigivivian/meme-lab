@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package } from "lucide-react";
+import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown, Undo2, Filter } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { SOURCE_COLORS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,11 @@ import {
   generateSingle,
   refineImage,
   generateVideo,
+  approveContent,
+  rejectContent,
+  unrejectContent,
+  bulkApproveContent,
+  bulkRejectContent,
   type ImageInfo,
   type ContentPackageDB,
 } from "@/lib/api";
@@ -117,7 +122,54 @@ export default function GalleryPage() {
     }
   };
 
+  // Approval flow state
+  const [statusFilter, setStatusFilter] = useState<"" | "pending" | "approved" | "rejected">("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [approving, setApproving] = useState<number | null>(null);
+
   const allPackages = contentData?.packages ?? [];
+  const filteredPackages = statusFilter
+    ? allPackages.filter((p) => p.approval_status === statusFilter)
+    : allPackages;
+
+  const pendingCount = allPackages.filter((p) => p.approval_status === "pending").length;
+  const approvedCount = allPackages.filter((p) => p.approval_status === "approved").length;
+  const rejectedCount = allPackages.filter((p) => p.approval_status === "rejected").length;
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleApprove = async (id: number) => {
+    setApproving(id);
+    try { await approveContent(id); mutateContent(); } catch {} finally { setApproving(null); }
+  };
+
+  const handleReject = async (id: number) => {
+    setApproving(id);
+    try { await rejectContent(id); mutateContent(); } catch {} finally { setApproving(null); }
+  };
+
+  const handleUnreject = async (id: number) => {
+    setApproving(id);
+    try { await unrejectContent(id); mutateContent(); } catch {} finally { setApproving(null); }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) return;
+    setApproving(-1);
+    try { await bulkApproveContent([...selectedIds]); setSelectedIds(new Set()); mutateContent(); } catch {} finally { setApproving(null); }
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedIds.size === 0) return;
+    setApproving(-1);
+    try { await bulkRejectContent([...selectedIds]); setSelectedIds(new Set()); mutateContent(); } catch {} finally { setApproving(null); }
+  };
 
   const driveThemeList = driveThemesData?.themes ?? [];
   const situacaoThemes = themesData?.themes ?? [];
@@ -578,97 +630,181 @@ export default function GalleryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Conteudo Aprovado — Video Generation */}
+      {/* Conteudo Gerado — Approval + Video */}
       {allPackages.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Package className="h-4 w-4 text-primary" />
               Conteudo Gerado
-              <Badge variant="secondary" className="text-xs ml-auto">{allPackages.length}</Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <motion.div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" variants={staggerContainer} initial="initial" animate="animate">
-              {allPackages.map((pkg) => {
-                const filename = pkg.image_path.split(/[/\\]/).pop() ?? "";
-                return (
-                  <motion.div
-                    key={pkg.id}
-                    className="group relative overflow-hidden rounded-xl border bg-secondary"
-                    variants={staggerItem}
+          <CardContent className="space-y-4">
+            {/* Status filter + bulk actions */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 rounded-lg bg-white/[0.02] p-0.5">
+                {([
+                  { key: "", label: "Todos", count: allPackages.length },
+                  { key: "pending", label: "Pendentes", count: pendingCount },
+                  { key: "approved", label: "Aprovados", count: approvedCount },
+                  { key: "rejected", label: "Rejeitados", count: rejectedCount },
+                ] as const).map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => { setStatusFilter(tab.key as typeof statusFilter); setSelectedIds(new Set()); }}
+                    className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+                      statusFilter === tab.key
+                        ? "bg-primary/15 text-primary font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                    }`}
                   >
-                    <div className="relative aspect-[4/5] overflow-hidden">
-                      <img src={imageUrl(filename)} alt={pkg.phrase} className="h-full w-full object-cover" />
-                      {/* Video status badge */}
-                      {pkg.video_status && (
-                        <div className="absolute top-2 right-2">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm ${
-                            pkg.video_status === "generating" ? "bg-amber-500/80 animate-pulse"
-                            : pkg.video_status === "success" ? "bg-cyan-500/80"
-                            : pkg.video_status === "failed" ? "bg-rose-500/80"
-                            : "bg-zinc-500/80"
-                          }`}>
-                            <Video className="h-2.5 w-2.5" />
-                            {pkg.video_status === "generating" ? "Gerando..." : pkg.video_status === "success" ? "Video pronto" : pkg.video_status === "failed" ? "Falhou" : pkg.video_status}
-                          </span>
+                    {tab.label} <span className="tabular-nums ml-0.5 opacity-60">{tab.count}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Bulk actions */}
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={handleBulkApprove} disabled={approving !== null}>
+                    <ThumbsUp className="h-3 w-3" /> Aprovar
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-rose-400 border-rose-500/20 hover:bg-rose-500/10" onClick={handleBulkReject} disabled={approving !== null}>
+                    <ThumbsDown className="h-3 w-3" /> Rejeitar
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>Limpar</Button>
+                </div>
+              )}
+
+              {/* Select all pending shortcut */}
+              {statusFilter === "pending" && pendingCount > 0 && selectedIds.size === 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs gap-1 ml-auto"
+                  onClick={() => setSelectedIds(new Set(filteredPackages.map((p) => p.id)))}
+                >
+                  Selecionar todos
+                </Button>
+              )}
+            </div>
+
+            {approving === -1 && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/[0.04]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span className="text-xs">Processando...</span>
+              </div>
+            )}
+
+            {/* Content grid */}
+            {filteredPackages.length > 0 ? (
+              <motion.div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" variants={staggerContainer} initial="initial" animate="animate">
+                {filteredPackages.map((pkg) => {
+                  const filename = pkg.image_path.split(/[/\\]/).pop() ?? "";
+                  const isSelected = selectedIds.has(pkg.id);
+                  const isPending = pkg.approval_status === "pending";
+                  const isApproved = pkg.approval_status === "approved";
+                  const isRejected = pkg.approval_status === "rejected";
+                  return (
+                    <motion.div
+                      key={pkg.id}
+                      className={`group relative overflow-hidden rounded-xl border transition-all ${
+                        isSelected ? "border-primary ring-1 ring-primary/30" :
+                        isRejected ? "border-rose-500/20 opacity-60" :
+                        "border-white/[0.04] hover:border-white/[0.08]"
+                      } bg-secondary`}
+                      variants={staggerItem}
+                    >
+                      {/* Selection checkbox */}
+                      <div
+                        className="absolute top-2 left-2 z-10 cursor-pointer"
+                        onClick={(e) => { e.stopPropagation(); toggleSelect(pkg.id); }}
+                      >
+                        <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                          isSelected ? "bg-primary border-primary" : "border-white/30 bg-black/30 backdrop-blur-sm"
+                        }`}>
+                          {isSelected && <CheckCircle2 className="h-3 w-3 text-white" />}
                         </div>
-                      )}
-                    </div>
-                    <div className="p-2.5 space-y-2">
-                      <p className="line-clamp-2 text-xs leading-snug">{pkg.phrase}</p>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted-foreground">{pkg.topic}</span>
-                        <span className="text-[10px] text-muted-foreground tabular-nums">{(pkg.quality_score * 100).toFixed(0)}%</span>
                       </div>
-                      {/* Video action button */}
-                      {!pkg.video_status ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className={`w-full h-7 text-xs gap-1 ${pkg.approval_status !== "approved" ? "opacity-60" : ""}`}
-                          onClick={() => {
-                            if (pkg.approval_status !== "approved") {
-                              setVideoTarget(pkg);
-                              setVideoError("Aprove o conteudo antes de gerar video");
-                              setVideoSuccess(false);
-                              return;
-                            }
-                            setVideoTarget(pkg);
-                            setVideoError(null);
-                            setVideoSuccess(false);
-                            setVideoDuration(10);
-                          }}
-                        >
-                          <Video className="h-3 w-3" />
-                          Gerar Video
-                        </Button>
-                      ) : pkg.video_status === "generating" ? (
-                        <div className="flex items-center justify-center gap-1 h-7 text-xs text-amber-400">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Gerando...
+
+                      <div className="relative aspect-[4/5] overflow-hidden">
+                        <img src={imageUrl(filename)} alt={pkg.phrase} className="h-full w-full object-cover" />
+                        {/* Status + video badges */}
+                        <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm ${
+                            isApproved ? "bg-emerald-500/80" : isRejected ? "bg-rose-500/80" : "bg-amber-500/80"
+                          }`}>
+                            {isApproved ? "Aprovado" : isRejected ? "Rejeitado" : "Pendente"}
+                          </span>
+                          {pkg.video_status && (
+                            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm ${
+                              pkg.video_status === "generating" ? "bg-cyan-500/80 animate-pulse"
+                              : pkg.video_status === "success" ? "bg-cyan-500/80"
+                              : "bg-rose-500/80"
+                            }`}>
+                              <Video className="h-2.5 w-2.5" />
+                              {pkg.video_status === "generating" ? "Gerando..." : pkg.video_status === "success" ? "Video" : "Falhou"}
+                            </span>
+                          )}
                         </div>
-                      ) : pkg.video_status === "failed" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full h-7 text-xs gap-1 text-rose-400 border-rose-500/20"
-                          onClick={() => {
-                            setVideoTarget(pkg);
-                            setVideoError(null);
-                            setVideoSuccess(false);
-                            setVideoDuration(10);
-                          }}
-                        >
-                          <Video className="h-3 w-3" />
-                          Tentar novamente
-                        </Button>
-                      ) : null}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
+                      </div>
+                      <div className="p-2.5 space-y-2">
+                        <p className="line-clamp-2 text-xs leading-snug">{pkg.phrase}</p>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground">{pkg.topic}</span>
+                          <span className="text-[10px] text-muted-foreground tabular-nums">{(pkg.quality_score * 100).toFixed(0)}%</span>
+                        </div>
+
+                        {/* Action buttons by status */}
+                        {isPending && (
+                          <div className="flex gap-1.5">
+                            <Button size="sm" variant="outline" className="flex-1 h-7 text-xs gap-1" onClick={() => handleApprove(pkg.id)} disabled={approving === pkg.id}>
+                              {approving === pkg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ThumbsUp className="h-3 w-3" />}
+                              Aprovar
+                            </Button>
+                            <Button size="sm" variant="outline" className="flex-1 h-7 text-xs gap-1 text-rose-400 border-rose-500/20 hover:bg-rose-500/10" onClick={() => handleReject(pkg.id)} disabled={approving === pkg.id}>
+                              <ThumbsDown className="h-3 w-3" />
+                              Rejeitar
+                            </Button>
+                          </div>
+                        )}
+
+                        {isRejected && (
+                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={() => handleUnreject(pkg.id)} disabled={approving === pkg.id}>
+                            {approving === pkg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Undo2 className="h-3 w-3" />}
+                            Desfazer rejeicao
+                          </Button>
+                        )}
+
+                        {isApproved && !pkg.video_status && (
+                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={() => { setVideoTarget(pkg); setVideoError(null); setVideoSuccess(false); setVideoDuration(10); }}>
+                            <Video className="h-3 w-3" />
+                            Gerar Video
+                          </Button>
+                        )}
+
+                        {isApproved && pkg.video_status === "generating" && (
+                          <div className="flex items-center justify-center gap-1 h-7 text-xs text-amber-400">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Gerando video...
+                          </div>
+                        )}
+
+                        {isApproved && pkg.video_status === "failed" && (
+                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1 text-rose-400 border-rose-500/20" onClick={() => { setVideoTarget(pkg); setVideoError(null); setVideoSuccess(false); setVideoDuration(10); }}>
+                            <Video className="h-3 w-3" /> Tentar novamente
+                          </Button>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-sm text-muted-foreground">Nenhum conteudo {statusFilter ? `com status "${statusFilter}"` : ""}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
