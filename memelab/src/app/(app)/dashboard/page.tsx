@@ -5,8 +5,12 @@ import { motion } from "framer-motion";
 import {
   Image, Bot, Workflow, TrendingUp, HardDrive, Palette,
   Loader2, CheckCircle2, Clock, Package, Send, Activity, Gauge,
-  Video, DollarSign,
+  Video, DollarSign, AlertTriangle, BarChart3,
 } from "lucide-react";
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
+  BarChart, Bar, PieChart, Pie, Cell,
+} from "recharts";
 import { staggerContainer, staggerItem, fastStaggerContainer, fastStaggerItem } from "@/lib/animations";
 import { StatsCard } from "@/components/panels/stats-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,8 +23,10 @@ import {
   useStatus, useAgents, useLatestImages, usePipelineRuns,
   useDriveHealth, useJobs, useContentPackages, useQueueSummary, useUsage,
   useVideoBudget, useVideoStatus,
+  useDashboardUsageHistory, useDashboardCostBreakdown,
+  useDashboardPipelineActivity, useDashboardPublishingStats,
 } from "@/hooks/use-api";
-import { imageUrl, generateVideo, type ContentPackageDB } from "@/lib/api";
+import { imageUrl, generateVideo, type ContentPackageDB, type UsageResponse } from "@/lib/api";
 import { SOURCE_COLORS, AGENT_TYPE_COLORS, PUBLISH_STATUS_COLORS } from "@/lib/constants";
 
 const DISTRIBUTION_BAR_COLORS: Record<string, string> = {
@@ -60,6 +66,15 @@ const VIDEO_STATUS_LABELS: Record<string, string> = {
   failed: "Video falhou",
 };
 
+const CHART_COLORS = {
+  gemini_text: "#3b82f6",    // blue-500
+  gemini_image: "#8b5cf6",   // violet-500
+  kie_video: "#06b6d4",      // cyan-500
+  gemini_web: "#10b981",     // emerald-500
+};
+
+const PIE_COLORS = ["#8b5cf6", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"];
+
 export default function DashboardPage() {
   const { data: status, isLoading: statusLoading } = useStatus();
   const { data: agents } = useAgents();
@@ -70,6 +85,12 @@ export default function DashboardPage() {
   const { data: contentData, mutate: mutateContent } = useContentPackages(6);
   const { data: queueSummary } = useQueueSummary();
   const { data: usageData, isLoading: usageLoading } = useUsage();
+
+  // Dashboard analytics hooks (Phase 16)
+  const { data: usageHistory } = useDashboardUsageHistory();
+  const { data: costBreakdown } = useDashboardCostBreakdown();
+  const { data: pipelineActivity } = useDashboardPipelineActivity();
+  const { data: publishingStats } = useDashboardPublishingStats();
 
   // Video generation state
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
@@ -592,6 +613,161 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Quota Alerts — per D-09, D-10, D-11 */}
+      <QuotaAlerts usageData={usageData} />
+
+      {/* Charts Section — per D-12, D-13 */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Uso 30 dias — stacked area chart */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Gauge className="h-4 w-4 text-primary" />
+              Uso 30 dias
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {usageHistory ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={usageHistory.history}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#71717a" }}
+                    tickFormatter={(v: string) => v.slice(5)} />
+                  <YAxis tick={{ fontSize: 10, fill: "#71717a" }} />
+                  <Tooltip
+                    contentStyle={{ background: "#1c1c22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
+                    labelFormatter={(v) => String(v)}
+                  />
+                  <Area type="monotone" dataKey="gemini_text" stackId="1" fill={CHART_COLORS.gemini_text} stroke={CHART_COLORS.gemini_text} fillOpacity={0.3} name="Gemini Text" />
+                  <Area type="monotone" dataKey="gemini_image" stackId="1" fill={CHART_COLORS.gemini_image} stroke={CHART_COLORS.gemini_image} fillOpacity={0.3} name="Gemini Image" />
+                  <Area type="monotone" dataKey="kie_video" stackId="1" fill={CHART_COLORS.kie_video} stroke={CHART_COLORS.kie_video} fillOpacity={0.3} name="Kie Video" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <Skeleton className="h-[250px] w-full" />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Custos por Servico — donut chart */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Custos por Servico
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {costBreakdown && costBreakdown.services.length > 0 ? (
+              <div className="flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={costBreakdown.services}
+                      dataKey="cost_usd"
+                      nameKey="service"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      label={({ name, value }: { name?: string; value?: number }) =>
+                        `${(name ?? "").replace("_", " ")} $${(value ?? 0).toFixed(2)}`
+                      }
+                    >
+                      {costBreakdown.services.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ background: "#1c1c22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
+                      formatter={(v) => [`$${Number(v).toFixed(4)}`, "Custo"]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : costBreakdown ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <DollarSign className="h-8 w-8 text-muted-foreground/20 mb-2" />
+                <p className="text-sm text-muted-foreground/60">Sem custos no periodo</p>
+              </div>
+            ) : (
+              <Skeleton className="h-[250px] w-full" />
+            )}
+            {costBreakdown && (
+              <div className="mt-2 text-center">
+                <span className="text-xs text-muted-foreground">
+                  Total 30 dias: <span className="font-medium text-foreground">${costBreakdown.total_cost_usd.toFixed(2)}</span>
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Atividade do Pipeline — bar chart */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              Atividade do Pipeline
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pipelineActivity ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={pipelineActivity.activity}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#71717a" }}
+                    tickFormatter={(v: string) => v.slice(5)} />
+                  <YAxis tick={{ fontSize: 10, fill: "#71717a" }} />
+                  <Tooltip
+                    contentStyle={{ background: "#1c1c22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
+                    labelFormatter={(v) => String(v)}
+                  />
+                  <Bar dataKey="runs" fill="#7C3AED" radius={[4, 4, 0, 0]} name="Runs" />
+                  <Bar dataKey="packages" fill="#a78bfa" radius={[4, 4, 0, 0]} name="Pacotes" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Skeleton className="h-[250px] w-full" />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Publicacao stats */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Send className="h-4 w-4 text-primary" />
+              Publicacao
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {publishingStats ? (
+              <div className="space-y-3">
+                <div className="text-3xl font-bold tabular-nums">{publishingStats.total}</div>
+                <p className="text-xs text-muted-foreground -mt-2">posts totais</p>
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  {[
+                    { label: "Publicados", value: publishingStats.published, color: "text-emerald-400" },
+                    { label: "Na fila", value: publishingStats.queued, color: "text-amber-400" },
+                    { label: "Falharam", value: publishingStats.failed, color: "text-rose-400" },
+                    { label: "Cancelados", value: publishingStats.cancelled, color: "text-zinc-400" },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-lg bg-white/[0.02] px-3 py-2">
+                      <p className={`text-lg font-bold tabular-nums ${item.color}`}>{item.value}</p>
+                      <p className="text-[10px] text-muted-foreground">{item.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Skeleton className="h-[200px] w-full" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Video Generation Dialog */}
       <Dialog
         open={!!videoTarget}
@@ -741,6 +917,38 @@ function StatusRow({ label, value, ok }: { label: string; value: string; ok?: bo
         )}
         <span className="text-xs font-medium tabular-nums">{value}</span>
       </div>
+    </div>
+  );
+}
+
+function QuotaAlerts({ usageData }: { usageData: UsageResponse | undefined }) {
+  if (!usageData) return null;
+  const alerts: { service: string; pct: number; level: "warning" | "critical" }[] = [];
+  for (const svc of usageData.services) {
+    if (svc.limit === 0) continue; // unlimited
+    const pct = Math.round((svc.used / svc.limit) * 100);
+    if (pct >= 95) alerts.push({ service: svc.service, pct, level: "critical" });
+    else if (pct >= 80) alerts.push({ service: svc.service, pct, level: "warning" });
+  }
+  if (alerts.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      {alerts.map((a) => (
+        <div
+          key={a.service}
+          className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm ${
+            a.level === "critical"
+              ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
+              : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+          }`}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            {a.service.replace("_", " ")} — {a.pct}% do limite diario
+            {a.level === "critical" ? " (critico!)" : ""}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

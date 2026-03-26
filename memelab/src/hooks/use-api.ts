@@ -129,13 +129,6 @@ export function useCharacterValidation(slug: string | null) {
   );
 }
 
-export function useInstagramStatus() {
-  return useSWR("instagram-status", () => api.getInstagramStatus(), {
-    refreshInterval: 60000,
-    errorRetryCount: 1,
-  });
-}
-
 export function usePublishingQueue(params?: { status?: string; platform?: string; limit?: number }) {
   const key = `publishing-queue-${params?.status ?? ""}-${params?.platform ?? ""}-${params?.limit ?? 20}`;
   return useSWR(key, () => api.getPublishingQueue(params), {
@@ -170,13 +163,6 @@ export function useUsage() {
   });
 }
 
-export function useVideoList(status?: string) {
-  const key = `video-list-${status ?? "all"}`;
-  return useSWR(key, () => api.getVideoList(status), {
-    refreshInterval: 5000,
-  });
-}
-
 export function useVideoBudget() {
   return useSWR("video-budget", () => api.getVideoBudget(), {
     refreshInterval: 30000,
@@ -192,9 +178,30 @@ export function useVideoStatus(contentPackageId: number | null, enabled = false)
   );
 }
 
-export function useInstagramStatus() {
-  return useSWR("instagram-status", () => api.getInstagramStatus(), {
+// --- Dashboard Analytics (Phase 16) ---
+
+export function useDashboardUsageHistory(days = 30) {
+  return useSWR(`dashboard-usage-history-${days}`, () => api.getDashboardUsageHistory(days), {
     refreshInterval: 60000,
-    errorRetryCount: 1,
+    revalidateOnFocus: false,
+  });
+}
+
+export function useDashboardCostBreakdown(days = 30) {
+  return useSWR(`dashboard-cost-breakdown-${days}`, () => api.getDashboardCostBreakdown(days), {
+    refreshInterval: 60000,
+    revalidateOnFocus: false,
+  });
+}
+
+export function useDashboardPipelineActivity(days = 30) {
+  return useSWR(`dashboard-pipeline-activity-${days}`, () => api.getDashboardPipelineActivity(days), {
+    refreshInterval: 30000,
+  });
+}
+
+export function useDashboardPublishingStats() {
+  return useSWR("dashboard-publishing-stats", () => api.getDashboardPublishingStats(), {
+    refreshInterval: 30000,
   });
 }

@@ -413,6 +413,63 @@ export interface UsageResponse {
 
 export const getUsage = () => request<UsageResponse>("/auth/me/usage");
 
+// --- Dashboard Analytics (Phase 16) ---
+export interface UsageHistoryDay {
+  date: string;
+  gemini_text: number;
+  gemini_image: number;
+  kie_video: number;
+  [key: string]: string | number;
+}
+
+export interface UsageHistoryResponse {
+  days: number;
+  history: UsageHistoryDay[];
+}
+
+export interface CostBreakdownService {
+  service: string;
+  cost_usd: number;
+  calls: number;
+}
+
+export interface CostBreakdownResponse {
+  days: number;
+  services: CostBreakdownService[];
+  total_cost_usd: number;
+}
+
+export interface PipelineActivityDay {
+  date: string;
+  runs: number;
+  packages: number;
+}
+
+export interface PipelineActivityResponse {
+  days: number;
+  activity: PipelineActivityDay[];
+}
+
+export interface PublishingStatsResponse {
+  total: number;
+  published: number;
+  queued: number;
+  failed: number;
+  cancelled: number;
+}
+
+export const getDashboardUsageHistory = (days = 30) =>
+  request<UsageHistoryResponse>(`/dashboard/usage-history?days=${days}`);
+
+export const getDashboardCostBreakdown = (days = 30) =>
+  request<CostBreakdownResponse>(`/dashboard/cost-breakdown?days=${days}`);
+
+export const getDashboardPipelineActivity = (days = 30) =>
+  request<PipelineActivityResponse>(`/dashboard/pipeline-activity?days=${days}`);
+
+export const getDashboardPublishingStats = () =>
+  request<PublishingStatsResponse>("/dashboard/publishing-stats");
+
 // --- Status ---
 export const getStatus = () => request<StatusResponse>("/status");
 
