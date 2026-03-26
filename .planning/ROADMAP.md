@@ -43,13 +43,22 @@ Plans:
 
 ### Phase 12.1: Viral Content Engine — Trend Agents & Content Quality Overhaul (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
+**Goal:** Overhaul the trend agent layer (L1) and curator layer (L3) to produce content that is consistently relevant, timely, and viral-ready for Brazilian meme audiences
 **Depends on:** Phase 12
-**Plans:** 0 plans
+**Requirements**: VIRAL-01, VIRAL-02, VIRAL-03, VIRAL-04, VIRAL-05, VIRAL-06, VIRAL-07, VIRAL-08, VIRAL-09, VIRAL-10, VIRAL-11, VIRAL-12, VIRAL-13, VIRAL-14, VIRAL-15, VIRAL-16
+**Success Criteria** (what must be TRUE):
+  1. Pipeline only uses agents that produce BR-relevant meme content (HackerNews and Lemmy removed)
+  2. Trend scoring is dynamic — fresh multi-source trends rank higher than stale single-source ones
+  3. Curator intelligently maps trending topics to visual themes via LLM instead of rigid keyword matching
+  4. Generated phrases pass quality validation (length, language, format) before image composition
+  5. Topic-image coherence is verified before generation, with automatic theme remapping on mismatch
+**Plans**: 4 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 12.1 to break down)
+- [ ] 12.1-01-PLAN.md — Agent cleanup: remove HN/Lemmy, simplify RSS, improve Reddit/YouTube/Gemini/BlueSky agents
+- [ ] 12.1-02-PLAN.md — Scoring engine: fix Google Trends parsing, temporal decay, multi-source boost, engagement scoring
+- [ ] 12.1-03-PLAN.md — Curator intelligence: LLM theme mapping, relevance filter, throughput increase
+- [ ] 12.1-04-PLAN.md — Content guardrails: phrase validation, topic-image coherence check
 
 ### Phase 13: Tenant Isolation
 **Goal**: Every user sees only their own data across all resources, with admin users able to bypass isolation
@@ -139,6 +148,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 12. Pipeline Simplification | 2/3 | In Progress|  |
+| 12.1 Viral Content Engine | 0/4 | Not started | - |
 | 13. Tenant Isolation | 2/3 | Complete    | 2026-03-25 |
 | 14. Instagram Connection & CDN | 0/? | Not started | - |
 | 15. Publishing & Scheduling | 0/? | Not started | - |
