@@ -21,15 +21,34 @@ Requirements for milestone v2.0: Pipeline Simplification, Auto-Publicacao & Mult
 - [x] **TENANT-03**: Admin user can access all users' data via admin bypass
 - [x] **TENANT-04**: Cross-user data access returns 403 (not 404)
 
+### Viral Content Engine (Phase 12.1 — INSERTED)
+
+- [x] **VIRAL-01**: HackerNewsAgent removed from pipeline (irrelevant for BR meme content)
+- [x] **VIRAL-02**: LemmyCommunitiesAgent removed from pipeline (low-volume, duplicates Reddit)
+- [x] **VIRAL-03**: RSSFeedAgent simplified to Sensacionalista + cannabis feeds only (no Reddit RSS overlap)
+- [x] **VIRAL-04**: RedditMemesAgent uses BR-first scoring (BR subs 0.6 base, English subs 0.3 base)
+- [x] **VIRAL-05**: YouTubeRSSAgent expanded with 5+ major Brazilian comedy/entertainment channels
+- [x] **VIRAL-06**: GeminiWebTrendsAgent requests 25 topics per fetch for broader coverage
+- [x] **VIRAL-07**: BlueSkyAgent uses specific BR humor keywords instead of generic terms
+- [x] **VIRAL-08**: Google Trends traffic parsing uses regex with K/M/B suffix support
+- [x] **VIRAL-09**: Trend scores apply temporal velocity decay (e^(-age_hours/24))
+- [x] **VIRAL-10**: TrendAggregator applies multi-source boost (1 + 0.2*(sources-1), capped at 2.0x)
+- [x] **VIRAL-11**: Reddit posts use engagement/position-based scoring instead of fixed 0.4
+- [x] **VIRAL-12**: Curator uses LLM-based theme mapping instead of rigid KEYWORD_MAP
+- [x] **VIRAL-13**: Curator processes 20+ trends and produces 10-15 WorkOrders per run
+- [x] **VIRAL-14**: Curator filters topics with meme potential below 3 (LLM-rated 1-5)
+- [x] **VIRAL-15**: Generated phrases validated for length (<120 chars), language, and format before use
+- [x] **VIRAL-16**: Topic-image coherence checked before generation, with LLM-based theme remapping on mismatch
+
 ### Instagram Auto-Publishing
 
-- [ ] **PUB-01**: User can connect Instagram Business Account and store credentials securely
-- [ ] **PUB-02**: Images are uploaded to CDN (Cloudflare R2) with public URLs for Instagram API
+- [x] **PUB-01**: User can connect Instagram Business Account and store credentials securely
+- [x] **PUB-02**: Images are uploaded to CDN (Cloudflare R2) with public URLs for Instagram API
 - [ ] **PUB-03**: User can schedule a post for a specific date/time
 - [ ] **PUB-04**: Scheduler automatically publishes posts at scheduled time via Instagram Graph API
 - [ ] **PUB-05**: User can view, cancel, and retry scheduled posts
 - [ ] **PUB-06**: User can view a content calendar (month/week views) of scheduled and published posts
-- [ ] **PUB-07**: Instagram tokens auto-refresh before 60-day expiry
+- [x] **PUB-07**: Instagram tokens auto-refresh before 60-day expiry
 
 ### Dashboard v2
 
@@ -117,9 +136,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TENANT-02 | Phase 13 | Complete |
 | TENANT-03 | Phase 13 | Complete |
 | TENANT-04 | Phase 13 | Complete |
-| PUB-01 | Phase 14 | Pending |
-| PUB-02 | Phase 14 | Pending |
-| PUB-07 | Phase 14 | Pending |
+| VIRAL-01 | Phase 12.1 | Complete |
+| VIRAL-02 | Phase 12.1 | Complete |
+| VIRAL-03 | Phase 12.1 | Complete |
+| VIRAL-04 | Phase 12.1 | Complete |
+| VIRAL-05 | Phase 12.1 | Complete |
+| VIRAL-06 | Phase 12.1 | Complete |
+| VIRAL-07 | Phase 12.1 | Complete |
+| VIRAL-08 | Phase 12.1 | Complete |
+| VIRAL-09 | Phase 12.1 | Complete |
+| VIRAL-10 | Phase 12.1 | Complete |
+| VIRAL-11 | Phase 12.1 | Complete |
+| VIRAL-12 | Phase 12.1 | Complete |
+| VIRAL-13 | Phase 12.1 | Complete |
+| VIRAL-14 | Phase 12.1 | Complete |
+| VIRAL-15 | Phase 12.1 | Complete |
+| VIRAL-16 | Phase 12.1 | Complete |
+| PUB-01 | Phase 14 | Complete |
+| PUB-02 | Phase 14 | Complete |
+| PUB-07 | Phase 14 | Complete |
 | PUB-03 | Phase 15 | Pending |
 | PUB-04 | Phase 15 | Pending |
 | PUB-05 | Phase 15 | Pending |
@@ -145,11 +180,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VID-10 | Phase 999.1 | Complete |
 
 **Coverage:**
-- v2.0 requirements: 24 total
-- Mapped to phases: 24
+- v2.0 requirements: 40 total (24 original + 16 VIRAL)
+- Mapped to phases: 40
 - Unmapped: 0
 - Backlog requirements: 10 (VID-01 through VID-10)
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-26 after Phase 999.1 planning*
+*Last updated: 2026-03-26 after Phase 12.1 planning*
