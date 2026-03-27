@@ -172,7 +172,7 @@ Plans:
   1. A new "Videos" entry exists in the sidebar navigation, leading to a dedicated video gallery page
   2. Videos are displayed ordered from newest to oldest, with inline video player (play in browser without download)
   3. Each video has separate action buttons: download, approve, delete — with confirmation dialog for delete
-  4. Filter tabs allow filtering by status (all/completed/failed), model used, and date range
+  4. Filter tabs allow filtering by status (all/completed/failed) and model used
   5. In the image gallery, images that already have generated videos show a "Video Gerado" tag but all actions remain enabled for new video generations
   6. Deleting a video removes the file and clears video columns from the content package
 **Plans**: 2 plans
