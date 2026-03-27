@@ -16,12 +16,12 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 12: Pipeline Simplification** - Manual pipeline mode with static backgrounds and Pillow composition, zero Gemini Image calls (completed 2026-03-26)
+- [x] **Phase 12: Pipeline Simplification** - Manual pipeline mode with static backgrounds and Pillow composition, zero Gemini Image calls (completed 2026-03-26)
 - [x] **Phase 13: Tenant Isolation** - Per-user data scoping across all resources with admin bypass (completed 2026-03-25)
-- [x] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, CDN image upload, token lifecycle management (completed 2026-03-26)
-- [x] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts (completed 2026-03-26)
-- [x] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history (completed 2026-03-26)
-- [x] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement (completed 2026-03-26)
+- [x] **Phase 14: Instagram Connection & CDN** - Connect Instagram Business Account, CDN image upload, token lifecycle management (completed 2026-03-26)
+- [x] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts (completed 2026-03-26)
+- [x] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history (completed 2026-03-26)
+- [x] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement (completed 2026-03-26)
 
 ## Phase Details
 
@@ -135,6 +135,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 16. Dashboard v2 | 0/? | Complete    | 2026-03-26 |
 | 17. Billing & Stripe | 1/2 | Complete    | 2026-03-26 |
 | 999.1. Video Generation — Kie.ai Sora 2 | 3/3 | Complete    | 2026-03-26 |
+| 999.2. Video Legends & Subtitles | 0/2 | Planned    | - |
 
 ## Backlog
 
@@ -171,19 +172,21 @@ Plans:
 **Scope:**
 - New module: `src/video_gen/legend_renderer.py` — FFmpeg `drawtext` filter chain (white text, black stroke, watermark)
 - New worker: `src/pipeline/workers/legend_worker.py` — runs in L5 post-production after video generation
-- 3 modes: `static` (default, full duration), `fade` (in/out), `typewriter` (char-by-char)
+- 3 modes: `static` (default, full duration), `fade` (in/out), `typewriter` (line-by-line reveal)
 - API: `POST /generate/video/legend`, `POST /generate/video/legend/batch`
-- Config: `VIDEO_LEGEND_ENABLED=true`, `VIDEO_LEGEND_MODE=static`, `VIDEO_LEGEND_FONT_SIZE=48`
-- Dep: `ffmpeg-python` (pip) + FFmpeg system binary
+- Config: `VIDEO_LEGEND_ENABLED=false`, `VIDEO_LEGEND_MODE=static`, `VIDEO_LEGEND_FONT_SIZE=48`
+- Dep: FFmpeg system binary (subprocess, no pip wrapper)
 - Port word-wrap logic from `src/image_maker.py` for video text rendering
+- DB: `legend_status`, `legend_path` columns on `content_packages`
 
 **Cost:** Zero (local FFmpeg processing).
 **Depends on:** Phase 999.1 (needs videos to overlay)
-**Requirements:** TBD
-**Plans:** 0 plans
+**Requirements:** LEG-01, LEG-02, LEG-03, LEG-04, LEG-05, LEG-06, LEG-07, LEG-08
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+- [ ] 999.2-01-PLAN.md — Foundation: config constants, DB migration, LegendRenderer module with 3 animation modes
+- [ ] 999.2-02-PLAN.md — Pipeline + API: LegendWorker, API endpoints (single + batch), PostProduction integration
 
 ### Phase 999.3: Sora 2 Prompt Engineering Research (BACKLOG)
 
