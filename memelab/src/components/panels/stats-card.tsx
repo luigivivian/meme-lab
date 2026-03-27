@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { type LucideIcon } from "lucide-react";
+import { type LucideIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StatsCardProps {
@@ -9,9 +9,10 @@ interface StatsCardProps {
   description?: string;
   trend?: { value: number; label: string };
   className?: string;
+  iconClassName?: string;
 }
 
-export function StatsCard({ title, value, icon: Icon, description, trend, className }: StatsCardProps) {
+export function StatsCard({ title, value, icon: Icon, description, trend, className, iconClassName }: StatsCardProps) {
   return (
     <Card className={cn(
       "group relative overflow-hidden",
@@ -31,13 +32,22 @@ export function StatsCard({ title, value, icon: Icon, description, trend, classN
             )}
             {trend && (
               <div className="flex items-center gap-1.5">
+                {trend.value > 0 ? (
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                ) : trend.value < 0 ? (
+                  <TrendingDown className="h-3.5 w-3.5 text-rose-400" />
+                ) : (
+                  <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
                 <span className={cn(
                   "text-[11px] font-semibold px-1.5 py-0.5 rounded-md",
-                  trend.value >= 0
+                  trend.value > 0
                     ? "text-emerald-400 bg-emerald-500/10"
-                    : "text-rose-400 bg-rose-500/10"
+                    : trend.value < 0
+                      ? "text-rose-400 bg-rose-500/10"
+                      : "text-muted-foreground bg-muted/50"
                 )}>
-                  {trend.value >= 0 ? "+" : ""}{trend.value}%
+                  {trend.value > 0 ? "+" : ""}{trend.value}%
                 </span>
                 <span className="text-[10px] text-muted-foreground">{trend.label}</span>
               </div>
@@ -46,7 +56,8 @@ export function StatsCard({ title, value, icon: Icon, description, trend, classN
           <div className={cn(
             "flex h-11 w-11 items-center justify-center rounded-xl",
             "bg-primary/[0.08] transition-all duration-300",
-            "group-hover:bg-primary/[0.15] group-hover:shadow-[0_0_20px_rgba(139,92,246,0.15)]"
+            "group-hover:bg-primary/[0.15] group-hover:shadow-[0_0_20px_rgba(139,92,246,0.15)]",
+            iconClassName
           )}>
             <Icon className="h-5 w-5 text-primary" />
           </div>

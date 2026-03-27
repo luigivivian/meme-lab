@@ -25,7 +25,7 @@ import {
   useVideoBudget, useVideoStatus,
   useDashboardUsageHistory, useDashboardCostBreakdown,
   useDashboardPipelineActivity, useDashboardPublishingStats,
-  useVideoCredits,
+  useVideoCredits, useBusinessMetrics,
 } from "@/hooks/use-api";
 import { imageUrl, generateVideo, type ContentPackageDB, type UsageResponse, type VideoCreditsResponse } from "@/lib/api";
 import { SOURCE_COLORS, AGENT_TYPE_COLORS, PUBLISH_STATUS_COLORS } from "@/lib/constants";
@@ -76,6 +76,13 @@ const CHART_COLORS = {
 
 const PIE_COLORS = ["#8b5cf6", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"];
 
+const VIDEO_USD_TO_BRL = 5.75;
+
+function computePercentChange(current: number, previous: number): number {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
 export default function DashboardPage() {
   const { data: status, isLoading: statusLoading } = useStatus();
   const { data: agents } = useAgents();
@@ -95,6 +102,9 @@ export default function DashboardPage() {
 
   // Video credits (Phase 20)
   const { data: videoCredits } = useVideoCredits();
+
+  // Business metrics (Phase 21)
+  const { data: businessMetrics, isLoading: metricsLoading } = useBusinessMetrics();
 
   // Video generation state
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
@@ -153,6 +163,14 @@ export default function DashboardPage() {
     return { counts, total };
   }, [contentData]);
 
+  const costDataBRL = useMemo(() => {
+    if (!costBreakdown?.services) return null;
+    return costBreakdown.services.map(s => ({
+      ...s,
+      cost_brl: s.cost_usd * VIDEO_USD_TO_BRL,
+    }));
+  }, [costBreakdown]);
+
   return (
     <div className="space-y-6">
       {/* Welcome */}
@@ -164,7 +182,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      {statusLoading ? (
+      {metricsLoading ? (
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <SkeletonCard key={i} />
@@ -178,16 +196,59 @@ export default function DashboardPage() {
           animate="animate"
         >
           <motion.div variants={staggerItem}>
-            <StatsCard title="Imagens" value={totalImages} icon={Image} />
+            <StatsCard
+              title="Videos Gerados"
+              value={businessMetrics?.videos_generated.total ?? 0}
+              icon={Video}
+              iconClassName="bg-violet-500/10"
+              description={`${businessMetrics?.active_packages.current ?? 0} pacotes ativos`}
+              trend={businessMetrics ? {
+                value: computePercentChange(
+                  businessMetrics.videos_generated.current,
+                  businessMetrics.videos_generated.previous
+                ),
+                label: "vs 7d anteriores",
+              } : undefined}
+            />
           </motion.div>
           <motion.div variants={staggerItem}>
-            <StatsCard title="Agentes" value={`${activeAgents}/${agents?.length ?? 0}`} icon={Bot} />
+            <StatsCard
+              title="Custo Medio/Video"
+              value={formatBRL(businessMetrics?.avg_cost_per_video_brl.current ?? 0)}
+              icon={DollarSign}
+              iconClassName="bg-emerald-500/10"
+              trend={businessMetrics ? {
+                value: computePercentChange(
+                  businessMetrics.avg_cost_per_video_brl.current,
+                  businessMetrics.avg_cost_per_video_brl.previous
+                ),
+                label: "vs 7d anteriores",
+              } : undefined}
+            />
           </motion.div>
           <motion.div variants={staggerItem}>
-            <StatsCard title="Runs" value={runCount} icon={Workflow} />
+            <StatsCard
+              title="Creditos Restantes"
+              value={formatBRL(businessMetrics?.budget_remaining_brl.daily_remaining ?? 0)}
+              icon={Gauge}
+              iconClassName="bg-amber-500/10"
+              description={`de ${formatBRL(businessMetrics?.budget_remaining_brl.daily_budget ?? 0)}/dia`}
+            />
           </motion.div>
           <motion.div variants={staggerItem}>
-            <StatsCard title="Backgrounds" value={status?.total_backgrounds ?? 0} icon={TrendingUp} />
+            <StatsCard
+              title="Trends Coletados"
+              value={businessMetrics?.trends_collected.total ?? 0}
+              icon={TrendingUp}
+              iconClassName="bg-blue-500/10"
+              trend={businessMetrics ? {
+                value: computePercentChange(
+                  businessMetrics.trends_collected.current,
+                  businessMetrics.trends_collected.previous
+                ),
+                label: "vs 7d anteriores",
+              } : undefined}
+            />
           </motion.div>
         </motion.div>
       )}
@@ -662,13 +723,13 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {costBreakdown && costBreakdown.services.length > 0 ? (
+            {costDataBRL && costDataBRL.length > 0 ? (
               <div className="flex items-center justify-center">
                 <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
                     <Pie
-                      data={costBreakdown.services}
-                      dataKey="cost_usd"
+                      data={costDataBRL}
+                      dataKey="cost_brl"
                       nameKey="service"
                       cx="50%"
                       cy="50%"
@@ -676,16 +737,16 @@ export default function DashboardPage() {
                       outerRadius={90}
                       paddingAngle={2}
                       label={({ name, value }: { name?: string; value?: number }) =>
-                        `${(name ?? "").replace("_", " ")} $${(value ?? 0).toFixed(2)}`
+                        `${(name ?? "").replace("_", " ")} ${formatBRL(value ?? 0)}`
                       }
                     >
-                      {costBreakdown.services.map((_, i) => (
+                      {costDataBRL.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip
                       contentStyle={{ background: "#1c1c22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
-                      formatter={(v) => [`$${Number(v).toFixed(4)}`, "Custo"]}
+                      formatter={(v) => [formatBRL(Number(v)), "Custo"]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -701,7 +762,7 @@ export default function DashboardPage() {
             {costBreakdown && (
               <div className="mt-2 text-center">
                 <span className="text-xs text-muted-foreground">
-                  Total 30 dias: <span className="font-medium text-foreground">${costBreakdown.total_cost_usd.toFixed(2)}</span>
+                  Total 30 dias: <span className="font-medium text-foreground">{formatBRL(costBreakdown.total_cost_usd * VIDEO_USD_TO_BRL)}</span>
                 </span>
               </div>
             )}
@@ -819,7 +880,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <span className="text-xs font-medium tabular-nums">
-                      ${budgetData.remaining_usd.toFixed(2)} restante
+                      {formatBRL(budgetData.remaining_usd * VIDEO_USD_TO_BRL)} restante
                     </span>
                     <span className="text-[10px] text-muted-foreground ml-1">
                       (~{budgetData.videos_remaining_estimate} videos)
