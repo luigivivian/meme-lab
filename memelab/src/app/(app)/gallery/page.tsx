@@ -97,7 +97,7 @@ export default function GalleryPage() {
   const { data: contentData, mutate: mutateContent } = useContentPackages(50);
   const { data: videoListData, mutate: mutateVideoList } = useVideoList();
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
-  const [videoDuration, setVideoDuration] = useState<10 | 15>(10);
+  const [videoDuration, setVideoDuration] = useState<number>(5);
   const [videoPrompt, setVideoPrompt] = useState("");
   const [videoModel, setVideoModel] = useState("");
   const [videoGenerating, setVideoGenerating] = useState(false);
@@ -997,38 +997,63 @@ export default function GalleryPage() {
               {/* Model selector */}
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Modelo</label>
-                <div className="grid gap-1.5">
-                  {modelsData?.models.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setVideoModel(m.id)}
-                      disabled={videoGenerating}
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
-                        (videoModel === m.id || (!videoModel && m.is_default))
-                          ? "bg-primary/15 border border-primary/40 text-foreground"
-                          : "bg-secondary/50 border border-transparent text-muted-foreground hover:bg-secondary/80"
-                      }`}
-                    >
-                      <div className="text-left">
-                        <span className="font-medium">{m.name}</span>
-                        <p className="text-[10px] opacity-70">{m.notes}</p>
-                      </div>
-                      <span className="text-[10px] tabular-nums ml-2 flex-shrink-0">
-                        ${m.cost_per_second}/s
-                      </span>
-                    </button>
-                  ))}
+                <div className="max-h-[240px] overflow-y-auto space-y-1 pr-1">
+                  {modelsData?.models.map((m) => {
+                    const selected = videoModel === m.id || (!videoModel && m.is_default);
+                    const speedDots = "⚡".repeat(m.speed);
+                    const cheapest = Math.min(...Object.values(m.prices_brl));
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setVideoModel(m.id);
+                          if (!m.durations.includes(videoDuration)) setVideoDuration(m.durations[0]);
+                        }}
+                        disabled={videoGenerating}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
+                          selected
+                            ? "bg-primary/15 border border-primary/40 text-foreground"
+                            : "bg-secondary/50 border border-transparent text-muted-foreground hover:bg-secondary/80"
+                        }`}
+                      >
+                        <div className="text-left min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">{m.name}</span>
+                            <span className="text-[9px] opacity-50">{m.resolution}</span>
+                          </div>
+                          <p className="text-[10px] opacity-60 truncate">{speedDots} {m.notes}</p>
+                        </div>
+                        <span className="text-[10px] tabular-nums ml-2 flex-shrink-0 text-right">
+                          <span className="text-emerald-400">R$ {cheapest.toFixed(2)}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+              {/* Duration selector */}
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Duracao</label>
                 <div className="flex gap-2">
                   {(() => {
-                    const cps = modelsData?.models.find((m) => m.id === (videoModel || modelsData?.default))?.cost_per_second ?? 0.015;
-                    return (<>
-                      <Button variant={videoDuration === 10 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(10)} disabled={videoGenerating}>10s — ${(cps * 10).toFixed(2)}</Button>
-                      <Button variant={videoDuration === 15 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(15)} disabled={videoGenerating}>15s — ${(cps * 15).toFixed(2)}</Button>
-                    </>);
+                    const sel = modelsData?.models.find((m) => m.id === (videoModel || modelsData?.default));
+                    const durations = sel?.durations ?? [5, 10];
+                    const prices = sel?.prices_brl ?? {};
+                    return durations.map((d) => {
+                      const price = prices[String(d)];
+                      return (
+                        <Button
+                          key={d}
+                          variant={videoDuration === d ? "default" : "outline"}
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setVideoDuration(d)}
+                          disabled={videoGenerating}
+                        >
+                          {d}s {price != null && <span className="ml-1 opacity-70">R$ {price.toFixed(2)}</span>}
+                        </Button>
+                      );
+                    });
                   })()}
                 </div>
               </div>

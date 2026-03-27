@@ -44,17 +44,21 @@ router = APIRouter(prefix="/generate/video", tags=["Video Generation"])
 @router.get("/models", summary="List available video generation models")
 async def list_video_models():
     """Return available Kie.ai models with pricing and default selection."""
+    from config import VIDEO_USD_TO_BRL
     models = []
     for model_id, info in VIDEO_MODELS.items():
         models.append({
             "id": model_id,
             "name": info["name"],
-            "cost_per_second": info["cost_per_second"],
-            "max_duration": info.get("max_duration", 10),
-            "notes": info["notes"],
+            "resolution": info.get("resolution", "720p"),
+            "tier": info.get("tier", "standard"),
+            "durations": info.get("durations", [5, 10]),
+            "prices_brl": info.get("prices_brl", {}),
+            "speed": info.get("speed", 3),
+            "notes": info.get("notes", ""),
             "is_default": model_id == VIDEO_MODEL,
         })
-    return {"models": models, "default": VIDEO_MODEL}
+    return {"models": models, "default": VIDEO_MODEL, "usd_to_brl": VIDEO_USD_TO_BRL}
 
 
 # -- Helper functions ---------------------------------------------------------

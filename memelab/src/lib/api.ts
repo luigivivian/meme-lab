@@ -1184,8 +1184,11 @@ export const getVideoStatus = (contentPackageId: number) =>
 export interface VideoModel {
   id: string;
   name: string;
-  cost_per_second: number;
-  max_duration: number;
+  resolution: string;
+  tier: string;
+  durations: number[];
+  prices_brl: Record<string, number>;
+  speed: number;
   notes: string;
   is_default: boolean;
 }
@@ -1193,6 +1196,7 @@ export interface VideoModel {
 export interface VideoModelsResponse {
   models: VideoModel[];
   default: string;
+  usd_to_brl: number;
 }
 
 export const getVideoModels = () =>

@@ -138,37 +138,66 @@ class KieSora2Client:
         """
         resolved_model = model or _get_config("VIDEO_MODEL", _VIDEO_MODEL)
 
-        # Build model-specific payload — Hailuo and Sora 2 use different input schemas
-        if resolved_model.startswith("hailuo/"):
-            # Hailuo: image_url (singular), duration as string seconds, resolution
-            hailuo_duration = str(min(duration, 6))  # Hailuo supports up to 6s
-            payload = {
-                "model": resolved_model,
-                "input": {
-                    "prompt": prompt,
-                    "image_url": image_url,
-                    "duration": hailuo_duration,
-                    "resolution": "768P",
-                },
-            }
+        # Resolve input format from VIDEO_MODELS config or detect by prefix
+        input_format = "sora"  # default fallback
+        try:
+            from config import VIDEO_MODELS
+            model_info = VIDEO_MODELS.get(resolved_model, {})
+            input_format = model_info.get("input_format", "sora")
+        except (ImportError, AttributeError):
+            # Detect by model prefix
+            if resolved_model.startswith("hailuo/"):
+                input_format = "hailuo"
+            elif resolved_model.startswith("wan/"):
+                input_format = "wan"
+            elif resolved_model.startswith("bytedance/"):
+                input_format = "bytedance"
+            elif resolved_model.startswith("kling"):
+                input_format = "kling"
+            elif resolved_model.startswith("grok"):
+                input_format = "grok"
+            elif resolved_model.startswith("sora"):
+                input_format = "sora"
+
+        # Build payload per input format
+        if input_format == "hailuo":
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "image_url": image_url,
+                "duration": str(duration), "resolution": "720P",
+            }}
+        elif input_format == "wan":
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "image_urls": [image_url],
+                "duration": str(duration), "resolution": "720p",
+            }}
+        elif input_format in ("bytedance", "seedance"):
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "image_url": image_url,
+                "duration": str(duration), "resolution": "720p",
+            }}
+        elif input_format == "kling":
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "input_urls": [image_url],
+                "duration": str(duration), "mode": "720p",
+            }}
+        elif input_format == "grok":
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "image_urls": [image_url],
+                "duration": str(duration), "resolution": "720p",
+                "mode": "normal", "aspect_ratio": "9:16",
+            }}
         else:
-            # Sora 2 and other models: image_urls (array), n_frames, aspect_ratio
-            payload = {
-                "model": resolved_model,
-                "input": {
-                    "prompt": prompt,
-                    "image_urls": [image_url],
-                    "aspect_ratio": aspect_ratio,
-                    "n_frames": str(duration),
-                    "remove_watermark": True,
-                    "upload_method": "s3",
-                    "character_id_list": character_ids or [],
-                },
-            }
+            # Sora 2
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "image_urls": [image_url],
+                "aspect_ratio": aspect_ratio, "n_frames": str(duration),
+                "remove_watermark": True, "upload_method": "s3",
+                "character_id_list": character_ids or [],
+            }}
 
         logger.info(
-            "Creating video task: model=%s duration=%ds",
-            resolved_model, duration,
+            "Creating video task: model=%s duration=%ds format=%s",
+            resolved_model, duration, input_format,
         )
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
