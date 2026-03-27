@@ -185,6 +185,13 @@ export function useBillingStatus() {
   });
 }
 
+export function useVideoList() {
+  return useSWR("video-list", () => api.getVideoList(), {
+    refreshInterval: 10000,
+    errorRetryCount: 1,
+  });
+}
+
 export function useDashboardUsageHistory() {
   return useSWR("dashboard-usage-history", () => api.getDashboardUsageHistory(), {
     refreshInterval: 60000,

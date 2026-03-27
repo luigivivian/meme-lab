@@ -1198,6 +1198,34 @@ export async function createPortalSession(
   });
 }
 
+// ── Video List ──────────────────────────────────────────────────────────
+
+export interface VideoListItem {
+  content_package_id: number;
+  phrase: string;
+  topic: string;
+  image_path: string | null;
+  video_status: string;
+  video_path: string | null;
+  video_task_id: string | null;
+  video_source: string | null;
+  video_metadata: Record<string, unknown> | null;
+  video_prompt_used: string | null;
+  legend_status: string | null;
+  legend_path: string | null;
+  created_at: string | null;
+  is_published: boolean;
+}
+
+export interface VideoListResponse {
+  total: number;
+  videos: VideoListItem[];
+}
+
+export async function getVideoList(): Promise<VideoListResponse> {
+  return request<VideoListResponse>("/generate/video/list");
+}
+
 // ── Dashboard Analytics (Phase 16) ──────────────────────────────────────
 
 export interface UsageHistoryResponse {
