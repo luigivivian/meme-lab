@@ -16,7 +16,9 @@ Plataforma de geração e publicação automatizada de memes para Instagram. Pip
 - Dashboard v2: histórico 30 dias, alertas de limite, relatório de custos
 - Multi-tenant: isolamento por usuário, API keys por usuário, billing
 
-## Current State (updated 2026-03-26)
+## Current State (updated 2026-03-27)
+
+**Video legends & subtitles complete (Phase 999.2).** FFmpeg drawtext overlay on generated videos — 3 animation modes (static/fade/typewriter), word-wrap ported from image_maker.py, watermark matching Pillow style, PostProductionLayer auto-trigger (D-09), and 2 API endpoints for manual legend generation. 41 tests, 17/17 must-haves verified.
 
 **Video generation module complete (Phase 999.1).** Kie.ai Sora 2 image-to-video integration with async client, LLM-powered motion prompts (Gemini flash-lite), GCS upload for public URLs, daily budget enforcement, and 4 new API endpoints. Opt-in per content package, 10/15s duration selection, character consistency via character_id_list.
 
