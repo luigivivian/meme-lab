@@ -198,6 +198,14 @@ export function useVideoList() {
   });
 }
 
+export function useVideoGallery(params?: api.VideoGalleryParams) {
+  const key = `video-gallery-${params?.status ?? ""}-${params?.model ?? ""}-${params?.sort ?? "newest"}-${params?.limit ?? 50}`;
+  return useSWR(key, () => api.getVideoList(params), {
+    refreshInterval: 15000,
+    errorRetryCount: 1,
+  });
+}
+
 export function useInstagramStatus() {
   return useSWR("instagram-status", () => api.getInstagramStatus(), {
     refreshInterval: 60000,

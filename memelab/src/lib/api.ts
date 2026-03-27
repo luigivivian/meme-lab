@@ -684,6 +684,14 @@ export const imageDownloadUrl = (filename: string) =>
 export const deleteVideo = (contentPackageId: number) =>
   request<{ deleted: boolean }>(`/generate/video/${contentPackageId}`, { method: "DELETE" });
 
+// --- Video Approve ---
+
+export const approveVideo = (contentPackageId: number) =>
+  request<{ content_package_id: number; approved: boolean }>(
+    `/generate/video/${contentPackageId}/approve`,
+    { method: "PATCH" }
+  );
+
 // --- Instagram OAuth ---
 
 export interface InstagramStatus {
@@ -1296,8 +1304,21 @@ export interface VideoListResponse {
   videos: VideoListItem[];
 }
 
-export async function getVideoList(): Promise<VideoListResponse> {
-  return request<VideoListResponse>("/generate/video/list");
+export interface VideoGalleryParams {
+  status?: string;
+  model?: string;
+  sort?: "newest" | "oldest";
+  limit?: number;
+}
+
+export async function getVideoList(params?: VideoGalleryParams): Promise<VideoListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set("status", params.status);
+  if (params?.model) searchParams.set("model", params.model);
+  if (params?.sort) searchParams.set("sort", params.sort);
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  const qs = searchParams.toString();
+  return request<VideoListResponse>(`/generate/video/list${qs ? `?${qs}` : ""}`);
 }
 
 // ── Dashboard Analytics (Phase 16) ──────────────────────────────────────
