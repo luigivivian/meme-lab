@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
     from src.database.session import init_db
     from config import DATABASE_URL
     from src.services.scheduler_worker import start_scheduler, stop_scheduler
+    from src.video_gen.stale_job_scanner import start_stale_job_scanner, stop_stale_job_scanner
 
     await init_db()
     logger.info(f"Banco de dados inicializado: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
@@ -56,7 +57,15 @@ async def lifespan(app: FastAPI):
     start_scheduler(interval_seconds=60)
     logger.info("Scheduler de publicacao iniciado")
 
+    # Start stale job scanner (Phase 18: detect stuck video jobs)
+    start_stale_job_scanner()
+    logger.info("Stale job scanner iniciado")
+
     yield
+
+    # Stop stale job scanner
+    stop_stale_job_scanner()
+    logger.info("Stale job scanner parado")
 
     # Parar scheduler no shutdown
     stop_scheduler()

@@ -29,6 +29,11 @@ _KIE_POLL_INITIAL_INTERVAL = int(os.getenv("KIE_POLL_INITIAL_INTERVAL", "5"))
 _KIE_POLL_MAX_INTERVAL = int(os.getenv("KIE_POLL_MAX_INTERVAL", "30"))
 _KIE_POLL_TIMEOUT = int(os.getenv("KIE_POLL_TIMEOUT", "600"))
 
+# ── Transient error retry config (Phase 18) ──────────────────────────────
+
+_MAX_TRANSIENT_RETRIES = 2
+_TRANSIENT_RETRY_BASE_SECONDS = 5
+
 
 def _get_config(attr: str, default):
     """Try to read from config module, fall back to module-level default."""
@@ -155,12 +160,44 @@ class KieSora2Client:
             model, duration, aspect_ratio, len(character_ids or []),
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                f"{self.BASE_URL}/jobs/createTask",
-                json=payload,
-                headers=self._headers,
-            )
+        # Retry loop for transient errors (429, 5xx, timeouts) -- Phase 18
+        last_error = None
+        response = None
+        for attempt in range(_MAX_TRANSIENT_RETRIES + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    response = await client.post(
+                        f"{self.BASE_URL}/jobs/createTask",
+                        json=payload,
+                        headers=self._headers,
+                    )
+                # Check for transient HTTP errors
+                if response.status_code in (429, 500, 502, 503):
+                    wait = _TRANSIENT_RETRY_BASE_SECONDS * (2 ** attempt)
+                    logger.warning(
+                        "Transient error %d on attempt %d/%d, retrying in %ds",
+                        response.status_code, attempt + 1,
+                        _MAX_TRANSIENT_RETRIES + 1, wait,
+                    )
+                    last_error = KieAPIError(
+                        f"HTTP {response.status_code}",
+                        code=response.status_code,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                break  # Non-transient response, proceed
+            except httpx.TimeoutException as e:
+                wait = _TRANSIENT_RETRY_BASE_SECONDS * (2 ** attempt)
+                logger.warning(
+                    "Timeout on attempt %d/%d, retrying in %ds: %s",
+                    attempt + 1, _MAX_TRANSIENT_RETRIES + 1, wait, e,
+                )
+                last_error = e
+                await asyncio.sleep(wait)
+                continue
+        else:
+            # All retries exhausted
+            raise last_error or KieAPIError("All retries exhausted", code=0)
 
         self._handle_http_error(response)
 
