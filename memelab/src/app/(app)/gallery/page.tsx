@@ -758,13 +758,16 @@ export default function GalleryPage() {
                               Video Gerado
                             </span>
                           )}
-                          {pkg.video_status && pkg.video_status !== "success" && (
-                            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm ${
-                              pkg.video_status === "generating" ? "bg-cyan-500/80 animate-pulse"
-                              : "bg-rose-500/80"
-                            }`}>
+                          {pkg.video_status === "generating" && (
+                            <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm bg-cyan-500/80 animate-pulse">
                               <Video className="h-2.5 w-2.5" />
-                              {pkg.video_status === "generating" ? "Gerando..." : "Falhou"}
+                              Gerando...
+                            </span>
+                          )}
+                          {pkg.video_status === "failed" && (
+                            <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm bg-rose-500/80">
+                              <Video className="h-2.5 w-2.5" />
+                              Falhou
                             </span>
                           )}
                         </div>
