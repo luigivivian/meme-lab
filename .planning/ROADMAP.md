@@ -146,7 +146,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
 | 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
 | 19. Video Gallery & Management | 2/2 | Complete    | 2026-03-27 |
-| 20. Kie.ai Credits & Cost Tracking | 2/2 | Complete   | 2026-03-27 |
+| 20. Kie.ai Credits & Cost Tracking | 2/2 | Complete    | 2026-03-27 |
 | 21. Dashboard Business Metrics | 0/? | Not Started | - |
 
 ### Phase 18: Job Status Sync & Management
