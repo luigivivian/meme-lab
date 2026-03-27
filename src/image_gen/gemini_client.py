@@ -767,12 +767,12 @@ class GeminiImageClient:
         n = len(self._referencias)
         from config import GEMINI_IMAGE_MAX_REFS
         if n > GEMINI_IMAGE_MAX_REFS:
-            logger.warning(
-                f"Carregadas {n} imagens de referencia — excede limite da API ({GEMINI_IMAGE_MAX_REFS}). "
-                f"Serao selecionadas no maximo {self.n_referencias} por geracao."
+            logger.debug(
+                f"Carregadas {n} imagens de referencia (limite API: {GEMINI_IMAGE_MAX_REFS}, "
+                f"serao selecionadas {self.n_referencias} por geracao)"
             )
         else:
-            logger.info(f"Carregadas {n} imagens de referencia")
+            logger.debug(f"Carregadas {n} imagens de referencia")
 
     def is_available(self) -> bool:
         """Verifica se o client tem referencias e API key configurada."""
