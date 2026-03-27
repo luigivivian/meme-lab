@@ -138,12 +138,14 @@ class KieSora2Client:
         """
         resolved_model = model or _get_config("VIDEO_MODEL", _VIDEO_MODEL)
 
-        # Resolve input format from VIDEO_MODELS config or detect by prefix
+        # Resolve input format and valid durations from config
         input_format = "sora"  # default fallback
+        valid_durations = None
         try:
             from config import VIDEO_MODELS
             model_info = VIDEO_MODELS.get(resolved_model, {})
             input_format = model_info.get("input_format", "sora")
+            valid_durations = model_info.get("durations")
         except (ImportError, AttributeError):
             # Detect by model prefix
             if resolved_model.startswith("hailuo/"):
@@ -158,6 +160,10 @@ class KieSora2Client:
                 input_format = "grok"
             elif resolved_model.startswith("sora"):
                 input_format = "sora"
+
+        # Snap duration to nearest valid value for this model
+        if valid_durations:
+            duration = min(valid_durations, key=lambda d: abs(d - duration))
 
         # Build payload per input format — each verified against Kie.ai API
         if input_format == "hailuo":
