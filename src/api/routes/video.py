@@ -161,6 +161,16 @@ async def _generate_video_task(
             # Convert filename like "mago_coletando_frutas_20260309" to readable scene
             scene_hint = image_filename.replace("_", " ").split("2026")[0].strip() if image_filename else ""
 
+            # Try to infer theme_key from scene hint if still generic
+            if theme_key == "generico" and scene_hint:
+                from src.video_gen.video_prompt_builder import _get_templates
+                known_keys = _get_templates().keys()
+                for key in known_keys:
+                    if key in scene_hint.lower().replace(" ", "_") or key in scene_hint.lower():
+                        theme_key = key
+                        logger.info("Inferred theme_key=%s from scene '%s'", key, scene_hint)
+                        break
+
             # Build motion prompt — use custom prompt if provided, else auto-generate
             prompt_builder = VideoPromptBuilder()
             if custom_prompt:

@@ -430,16 +430,17 @@ class VideoPromptBuilder:
         try:
             from src.llm_client import generate
 
-            # Build user message with all available context
-            parts = [f"Base motion idea: {base_motion}"]
-            parts.append(f"Theme: {theme_key}")
-
+            # Build user message — scene and phrase are PRIMARY context
+            parts = []
+            if scene:
+                parts.append(f"IMPORTANT — The image shows: {scene}")
+                parts.append("The animation MUST depict this specific scene. Do NOT use generic wizard motion.")
             if phrase_context:
-                parts.append(f"Phrase context: {phrase_context}")
+                parts.append(f"Meme phrase: {phrase_context}")
+            parts.append(f"Theme: {theme_key}")
+            parts.append(f"Reference motion style (adapt to match the scene above): {base_motion}")
             if pose:
                 parts.append(f"Character pose: {pose}")
-            if scene:
-                parts.append(f"Scene description: {scene}")
             if video_prompt_notes:
                 parts.append(f"Improvement notes: {video_prompt_notes}")
 
