@@ -422,7 +422,7 @@ export default function JobsPage() {
           <CardContent>
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
               {videoListData.videos.map((v) => {
-                const filename = v.image_path.split(/[/\\]/).pop() ?? "";
+                const filename = (v.image_path ?? "").split(/[/\\]/).pop() ?? "";
                 const cost = v.video_metadata?.cost_usd as number | undefined;
                 const duration = v.video_metadata?.duration as number | undefined;
                 const genTime = v.video_metadata?.generation_time_ms as number | undefined;

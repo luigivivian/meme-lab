@@ -1,5 +1,6 @@
-"""Rotas de publishing — fila de publicacao, agendamento, calendario."""
+"""Rotas de publishing — fila de publicacao, agendamento, calendario, Instagram OAuth."""
 
+import logging
 from collections import defaultdict
 from datetime import datetime, date
 
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.deps import db_session, get_current_user
 from src.api.models import SchedulePostRequest
 from src.api.serializers import scheduled_post_to_dict, scheduled_post_calendar_item
+
+logger = logging.getLogger("clip-flow.publishing")
 
 router = APIRouter(prefix="/publishing", tags=["Publishing"])
 
@@ -227,3 +230,79 @@ async def best_times():
         "saturday": ["10:00", "14:00", "20:00"],
         "sunday": ["10:00", "14:00", "19:00"],
     }
+
+
+# ── Instagram OAuth ─────────────────────────────────────────────────────────
+
+
+@router.get("/instagram/status", summary="Status da conexao Instagram")
+async def instagram_status(
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Retorna status da conexao Instagram do usuario."""
+    try:
+        from src.services.instagram_oauth import InstagramOAuth
+        oauth = InstagramOAuth(session)
+        status = await oauth.get_status(current_user.id)
+        if status:
+            return {**status, "connected": True}
+        return {"connected": False, "ig_username": None, "ig_user_id": None,
+                "page_id": None, "token_expires_at": None, "status": None}
+    except Exception as e:
+        logger.warning("Instagram status check failed: %s", e)
+        return {"connected": False, "ig_username": None, "ig_user_id": None,
+                "page_id": None, "token_expires_at": None, "status": None}
+
+
+@router.get("/instagram/auth-url", summary="Gerar URL de autorizacao Instagram")
+async def instagram_auth_url(
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Gera URL de autorizacao OAuth do Instagram."""
+    try:
+        from src.services.instagram_oauth import InstagramOAuth
+        oauth = InstagramOAuth(session)
+        result = oauth.generate_auth_url()
+        return result
+    except Exception as e:
+        logger.error("Instagram auth URL generation failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/instagram/disconnect", summary="Desconectar Instagram")
+async def instagram_disconnect(
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Desconecta conta Instagram do usuario."""
+    try:
+        from src.services.instagram_oauth import InstagramOAuth
+        oauth = InstagramOAuth(session)
+        ok = await oauth.disconnect(current_user.id)
+        return {"disconnected": ok}
+    except Exception as e:
+        logger.error("Instagram disconnect failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/instagram/callback", summary="Callback OAuth do Instagram")
+async def instagram_callback(
+    body: dict,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Processa o codigo OAuth retornado pelo Instagram."""
+    code = body.get("code")
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing OAuth code")
+    try:
+        from src.services.instagram_oauth import InstagramOAuth
+        oauth = InstagramOAuth(session)
+        result = await oauth.exchange_code(code, current_user.id)
+        await session.commit()
+        return {"connected": True, **result}
+    except Exception as e:
+        logger.error("Instagram callback failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))

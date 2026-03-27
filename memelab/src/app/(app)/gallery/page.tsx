@@ -831,7 +831,7 @@ export default function GalleryPage() {
           <CardContent>
             <motion.div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" variants={staggerContainer} initial="initial" animate="animate">
               {videoListData.videos.filter((v) => v.video_status === "success").map((v) => {
-                const filename = v.image_path.split(/[/\\]/).pop() ?? "";
+                const filename = (v.image_path ?? "").split(/[/\\]/).pop() ?? "";
                 const cost = v.video_metadata?.cost_usd as number | undefined;
                 const duration = v.video_metadata?.duration as number | undefined;
                 const genTime = v.video_metadata?.generation_time_ms as number | undefined;
@@ -901,7 +901,7 @@ export default function GalleryPage() {
               })}
               {/* Generating videos */}
               {videoListData.videos.filter((v) => v.video_status === "generating").map((v) => {
-                const filename = v.image_path.split(/[/\\]/).pop() ?? "";
+                const filename = (v.image_path ?? "").split(/[/\\]/).pop() ?? "";
                 return (
                   <motion.div key={v.content_package_id} className="relative overflow-hidden rounded-xl border border-amber-500/20 bg-secondary" variants={staggerItem}>
                     <div className="relative aspect-[4/5] overflow-hidden">
@@ -919,7 +919,7 @@ export default function GalleryPage() {
               })}
               {/* Failed videos */}
               {videoListData.videos.filter((v) => v.video_status === "failed").map((v) => {
-                const filename = v.image_path.split(/[/\\]/).pop() ?? "";
+                const filename = (v.image_path ?? "").split(/[/\\]/).pop() ?? "";
                 const error = v.video_metadata?.error as string | undefined;
                 return (
                   <motion.div key={v.content_package_id} className="relative overflow-hidden rounded-xl border border-rose-500/20 bg-secondary opacity-60" variants={staggerItem}>

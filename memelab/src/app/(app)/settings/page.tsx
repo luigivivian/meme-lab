@@ -214,7 +214,7 @@ export default function SettingsPage() {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Conectado em {formatDate(igStatus.connected_at)}
+                    Conectado em {formatDate(igStatus.connected_at ?? undefined)}
                   </p>
                 </div>
               </div>
@@ -223,7 +223,7 @@ export default function SettingsPage() {
               <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Status do token</span>
-                  {statusBadge(igStatus.status)}
+                  {statusBadge(igStatus.status ?? undefined)}
                 </div>
                 {igStatus.token_expires_at && (
                   <div className="flex items-center justify-between">

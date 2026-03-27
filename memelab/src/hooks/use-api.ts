@@ -198,6 +198,13 @@ export function useVideoList() {
   });
 }
 
+export function useInstagramStatus() {
+  return useSWR("instagram-status", () => api.getInstagramStatus(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}
+
 export function useVideoModels() {
   return useSWR("video-models", () => api.getVideoModels(), {
     revalidateOnFocus: false,

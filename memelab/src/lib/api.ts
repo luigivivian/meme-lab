@@ -679,6 +679,38 @@ export const videoFileUrl = (contentPackageId: number) =>
 export const imageDownloadUrl = (filename: string) =>
   `${BASE}/drive/images/${encodeURIComponent(filename)}/download`;
 
+// --- Video Delete ---
+
+export const deleteVideo = (contentPackageId: number) =>
+  request<{ deleted: boolean }>(`/generate/video/${contentPackageId}`, { method: "DELETE" });
+
+// --- Instagram OAuth ---
+
+export interface InstagramStatus {
+  connected: boolean;
+  ig_username: string | null;
+  ig_user_id: string | null;
+  page_id: string | null;
+  token_expires_at: string | null;
+  connected_at: string | null;
+  status: string | null;
+}
+
+export const getInstagramStatus = () =>
+  request<InstagramStatus>("/publishing/instagram/status");
+
+export const getInstagramAuthUrl = () =>
+  request<{ auth_url: string; state: string }>("/publishing/instagram/auth-url");
+
+export const disconnectInstagram = () =>
+  request<{ disconnected: boolean }>("/publishing/instagram/disconnect", { method: "POST" });
+
+export const instagramCallback = (code: string) =>
+  request<{ connected: boolean }>("/publishing/instagram/callback", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+
 // --- Characters ---
 export interface CharacterRefsStats {
   approved: number;
