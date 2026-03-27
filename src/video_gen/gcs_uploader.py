@@ -57,20 +57,21 @@ class GCSUploader:
         return self._upload_temp(path)
 
     def _upload_gcs(self, path: Path, remote_name: str | None = None) -> str:
-        """Upload via GCS with signed URL."""
-        from datetime import timedelta
+        """Upload via GCS with public URL (no expiry).
 
+        Makes the blob publicly readable so Kie.ai can fetch it at any time.
+        Images are non-sensitive meme backgrounds — public access is acceptable.
+        Old approach (signed URLs) caused 403s when Kie.ai fetched after expiry.
+        """
         blob_name = remote_name or f"video-inputs/{path.name}"
         blob = self._bucket.blob(blob_name)
         content_type = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
         blob.upload_from_filename(str(path), content_type=content_type)
+        blob.make_public()
 
-        signed_url = blob.generate_signed_url(
-            expiration=timedelta(seconds=GCS_SIGNED_URL_EXPIRY),
-            method="GET",
-        )
-        logger.info(f"GCS upload: {path.name} → gs://{self._bucket_name}/{blob_name}")
-        return signed_url
+        public_url = blob.public_url
+        logger.info(f"GCS upload (public): {path.name} → {public_url}")
+        return public_url
 
     def _upload_temp(self, path: Path) -> str:
         """Upload via litterbox.catbox.moe (free, 1h expiry, no API key)."""
