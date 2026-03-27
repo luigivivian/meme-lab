@@ -27,12 +27,22 @@ from src.api.models import (
     VideoBatchRequest,
     VideoStatusResponse,
     VideoBudgetResponse,
+    VideoProgressDetailResponse,
 )
 from src.database.models import ContentPackage, Theme
 
 logger = logging.getLogger("clip-flow.api.video")
 
 router = APIRouter(prefix="/generate/video", tags=["Video Generation"])
+
+# Step label mapping: Kie.ai state -> Portuguese UI label (Phase 18)
+STEP_LABELS = {
+    "waiting": "Na fila...",
+    "queuing": "Na fila...",
+    "generating": "Gerando...",
+    "success": "Concluido",
+    "fail": "Falhou",
+}
 
 
 # -- Helper functions ---------------------------------------------------------
@@ -471,4 +481,180 @@ async def get_video_budget(
         spent_today_usd=round(spent_today, 4),
         remaining_usd=round(remaining, 4),
         videos_remaining_estimate=videos_remaining,
+    )
+
+
+@router.post("/retry/{content_package_id}", summary="Retry a failed video generation")
+async def retry_video_generation(
+    content_package_id: int,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Retry a failed video generation job.
+
+    Resubmits the same prompt/model/image to Kie.ai.
+    Only jobs with video_status='failed' can be retried.
+    Phase 18: One-click retry for failed jobs.
+    """
+    _check_video_enabled()
+
+    # Load content package
+    result = await session.execute(
+        select(ContentPackage).where(ContentPackage.id == content_package_id)
+    )
+    pkg = result.scalar_one_or_none()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Content package not found")
+
+    # Verify ownership
+    if current_user.role != "admin":
+        if pkg.character_id:
+            from src.database.models import Character
+            char_result = await session.execute(
+                select(Character).where(Character.id == pkg.character_id)
+            )
+            char = char_result.scalar_one_or_none()
+            if char and char.user_id != current_user.id:
+                raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Only failed videos can be retried
+    if pkg.video_status != "failed":
+        raise HTTPException(
+            status_code=400,
+            detail="Only failed videos can be retried",
+        )
+
+    # Extract previous params from video_metadata
+    duration = (
+        pkg.video_metadata.get("duration", VIDEO_DURATION)
+        if pkg.video_metadata
+        else VIDEO_DURATION
+    )
+    model = (
+        pkg.video_metadata.get("model", "")
+        if pkg.video_metadata
+        else ""
+    )
+    prompt = pkg.video_prompt_used or ""
+
+    # Check budget
+    await _check_budget(session, current_user.id, duration)
+
+    # Reset status for retry
+    pkg.video_status = "generating"
+    pkg.video_task_id = None
+    pkg.video_metadata = None
+    await session.commit()
+
+    # Schedule background task
+    character_ids = (
+        pkg.video_metadata.get("character_ids", [])
+        if pkg.video_metadata
+        else []
+    )
+    background_tasks.add_task(
+        _generate_video_task,
+        content_package_id=content_package_id,
+        duration=duration,
+        character_ids=character_ids,
+        user_id=current_user.id,
+    )
+
+    return VideoStatusResponse(
+        content_package_id=pkg.id,
+        video_status="generating",
+        video_task_id=None,
+        video_path=pkg.video_path,
+        video_source=pkg.video_source,
+        video_metadata=None,
+    )
+
+
+@router.get(
+    "/progress/{content_package_id}",
+    summary="Get detailed video generation progress",
+    response_model=VideoProgressDetailResponse,
+)
+async def get_video_progress(
+    content_package_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Get real-time video generation progress with human-readable step labels.
+
+    Phase 18: Enhanced progress with step labels mapped from Kie.ai task state.
+    Queries Kie.ai live for jobs in 'generating' state.
+    """
+    result = await session.execute(
+        select(ContentPackage).where(ContentPackage.id == content_package_id)
+    )
+    pkg = result.scalar_one_or_none()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Content package not found")
+
+    # Verify ownership for non-admin
+    if current_user.role != "admin":
+        if pkg.character_id:
+            from src.database.models import Character
+            char_result = await session.execute(
+                select(Character).where(Character.id == pkg.character_id)
+            )
+            char = char_result.scalar_one_or_none()
+            if char and char.user_id != current_user.id:
+                raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Non-generating states: return from DB directly
+    if pkg.video_status != "generating":
+        if pkg.video_status == "success":
+            return VideoProgressDetailResponse(
+                content_package_id=pkg.id,
+                state="success",
+                progress=100,
+                step_label="Concluido",
+            )
+        if pkg.video_status == "failed":
+            return VideoProgressDetailResponse(
+                content_package_id=pkg.id,
+                state="fail",
+                progress=0,
+                step_label="Falhou",
+            )
+        # No video / null status
+        return VideoProgressDetailResponse(
+            content_package_id=pkg.id,
+            state="none",
+            progress=0,
+            step_label="Sem video",
+        )
+
+    # Generating: query Kie.ai for live status
+    if pkg.video_task_id:
+        try:
+            from src.video_gen.kie_client import KieSora2Client
+
+            client = KieSora2Client()
+            task_data = await client.get_task_status(pkg.video_task_id)
+            state = task_data.get("state", "")
+            progress = task_data.get("progress", 0)
+            step_label = STEP_LABELS.get(state, "Processando...")
+
+            return VideoProgressDetailResponse(
+                content_package_id=pkg.id,
+                state=state,
+                progress=progress,
+                step_label=step_label,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to get Kie.ai progress for package %d: %s",
+                pkg.id, e,
+            )
+
+    # Fallback: generating but no task_id yet (submission in progress)
+    return VideoProgressDetailResponse(
+        content_package_id=pkg.id,
+        state="generating",
+        progress=0,
+        step_label="Enviando...",
     )

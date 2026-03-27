@@ -271,3 +271,11 @@ class VideoBudgetResponse(BaseModel):
     spent_today_usd: float
     remaining_usd: float
     videos_remaining_estimate: int  # at current duration
+
+
+class VideoProgressDetailResponse(BaseModel):
+    """Enhanced progress response with human-readable step label."""
+    content_package_id: int
+    state: str
+    progress: int
+    step_label: str
