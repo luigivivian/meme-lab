@@ -184,3 +184,23 @@ Plans:
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.3: Sora 2 Prompt Engineering Research (BACKLOG)
+
+**Goal:** Research prompt engineering techniques from awesome-sora2 and apply proven patterns to VideoPromptBuilder, improving motion prompt quality and video output consistency.
+
+**Scope:**
+- Research: Study https://github.com/ZeroLu/awesome-sora2 techniques, best practices, and community patterns
+- Analyze: Map applicable techniques to existing MOTION_TEMPLATES in `src/video_gen/video_prompt_builder.py`
+- Implement: Update motion templates with researched patterns (camera movement, scene description, temporal flow)
+- Improve: LLM system prompt for Gemini-generated motion prompts — incorporate best-practice structure
+- Test: Compare before/after prompt quality with sample generations
+- Config: `VIDEO_PROMPT_STYLE` env var for prompt template version (v1=current, v2=researched)
+
+**Cost:** Zero (research + code changes only).
+**Depends on:** Phase 999.1 (uses VideoPromptBuilder)
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD
