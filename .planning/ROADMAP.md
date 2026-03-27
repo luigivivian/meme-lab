@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 999.1: Video Generation — Kie.ai Sora 2** - Image-to-video via Kie.ai API, GCS upload, motion prompts, budget cap (completed 2026-03-26)
 - [x] **Phase 999.2: Video Legends & Subtitles** - FFmpeg text overlays on videos, 3 animation modes, pipeline integration (completed 2026-03-27)
 - [x] **Phase 999.3: Sora 2 Prompt Engineering Research** - V2 motion templates, three-layer framework, version switching (completed 2026-03-27)
-- [ ] **Phase 18: Job Status Sync & Management** - Fix stale/failed jobs, status sync, improved jobs page UI with progress visualization
+- [x] **Phase 18: Job Status Sync & Management** - Fix stale/failed jobs, status sync, improved jobs page UI with progress visualization (completed 2026-03-27)
 - [ ] **Phase 19: Video Gallery & Management** - Dedicated videos page, inline player, download/approve/delete, filters, video tag on images
 - [ ] **Phase 20: Kie.ai Credits & Cost Tracking** - Credits system per model, only charge on success, BRL cost tracking
 - [ ] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density
@@ -144,7 +144,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 999.1. Video Generation — Kie.ai Sora 2 | 3/3 | Complete    | 2026-03-26 |
 | 999.2. Video Legends & Subtitles | 2/2 | Complete    | 2026-03-27 |
 | 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
-| 18. Job Status Sync & Management | 1/2 | In Progress|  |
+| 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
 | 19. Video Gallery & Management | 0/? | Not Started | - |
 | 20. Kie.ai Credits & Cost Tracking | 0/? | Not Started | - |
 | 21. Dashboard Business Metrics | 0/? | Not Started | - |
@@ -231,7 +231,7 @@ Plans:
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
