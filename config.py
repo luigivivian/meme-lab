@@ -402,8 +402,3 @@ VIDEO_LEGEND_MODE = os.getenv("VIDEO_LEGEND_MODE", "static")
 
 # Font size for video text overlay (matches FONT_SIZE=48 by default)
 VIDEO_LEGEND_FONT_SIZE = int(os.getenv("VIDEO_LEGEND_FONT_SIZE", "48"))
-
-# ===== Video Prompt Style — Phase 999.3 =====
-
-# Prompt template version: "v1" (original) or "v2" (researched Sora 2 patterns)
-VIDEO_PROMPT_STYLE = os.getenv("VIDEO_PROMPT_STYLE", "v2")
