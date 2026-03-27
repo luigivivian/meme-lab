@@ -212,8 +212,13 @@ export default function JobsPage() {
           <CardContent>
             <motion.div className="space-y-2 max-h-[500px] overflow-auto" variants={staggerContainer} initial="initial" animate="animate">
             {filteredJobs.map((job) => {
-              const Icon = STATUS_ICON[job.status] ?? AlertCircle;
-              const jobProgress = job.total > 0 ? Math.round((job.done / job.total) * 100) : 0;
+              const hasFails = job.failed > 0;
+              const isDone = job.status === "completed" || (job.done + job.failed >= job.total && job.total > 0);
+              const Icon = hasFails && isDone ? XCircle
+                : isDone ? CheckCircle
+                : job.status === "running" ? RefreshCw
+                : Clock;
+              const jobProgress = job.total > 0 ? Math.round(((job.done + job.failed) / job.total) * 100) : 0;
               return (
                 <motion.div
                   key={job.job_id}
@@ -225,7 +230,9 @@ export default function JobsPage() {
                     <div className="flex items-center gap-3">
                       <Icon
                         className={`h-4 w-4 ${
-                          job.status === "completed"
+                          hasFails && isDone
+                            ? "text-rose-400"
+                            : isDone
                             ? "text-emerald-400"
                             : job.status === "running"
                             ? "text-amber-400 animate-spin"
@@ -236,25 +243,29 @@ export default function JobsPage() {
                         <span className="text-sm font-mono">{job.job_id}</span>
                         <p className="text-xs text-muted-foreground">
                           {job.done}/{job.total} concluidos
-                          {job.failed > 0 && ` | ${job.failed} falhas`}
+                          {hasFails && <span className="text-rose-400"> | {job.failed} falhas</span>}
                         </p>
                       </div>
                     </div>
                     <Badge
                       variant={
-                        job.status === "completed" ? "success"
+                        hasFails && isDone ? "destructive"
+                          : isDone ? "success"
                           : job.status === "running" ? "secondary"
                           : "outline"
                       }
                     >
-                      {job.status}
+                      {hasFails && isDone ? "falhou" : isDone ? "concluido" : job.status === "running" ? "executando" : "na fila"}
                     </Badge>
                   </div>
-                  {job.status === "running" && (
+                  {!isDone && job.status === "running" && (
                     <Progress value={jobProgress} className="h-1.5" />
                   )}
-                  {job.status === "completed" && (
+                  {isDone && !hasFails && (
                     <Progress value={100} className="h-1.5" indicatorClassName="bg-emerald-500" />
+                  )}
+                  {isDone && hasFails && (
+                    <Progress value={100} className="h-1.5" indicatorClassName="bg-rose-500" />
                   )}
                 </motion.div>
               );
