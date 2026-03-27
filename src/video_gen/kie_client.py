@@ -159,38 +159,63 @@ class KieSora2Client:
             elif resolved_model.startswith("sora"):
                 input_format = "sora"
 
-        # Build payload per input format
+        # Build payload per input format — each verified against Kie.ai API
         if input_format == "hailuo":
+            # image_url (singular), duration "6"/"10", resolution "768P"
             payload = {"model": resolved_model, "input": {
                 "prompt": prompt, "image_url": image_url,
-                "duration": str(duration), "resolution": "720P",
+                "duration": str(duration), "resolution": "768P",
             }}
         elif input_format == "wan":
+            # image_urls (array), duration "5"/"10"/"15"
             payload = {"model": resolved_model, "input": {
                 "prompt": prompt, "image_urls": [image_url],
                 "duration": str(duration), "resolution": "720p",
             }}
-        elif input_format in ("bytedance", "seedance"):
+        elif input_format == "wan_flash":
+            # image_urls (array), duration, audio required (boolean)
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "image_urls": [image_url],
+                "duration": str(duration), "resolution": "720p", "audio": False,
+            }}
+        elif input_format == "bytedance":
+            # image_url (singular), duration "5"/"10"
             payload = {"model": resolved_model, "input": {
                 "prompt": prompt, "image_url": image_url,
                 "duration": str(duration), "resolution": "720p",
             }}
-        elif input_format == "kling":
+        elif input_format == "seedance":
+            # input_urls (array), aspect_ratio required, duration "4"/"8"/"12"
+            sd_dur = str(min(duration, 12))  # seedance: 4/8/12
             payload = {"model": resolved_model, "input": {
                 "prompt": prompt, "input_urls": [image_url],
-                "duration": str(duration), "mode": "720p",
+                "aspect_ratio": "9:16", "duration": sd_dur,
+            }}
+        elif input_format == "kling_v2":
+            # image_url (singular), mode "std"/"pro", negative_prompt required
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "image_url": image_url,
+                "duration": str(duration), "mode": "std", "negative_prompt": "",
+            }}
+        elif input_format == "kling_v3":
+            # input_urls (array), multi_shots + multi_prompt required, sound boolean
+            payload = {"model": resolved_model, "input": {
+                "prompt": prompt, "input_urls": [image_url],
+                "duration": str(duration), "mode": "std", "sound": False,
+                "multi_shots": False, "multi_prompt": [{"prompt": prompt}],
             }}
         elif input_format == "grok":
+            # image_urls (array), mode "normal"/"fun"/"spicy", duration "6"/"10"
             payload = {"model": resolved_model, "input": {
                 "prompt": prompt, "image_urls": [image_url],
                 "duration": str(duration), "resolution": "720p",
                 "mode": "normal", "aspect_ratio": "9:16",
             }}
         else:
-            # Sora 2
+            # Sora 2 — image_urls (array), n_frames, aspect_ratio "portrait"
             payload = {"model": resolved_model, "input": {
                 "prompt": prompt, "image_urls": [image_url],
-                "aspect_ratio": aspect_ratio, "n_frames": str(duration),
+                "aspect_ratio": "portrait", "n_frames": str(duration),
                 "remove_watermark": True, "upload_method": "s3",
                 "character_id_list": character_ids or [],
             }}
