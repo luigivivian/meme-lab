@@ -18,6 +18,8 @@ from config import (
     VIDEO_DURATION,
     VIDEO_COST_PER_SECOND,
     VIDEO_DAILY_BUDGET_USD,
+    VIDEO_LEGEND_ENABLED,
+    VIDEO_LEGEND_MODE,
     KIE_API_KEY,
     GENERATED_VIDEOS_DIR,
 )
@@ -27,6 +29,8 @@ from src.api.models import (
     VideoBatchRequest,
     VideoStatusResponse,
     VideoBudgetResponse,
+    LegendRequest,
+    LegendBatchRequest,
 )
 from src.database.models import ContentPackage, Theme
 
@@ -214,6 +218,61 @@ async def _generate_video_task(
             try:
                 pkg.video_status = "failed"
                 pkg.video_metadata = {"error": str(e)}
+                await session.commit()
+            except Exception:
+                await session.rollback()
+
+
+def _check_legend_enabled():
+    """Raise HTTPException if legend rendering is not enabled."""
+    if not VIDEO_LEGEND_ENABLED:
+        raise HTTPException(
+            status_code=400,
+            detail="Video legend rendering is disabled. Set VIDEO_LEGEND_ENABLED=true and install FFmpeg.",
+        )
+
+
+async def _generate_legend_task(content_package_id: int, mode: str = "static"):
+    """Background task: render legend overlay for a content package.
+
+    Creates its own DB session (cannot reuse request session in background).
+    Per D-11: Graceful fallback on failure.
+    """
+    from src.database.session import get_session_factory
+    from src.pipeline.workers.legend_worker import LegendWorker
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        try:
+            result = await session.execute(
+                select(ContentPackage).where(ContentPackage.id == content_package_id)
+            )
+            pkg = result.scalar_one_or_none()
+            if not pkg:
+                logger.error("Legend task: ContentPackage %d not found", content_package_id)
+                return
+
+            worker = LegendWorker(mode=mode)
+            legend_path = await worker.process(
+                video_path=pkg.video_path,
+                phrase=pkg.phrase,
+                mode=mode,
+            )
+
+            if legend_path:
+                pkg.legend_status = "success"
+                pkg.legend_path = legend_path
+                logger.info("Legend rendered for package %d: %s", content_package_id, legend_path)
+            else:
+                pkg.legend_status = "failed"
+                logger.warning("Legend render returned None for package %d (graceful fallback)", content_package_id)
+
+            await session.commit()
+
+        except Exception as e:
+            logger.error("Legend task error for package %d: %s", content_package_id, e, exc_info=True)
+            try:
+                pkg.legend_status = "failed"
                 await session.commit()
             except Exception:
                 await session.rollback()
@@ -480,6 +539,8 @@ async def list_videos(
                 "video_source": pkg.video_source,
                 "video_metadata": pkg.video_metadata,
                 "video_prompt_used": pkg.video_prompt_used,
+                "legend_status": pkg.legend_status,
+                "legend_path": pkg.legend_path,
                 "created_at": pkg.created_at.isoformat() if pkg.created_at else None,
                 "is_published": pkg.is_published,
             }
@@ -548,6 +609,145 @@ async def delete_video(
     await session.commit()
 
     return {"deleted": True, "content_package_id": content_package_id}
+
+
+# -- Legend endpoints (Phase 999.2) -------------------------------------------
+
+
+@router.post("/legend", summary="Add text legend overlay to a generated video")
+async def generate_legend(
+    req: LegendRequest,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Add burned-in text overlay (phrase + watermark) to a video.
+
+    Per D-05: Default mode is "static" (full duration visibility).
+    Per D-08: Mode override via request parameter.
+    Per D-09: Auto-triggers after video generation, but also available manually.
+    Per D-10: Creates new file with _legend suffix, preserving original.
+    Per D-11: Graceful fallback -- failure logged, original video intact.
+    """
+    _check_legend_enabled()
+
+    # Validate mode
+    if req.mode not in ("static", "fade", "typewriter"):
+        raise HTTPException(status_code=400, detail="Mode must be 'static', 'fade', or 'typewriter'")
+
+    # Load content package
+    result = await session.execute(
+        select(ContentPackage).where(ContentPackage.id == req.content_package_id)
+    )
+    pkg = result.scalar_one_or_none()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Content package not found")
+
+    # Verify ownership (same pattern as generate_video)
+    if current_user.role != "admin":
+        if pkg.character_id:
+            from src.database.models import Character
+            char_result = await session.execute(
+                select(Character).where(Character.id == pkg.character_id)
+            )
+            char = char_result.scalar_one_or_none()
+            if char and char.user_id != current_user.id:
+                raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Must have a completed video
+    if not pkg.video_path or pkg.video_status != "success":
+        raise HTTPException(
+            status_code=400,
+            detail="Content package must have a completed video (video_status='success')",
+        )
+
+    # Check if already processing
+    if pkg.legend_status == "processing":
+        raise HTTPException(status_code=409, detail="Legend rendering already in progress")
+
+    # Mark as processing
+    pkg.legend_status = "processing"
+    await session.commit()
+
+    # Schedule background task
+    background_tasks.add_task(
+        _generate_legend_task,
+        content_package_id=req.content_package_id,
+        mode=req.mode,
+    )
+
+    return {
+        "content_package_id": pkg.id,
+        "legend_status": "processing",
+        "mode": req.mode,
+    }
+
+
+@router.post("/legend/batch", summary="Add text legend overlay to multiple videos")
+async def generate_legend_batch(
+    req: LegendBatchRequest,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Add burned-in text overlays to multiple videos.
+
+    Per D-08: Single mode applied to all videos in batch.
+    """
+    _check_legend_enabled()
+
+    if req.mode not in ("static", "fade", "typewriter"):
+        raise HTTPException(status_code=400, detail="Mode must be 'static', 'fade', or 'typewriter'")
+
+    if not req.content_package_ids:
+        raise HTTPException(status_code=400, detail="No content package IDs provided")
+
+    # Load all packages
+    result = await session.execute(
+        select(ContentPackage).where(
+            ContentPackage.id.in_(req.content_package_ids)
+        )
+    )
+    packages = result.scalars().all()
+
+    if len(packages) != len(req.content_package_ids):
+        found_ids = {p.id for p in packages}
+        missing = [pid for pid in req.content_package_ids if pid not in found_ids]
+        raise HTTPException(status_code=404, detail=f"Content packages not found: {missing}")
+
+    # Verify all have completed videos
+    for pkg in packages:
+        if not pkg.video_path or pkg.video_status != "success":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Package {pkg.id} does not have a completed video",
+            )
+        if pkg.legend_status == "processing":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Package {pkg.id} already has legend rendering in progress",
+            )
+
+    # Mark all as processing
+    responses = []
+    for pkg in packages:
+        pkg.legend_status = "processing"
+        responses.append({
+            "content_package_id": pkg.id,
+            "legend_status": "processing",
+            "mode": req.mode,
+        })
+    await session.commit()
+
+    # Schedule one background task per package
+    for pkg in packages:
+        background_tasks.add_task(
+            _generate_legend_task,
+            content_package_id=pkg.id,
+            mode=req.mode,
+        )
+
+    return responses
 
 
 @router.post("/enhance-prompt", summary="Enhance user animation description into Sora 2 prompt")
