@@ -261,3 +261,10 @@ export function useVideoCredits(days = 30) {
     errorRetryCount: 1,
   });
 }
+
+export function useBusinessMetrics() {
+  return useSWR("dashboard-business-metrics", () => api.getBusinessMetrics(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}

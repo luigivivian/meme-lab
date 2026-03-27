@@ -1360,6 +1360,42 @@ export async function getDashboardPublishingStats(): Promise<PublishingStatsResp
   return request<PublishingStatsResponse>("/dashboard/publishing-stats");
 }
 
+export async function getBusinessMetrics(): Promise<BusinessMetricsResponse> {
+  return request<BusinessMetricsResponse>("/dashboard/business-metrics");
+}
+
+// ── Business Metrics (Phase 21) ──────────────────────────────────────
+
+export interface PeriodMetric {
+  current: number;
+  previous: number;
+  total: number;
+}
+
+export interface CostPeriodMetric {
+  current: number;
+  previous: number;
+}
+
+export interface BudgetMetric {
+  daily_remaining: number;
+  daily_budget: number;
+  daily_spent: number;
+}
+
+export interface ActivePackagesMetric {
+  current: number;
+  total: number;
+}
+
+export interface BusinessMetricsResponse {
+  videos_generated: PeriodMetric;
+  avg_cost_per_video_brl: CostPeriodMetric;
+  budget_remaining_brl: BudgetMetric;
+  trends_collected: PeriodMetric;
+  active_packages: ActivePackagesMetric;
+}
+
 // ── Video Credits (Phase 20) ──────────────────────────────────────────
 
 export interface ModelCostBreakdown {
