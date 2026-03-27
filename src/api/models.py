@@ -276,6 +276,14 @@ class VideoBudgetResponse(BaseModel):
     videos_remaining_estimate: int  # at current duration
 
 
+class VideoProgressDetailResponse(BaseModel):
+    """Enhanced progress response with human-readable step label."""
+    content_package_id: int
+    state: str
+    progress: int
+    step_label: str
+
+
 # ===== Video Legend (Phase 999.2) =====
 
 class LegendRequest(BaseModel):
