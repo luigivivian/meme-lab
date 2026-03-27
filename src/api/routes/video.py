@@ -155,6 +155,12 @@ async def _generate_video_task(
                 theme_key = pkg.image_metadata.get("theme_key", theme_key)
                 theme_key = pkg.image_metadata.get("situacao_key", theme_key)
 
+            # Build scene context from image filename + phrase for better prompts
+            bg_path_str = pkg.background_path or pkg.image_path or ""
+            image_filename = Path(bg_path_str).stem if bg_path_str else ""
+            # Convert filename like "mago_coletando_frutas_20260309" to readable scene
+            scene_hint = image_filename.replace("_", " ").split("2026")[0].strip() if image_filename else ""
+
             # Build motion prompt — use custom prompt if provided, else auto-generate
             prompt_builder = VideoPromptBuilder()
             if custom_prompt:
@@ -163,6 +169,7 @@ async def _generate_video_task(
                 motion_prompt = prompt_builder.build_motion_prompt(
                     theme_key=theme_key,
                     phrase_context=pkg.phrase or "",
+                    scene=scene_hint,
                     video_prompt_notes=theme_notes,
                 )
 

@@ -302,6 +302,8 @@ _SYSTEM_PROMPT_V2 = (
     "- NO speech, NO text, NO lip movement, NO scene changes\n"
     "- NEVER use labels like 'CAMERA:', 'SUBJECT:', 'PHYSICS:' in your output\n"
     "- NEVER describe character appearance (already in the image)\n"
+    "- If a scene description is provided, the animation MUST match that scene "
+    "(e.g., if scene is 'wizard collecting fruits', animate fruit picking motion)\n"
     "- Output ONLY the motion prompt sentences, nothing else"
 )
 
