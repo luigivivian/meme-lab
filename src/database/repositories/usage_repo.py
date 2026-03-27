@@ -528,3 +528,191 @@ class UsageRepository:
             "daily_spent_brl": round(daily_spent_brl, 2),
             "daily_remaining_brl": daily_remaining_brl,
         }
+
+    async def get_business_metrics(self, user_id: int) -> dict:
+        """Consolidated business metrics for dashboard cards (DASH-05, DASH-06, DASH-07).
+
+        Returns 5 metric groups with current (7d) vs previous (7d) period values:
+          - videos_generated: current, previous, total
+          - avg_cost_per_video_brl: current, previous
+          - budget_remaining_brl: daily_remaining, daily_budget, daily_spent
+          - trends_collected: current, previous, total
+          - active_packages: current, total
+        """
+        from datetime import timedelta
+
+        from sqlalchemy import case
+
+        from config import VIDEO_DAILY_BUDGET_USD, VIDEO_USD_TO_BRL
+        from src.database.models import (
+            Character,
+            ContentPackage,
+            PipelineRun,
+            TrendEvent,
+        )
+
+        now = datetime.utcnow()
+        current_start = now - timedelta(days=7)
+        previous_start = now - timedelta(days=14)
+
+        # -- Query 1: Videos generated + costs (from api_usage, kie_video) -----
+        video_stmt = select(
+            func.sum(
+                case((ApiUsage.date >= current_start, ApiUsage.usage_count), else_=0)
+            ).label("current_count"),
+            func.sum(
+                case((ApiUsage.date < current_start, ApiUsage.usage_count), else_=0)
+            ).label("previous_count"),
+            func.sum(ApiUsage.usage_count).label("total_count"),
+            func.sum(
+                case((ApiUsage.date >= current_start, ApiUsage.cost_brl), else_=0)
+            ).label("current_cost_brl"),
+            func.sum(
+                case((ApiUsage.date >= current_start, ApiUsage.cost_usd), else_=0)
+            ).label("current_cost_usd"),
+            func.sum(
+                case((ApiUsage.date < current_start, ApiUsage.cost_brl), else_=0)
+            ).label("previous_cost_brl"),
+            func.sum(
+                case((ApiUsage.date < current_start, ApiUsage.cost_usd), else_=0)
+            ).label("previous_cost_usd"),
+        ).where(
+            ApiUsage.user_id == user_id,
+            ApiUsage.service == "kie_video",
+            ApiUsage.status == "success",
+            ApiUsage.date >= previous_start,
+        )
+        video_result = await self.session.execute(video_stmt)
+        vr = video_result.one()
+
+        current_count = int(vr.current_count or 0)
+        previous_count = int(vr.previous_count or 0)
+        total_count = int(vr.total_count or 0)
+
+        # Legacy fallback: cost_brl=0 but cost_usd>0
+        current_cost_brl = float(vr.current_cost_brl or 0)
+        current_cost_usd = float(vr.current_cost_usd or 0)
+        if current_cost_brl == 0 and current_cost_usd > 0:
+            current_cost_brl = round(current_cost_usd * VIDEO_USD_TO_BRL, 2)
+
+        previous_cost_brl = float(vr.previous_cost_brl or 0)
+        previous_cost_usd = float(vr.previous_cost_usd or 0)
+        if previous_cost_brl == 0 and previous_cost_usd > 0:
+            previous_cost_brl = round(previous_cost_usd * VIDEO_USD_TO_BRL, 2)
+
+        avg_cost_current = round(current_cost_brl / current_count, 2) if current_count > 0 else 0.0
+        avg_cost_previous = round(previous_cost_brl / previous_count, 2) if previous_count > 0 else 0.0
+
+        # -- Query 1b: All-time video total (not limited to 14 days) ----------
+        alltime_video_stmt = select(
+            func.sum(ApiUsage.usage_count).label("total"),
+        ).where(
+            ApiUsage.user_id == user_id,
+            ApiUsage.service == "kie_video",
+            ApiUsage.status == "success",
+        )
+        alltime_video_result = await self.session.execute(alltime_video_stmt)
+        alltime_total = int(alltime_video_result.scalar_one_or_none() or 0)
+
+        # -- Query 2: Trends collected (tenant-scoped via PipelineRun+Character) --
+        trends_stmt = (
+            select(
+                func.sum(
+                    case((TrendEvent.created_at >= current_start, 1), else_=0)
+                ).label("current"),
+                func.sum(
+                    case((TrendEvent.created_at < current_start, 1), else_=0)
+                ).label("previous"),
+            )
+            .select_from(TrendEvent)
+            .join(PipelineRun, TrendEvent.pipeline_run_id == PipelineRun.id)
+            .outerjoin(Character, PipelineRun.character_id == Character.id)
+            .where(
+                (Character.user_id == user_id) | (PipelineRun.character_id.is_(None)),
+                TrendEvent.created_at >= previous_start,
+            )
+        )
+        trends_result = await self.session.execute(trends_stmt)
+        tr = trends_result.one()
+        trends_current = int(tr.current or 0)
+        trends_previous = int(tr.previous or 0)
+
+        # All-time trends total (separate query, no date filter)
+        total_trends_stmt = (
+            select(func.count())
+            .select_from(TrendEvent)
+            .join(PipelineRun, TrendEvent.pipeline_run_id == PipelineRun.id)
+            .outerjoin(Character, PipelineRun.character_id == Character.id)
+            .where(
+                (Character.user_id == user_id) | (PipelineRun.character_id.is_(None)),
+            )
+        )
+        total_trends_result = await self.session.execute(total_trends_stmt)
+        trends_total = int(total_trends_result.scalar_one_or_none() or 0)
+
+        # -- Query 3: Active content packages (video_status IS NOT NULL) -------
+        pkg_stmt = (
+            select(
+                func.sum(
+                    case((ContentPackage.created_at >= current_start, 1), else_=0)
+                ).label("current"),
+                func.count().label("total"),
+            )
+            .select_from(ContentPackage)
+            .join(PipelineRun, ContentPackage.pipeline_run_id == PipelineRun.id)
+            .outerjoin(Character, PipelineRun.character_id == Character.id)
+            .where(
+                ContentPackage.video_status.isnot(None),
+                (Character.user_id == user_id) | (PipelineRun.character_id.is_(None)),
+            )
+        )
+        pkg_result = await self.session.execute(pkg_stmt)
+        pr = pkg_result.one()
+        pkg_current = int(pr.current or 0)
+        pkg_total = int(pr.total or 0)
+
+        # -- Query 4: Daily budget remaining ----------------------------------
+        today_utc = self._get_pt_today_start_utc()
+        daily_stmt = select(
+            func.sum(ApiUsage.cost_brl).label("brl"),
+            func.sum(ApiUsage.cost_usd).label("usd"),
+        ).where(
+            ApiUsage.user_id == user_id,
+            ApiUsage.service == "kie_video",
+            ApiUsage.date == today_utc,
+            ApiUsage.status == "success",
+        )
+        daily_result = await self.session.execute(daily_stmt)
+        dr = daily_result.one()
+        daily_spent_brl = float(dr.brl or 0)
+        if daily_spent_brl == 0 and (dr.usd or 0) > 0:
+            daily_spent_brl = round(float(dr.usd) * VIDEO_USD_TO_BRL, 2)
+
+        daily_budget_brl = round(VIDEO_DAILY_BUDGET_USD * VIDEO_USD_TO_BRL, 2)
+        daily_remaining = round(max(0, daily_budget_brl - daily_spent_brl), 2)
+
+        return {
+            "videos_generated": {
+                "current": current_count,
+                "previous": previous_count,
+                "total": alltime_total,
+            },
+            "avg_cost_per_video_brl": {
+                "current": avg_cost_current,
+                "previous": avg_cost_previous,
+            },
+            "budget_remaining_brl": {
+                "daily_remaining": daily_remaining,
+                "daily_budget": daily_budget_brl,
+                "daily_spent": round(daily_spent_brl, 2),
+            },
+            "trends_collected": {
+                "current": trends_current,
+                "previous": trends_previous,
+                "total": trends_total,
+            },
+            "active_packages": {
+                "current": pkg_current,
+                "total": pkg_total,
+            },
+        }

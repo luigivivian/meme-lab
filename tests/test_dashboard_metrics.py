@@ -81,15 +81,16 @@ def test_business_metrics_endpoint_exists():
     """DASH-06: GET /dashboard/business-metrics endpoint is registered."""
     from src.api.routes.dashboard import router
     routes = [r.path for r in router.routes]
-    assert "/business-metrics" in routes, \
-        f"Expected /business-metrics in routes, got: {routes}"
+    # Router includes prefix in path: /dashboard/business-metrics
+    assert any("business-metrics" in r for r in routes), \
+        f"Expected business-metrics in routes, got: {routes}"
 
 
 def test_business_metrics_endpoint_method():
     """Endpoint accepts GET method."""
     from src.api.routes.dashboard import router
     for route in router.routes:
-        if getattr(route, "path", "") == "/business-metrics":
+        if "business-metrics" in getattr(route, "path", ""):
             assert "GET" in route.methods
             break
     else:

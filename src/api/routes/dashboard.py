@@ -149,3 +149,21 @@ async def publishing_stats(
         "failed": counts.get("failed", 0),
         "cancelled": counts.get("cancelled", 0),
     }
+
+
+# -- Business Metrics (Phase 21 -- DASH-05, DASH-06, DASH-07) ----------------
+
+@router.get("/business-metrics", summary="Metricas de negocio consolidadas")
+async def business_metrics(
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Return consolidated business metrics with 7d period comparison (DASH-06, DASH-07).
+
+    All cost values are in BRL (DASH-05).
+    """
+    from src.database.repositories.usage_repo import UsageRepository
+
+    repo = UsageRepository(session)
+    metrics = await repo.get_business_metrics(current_user.id)
+    return metrics
