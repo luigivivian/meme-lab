@@ -184,3 +184,31 @@ export function useBillingStatus() {
     errorRetryCount: 1,
   });
 }
+
+export function useDashboardUsageHistory() {
+  return useSWR("dashboard-usage-history", () => api.getDashboardUsageHistory(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}
+
+export function useDashboardCostBreakdown() {
+  return useSWR("dashboard-cost-breakdown", () => api.getDashboardCostBreakdown(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}
+
+export function useDashboardPipelineActivity() {
+  return useSWR("dashboard-pipeline-activity", () => api.getDashboardPipelineActivity(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}
+
+export function useDashboardPublishingStats() {
+  return useSWR("dashboard-publishing-stats", () => api.getDashboardPublishingStats(), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}

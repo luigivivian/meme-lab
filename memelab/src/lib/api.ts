@@ -1198,6 +1198,45 @@ export async function createPortalSession(
   });
 }
 
+// ── Dashboard Analytics (Phase 16) ──────────────────────────────────────
+
+export interface UsageHistoryResponse {
+  history: { date: string; gemini_text: number; gemini_image: number; kie_video: number }[];
+}
+
+export interface CostBreakdownResponse {
+  services: { service: string; cost_usd: number }[];
+  total_cost_usd: number;
+}
+
+export interface PipelineActivityResponse {
+  activity: { date: string; runs: number; packages: number }[];
+}
+
+export interface PublishingStatsResponse {
+  total: number;
+  published: number;
+  queued: number;
+  failed: number;
+  cancelled: number;
+}
+
+export async function getDashboardUsageHistory(): Promise<UsageHistoryResponse> {
+  return request<UsageHistoryResponse>("/dashboard/usage-history");
+}
+
+export async function getDashboardCostBreakdown(): Promise<CostBreakdownResponse> {
+  return request<CostBreakdownResponse>("/dashboard/cost-breakdown");
+}
+
+export async function getDashboardPipelineActivity(): Promise<PipelineActivityResponse> {
+  return request<PipelineActivityResponse>("/dashboard/pipeline-activity");
+}
+
+export async function getDashboardPublishingStats(): Promise<PublishingStatsResponse> {
+  return request<PublishingStatsResponse>("/dashboard/publishing-stats");
+}
+
 // --- Content Export ---
 export const exportContentPack = (packageId: number) =>
   `${BASE}/content/${packageId}/export`;
