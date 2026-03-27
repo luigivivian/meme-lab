@@ -470,6 +470,30 @@ VIDEO_DAILY_BUDGET_USD = float(os.getenv("VIDEO_DAILY_BUDGET_USD", "3.0"))
 # Cost per second (fallback — overridden per-model from VIDEO_MODELS)
 VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.005"))
 
+
+def compute_video_cost_brl(model_id: str, duration: int) -> float:
+    """Look up BRL cost from VIDEO_MODELS config.
+
+    Returns prices_brl value for exact or closest duration.
+    Falls back to cost_usd * VIDEO_USD_TO_BRL if model not found.
+    """
+    import logging
+
+    model_info = VIDEO_MODELS.get(model_id)
+    if model_info and "prices_brl" in model_info:
+        prices = model_info["prices_brl"]
+        if duration in prices:
+            return prices[duration]
+        valid = list(prices.keys())
+        if valid:
+            closest = min(valid, key=lambda d: abs(d - duration))
+            return prices[closest]
+    logging.getLogger("clip-flow.credits").warning(
+        "Model %s not in VIDEO_MODELS, using USD fallback", model_id,
+    )
+    return round(duration * VIDEO_COST_PER_SECOND * VIDEO_USD_TO_BRL, 2)
+
+
 # Prompt style for video motion templates: "v1" (original) or "v2" (Sora 2 researched)
 # Per D-05: v2 uses three-layer motion framework (OpenAI Cookbook + awesome-sora2)
 VIDEO_PROMPT_STYLE = os.getenv("VIDEO_PROMPT_STYLE", "v2")

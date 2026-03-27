@@ -23,10 +23,10 @@ def test_api_usage_columns():
     assert "service" in cols
     assert cols["service"].nullable is False
     assert cols["service"].type.length == 50
-    # tier — String(20), not nullable (D-02)
+    # tier — String(100), not nullable (D-02, widened Phase 20 for model IDs)
     assert "tier" in cols
     assert cols["tier"].nullable is False
-    assert cols["tier"].type.length == 20
+    assert cols["tier"].type.length == 100
     # date — DateTime, not nullable (D-03: stores UTC)
     assert "date" in cols
     assert cols["date"].nullable is False

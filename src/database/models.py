@@ -598,10 +598,12 @@ class ApiUsage(TimestampMixin, Base):
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     service: Mapped[str] = mapped_column(String(50), nullable=False)
-    tier: Mapped[str] = mapped_column(String(20), nullable=False)
+    tier: Mapped[str] = mapped_column(String(100), nullable=False)
     date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     usage_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
+    cost_brl: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
+    model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # Relationships
