@@ -144,7 +144,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 999.1. Video Generation — Kie.ai Sora 2 | 3/3 | Complete    | 2026-03-26 |
 | 999.2. Video Legends & Subtitles | 2/2 | Complete    | 2026-03-27 |
 | 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
-| 18. Job Status Sync & Management | 0/? | Not Started | - |
+| 18. Job Status Sync & Management | 0/2 | Not Started | - |
 | 19. Video Gallery & Management | 0/? | Not Started | - |
 | 20. Kie.ai Credits & Cost Tracking | 0/? | Not Started | - |
 | 21. Dashboard Business Metrics | 0/? | Not Started | - |
@@ -158,11 +158,11 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
   2. Job status sync validates against Kie.ai API on each poll — request errors and missing IDs trigger automatic failed status
   3. Jobs page shows clear visual distinction between running (spinner), completed (green check), and failed (red X) states
   4. Jobs page has improved progress bars with real-time updates and accurate percentage display
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 18-01: TBD
-- [ ] 18-02: TBD
+- [ ] 18-01-PLAN.md -- Backend: stale job scanner, retry endpoint, progress step labels, kie_client transient retry
+- [ ] 18-02-PLAN.md -- Frontend: jobs page card grid, progress bars, retry button, expandable detail rows
 
 ### Phase 19: Video Gallery & Management
 **Goal**: Create a dedicated "Videos Gerados" page with its own sidebar menu entry, supporting inline video playback, download, approve/delete actions, filters, and newest-first ordering. Images with existing videos show a tag but keep all generation actions enabled.
