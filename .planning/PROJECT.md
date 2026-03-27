@@ -18,6 +18,8 @@ Plataforma de geração e publicação automatizada de memes para Instagram. Pip
 
 ## Current State (updated 2026-03-27)
 
+**Sora 2 prompt engineering research complete (Phase 999.3).** VideoPromptBuilder upgraded with v2 motion templates (17 themes, three-layer framework: camera/subject/physics), structured system prompts, present continuous tense, 300-500 char sweet spot. Version switching via VIDEO_PROMPT_STYLE env var (v1/v2). 23 tests.
+
 **Video legends & subtitles complete (Phase 999.2).** FFmpeg drawtext overlay on generated videos — 3 animation modes (static/fade/typewriter), word-wrap ported from image_maker.py, watermark matching Pillow style, PostProductionLayer auto-trigger (D-09), and 2 API endpoints for manual legend generation. 41 tests, 17/17 must-haves verified.
 
 **Video generation module complete (Phase 999.1).** Kie.ai Sora 2 image-to-video integration with async client, LLM-powered motion prompts (Gemini flash-lite), GCS upload for public URLs, daily budget enforcement, and 4 new API endpoints. Opt-in per content package, 10/15s duration selection, character consistency via character_id_list.
