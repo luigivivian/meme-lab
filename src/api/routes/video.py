@@ -326,9 +326,9 @@ async def generate_video(
     """
     _check_video_enabled()
 
-    # Validate duration (per D-08)
-    if req.duration not in (10, 15):
-        raise HTTPException(status_code=400, detail="Duration must be 10 or 15 seconds")
+    # Validate duration against model's supported range (kie_client snaps to nearest valid)
+    if req.duration < 1 or req.duration > 15:
+        raise HTTPException(status_code=400, detail="Duration must be between 1 and 15 seconds")
 
     # Load and verify content package
     result = await session.execute(
@@ -404,8 +404,8 @@ async def generate_video_batch(
     """
     _check_video_enabled()
 
-    if req.duration not in (10, 15):
-        raise HTTPException(status_code=400, detail="Duration must be 10 or 15 seconds")
+    if req.duration < 1 or req.duration > 15:
+        raise HTTPException(status_code=400, detail="Duration must be between 1 and 15 seconds")
 
     if not req.content_package_ids:
         raise HTTPException(status_code=400, detail="No content package IDs provided")
