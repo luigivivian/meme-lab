@@ -387,3 +387,14 @@ STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "")
 STRIPE_ENTERPRISE_PRICE_ID = os.getenv("STRIPE_ENTERPRISE_PRICE_ID", "")
+
+# ===== Video Legends (FFmpeg drawtext) — Phase 999.2 =====
+
+# Feature flag — legend rendering disabled by default (requires FFmpeg installed)
+VIDEO_LEGEND_ENABLED = os.getenv("VIDEO_LEGEND_ENABLED", "false").lower() == "true"
+
+# Default animation mode: "static" | "fade" | "typewriter" (per D-05, D-08)
+VIDEO_LEGEND_MODE = os.getenv("VIDEO_LEGEND_MODE", "static")
+
+# Font size for video text overlay (matches FONT_SIZE=48 by default)
+VIDEO_LEGEND_FONT_SIZE = int(os.getenv("VIDEO_LEGEND_FONT_SIZE", "48"))
