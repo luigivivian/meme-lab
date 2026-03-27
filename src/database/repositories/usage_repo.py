@@ -341,3 +341,58 @@ class UsageRepository:
         )
         total = result.scalar_one_or_none()
         return float(total) if total is not None else 0.0
+
+    async def get_usage_history(self, user_id: int, days: int = 30) -> list[dict]:
+        """Return daily usage counts grouped by service for the last N days."""
+        from datetime import timedelta
+
+        cutoff = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days)
+        result = await self.session.execute(
+            select(
+                ApiUsage.date,
+                ApiUsage.service,
+                func.sum(ApiUsage.usage_count).label("count"),
+            )
+            .where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.date >= cutoff,
+                ApiUsage.status == "success",
+            )
+            .group_by(ApiUsage.date, ApiUsage.service)
+            .order_by(ApiUsage.date)
+        )
+        rows = result.all()
+
+        # Pivot into per-day dicts
+        day_map: dict[str, dict] = {}
+        for row in rows:
+            d = row.date.strftime("%Y-%m-%d") if hasattr(row.date, "strftime") else str(row.date)[:10]
+            if d not in day_map:
+                day_map[d] = {"date": d, "gemini_text": 0, "gemini_image": 0, "kie_video": 0}
+            svc = row.service
+            if svc in day_map[d]:
+                day_map[d][svc] = row.count
+            else:
+                day_map[d][svc] = row.count
+
+        return list(day_map.values())
+
+    async def get_cost_breakdown(self, user_id: int, days: int = 30) -> list[dict]:
+        """Return cost_usd aggregated by service for the last N days."""
+        from datetime import timedelta
+
+        cutoff = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days)
+        result = await self.session.execute(
+            select(
+                ApiUsage.service,
+                func.sum(ApiUsage.cost_usd).label("cost"),
+            )
+            .where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.date >= cutoff,
+                ApiUsage.status == "success",
+            )
+            .group_by(ApiUsage.service)
+        )
+        rows = result.all()
+        return [{"service": row.service, "cost_usd": round(float(row.cost or 0), 6)} for row in rows]
