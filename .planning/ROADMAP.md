@@ -145,7 +145,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 999.2. Video Legends & Subtitles | 2/2 | Complete    | 2026-03-27 |
 | 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
 | 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
-| 19. Video Gallery & Management | 1/2 | In Progress | - |
+| 19. Video Gallery & Management | 0/2 | Planned    |  |
 | 20. Kie.ai Credits & Cost Tracking | 0/? | Not Started | - |
 | 21. Dashboard Business Metrics | 0/? | Not Started | - |
 
@@ -179,7 +179,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [x] 19-01-PLAN.md — Backend approve endpoint + model/sort filters on video list, frontend API client + SWR hook + sidebar Videos entry
+- [ ] 19-01-PLAN.md — Backend approve endpoint + model/sort filters on video list, frontend API client + SWR hook + sidebar Videos entry
 - [ ] 19-02-PLAN.md — Videos gallery page with inline player, actions, filters + gallery video tag badge
 
 ### Phase 20: Kie.ai Credits & Cost Tracking
@@ -231,7 +231,7 @@ Plans:
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 2/2 plans complete
+**Plans:** 0/2 plans executed
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
