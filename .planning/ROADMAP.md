@@ -72,7 +72,7 @@ Plans:
   1. User can connect an Instagram Business Account via Facebook OAuth flow and see the connected account in their settings
   2. Composed meme images are automatically uploaded to Cloudflare R2 CDN and assigned public URLs accessible by Instagram's servers
   3. Instagram access tokens auto-refresh before the 60-day expiry — user never has to manually reconnect due to token expiration
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
@@ -88,7 +88,7 @@ Plans:
   2. The scheduler automatically publishes posts at the scheduled time via Instagram Graph API (container create, poll, publish)
   3. User can view, cancel, and retry scheduled posts from a management interface
   4. User can view a content calendar (month and week views) showing scheduled and published posts
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
@@ -104,7 +104,7 @@ Plans:
   2. User sees alert notifications when approaching 80% and 95% of their plan quota
   3. User can view an estimated cost report broken down by service and tier
   4. User can view pipeline run history with status indicators (success, failed, in-progress)
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
@@ -146,7 +146,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
 | 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
 | 19. Video Gallery & Management | 2/2 | Complete    | 2026-03-27 |
-| 20. Kie.ai Credits & Cost Tracking | 0/? | Not Started | - |
+| 20. Kie.ai Credits & Cost Tracking | 0/2 | Not Started | - |
 | 21. Dashboard Business Metrics | 0/? | Not Started | - |
 
 ### Phase 18: Job Status Sync & Management
@@ -191,10 +191,12 @@ Plans:
   2. Each model's cost is tracked using the prices_brl values from VIDEO_MODELS config
   3. A credits summary is available via API showing total spent, per-model breakdown, and remaining budget
   4. Dashboard displays accurate cumulative costs in BRL with per-model granularity
-**Plans**: TBD
+**Plans**: 2 plans
+**UI hint**: yes
 
 Plans:
-- [ ] 20-01: TBD
+- [ ] 20-01-PLAN.md — Backend: migration, cost_brl column, compute helper, UsageRepository extension, credits summary endpoint
+- [ ] 20-02-PLAN.md — Frontend: API client, SWR hook, VideoCreditsCard dashboard component
 
 ### Phase 21: Dashboard Business Metrics
 **Goal**: Improve dashboard info cards with business-relevant metrics (videos gerados, custo medio por video, creditos restantes, trends coletados) and update all spending values to display in BRL
