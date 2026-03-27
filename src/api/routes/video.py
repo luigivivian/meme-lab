@@ -92,14 +92,24 @@ async def preview_prompt(
                 theme_key = key
                 break
 
-    prompt_builder = VideoPromptBuilder()
-    if req.custom_prompt:
-        prompt = prompt_builder.enhance_user_prompt(req.custom_prompt, theme_key)
-    else:
-        prompt = prompt_builder.build_motion_prompt(
-            theme_key=theme_key, phrase_context=pkg.phrase or "",
-            pose=pose, scene=scene,
-        )
+    try:
+        from src.video_gen.video_prompt_builder import VideoPromptBuilder
+        prompt_builder = VideoPromptBuilder()
+        if req.custom_prompt:
+            prompt = await asyncio.to_thread(
+                prompt_builder.enhance_user_prompt, req.custom_prompt, theme_key
+            )
+        else:
+            prompt = await asyncio.to_thread(
+                prompt_builder.build_motion_prompt,
+                theme_key=theme_key, phrase_context=pkg.phrase or "",
+                pose=pose, scene=scene,
+            )
+    except Exception as e:
+        logger.error("Preview prompt failed: %s", e)
+        # Fallback to static template
+        from src.video_gen.video_prompt_builder import VideoPromptBuilder as VPB
+        prompt = VPB().get_fallback_prompt(theme_key)
 
     model_info = VIDEO_MODELS.get(req.model or VIDEO_MODEL, {})
     valid_durations = model_info.get("durations", [5, 10])
