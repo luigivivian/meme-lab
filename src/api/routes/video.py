@@ -686,17 +686,30 @@ async def get_video_progress(
 @router.get("/list", summary="List content packages with video status")
 async def list_videos(
     status: str | None = None,
+    model: str | None = None,
+    sort: str = "newest",
     limit: int = 50,
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(db_session),
 ):
-    """List content packages that have video generation activity."""
-    from sqlalchemy import desc
+    """List content packages that have video generation activity.
+
+    Supports filtering by status, model (from video_metadata JSON), and sort order.
+    """
+    from sqlalchemy import desc, asc
 
     stmt = select(ContentPackage).where(ContentPackage.video_status.isnot(None))
     if status:
         stmt = stmt.where(ContentPackage.video_status == status)
-    stmt = stmt.order_by(desc(ContentPackage.id)).limit(limit)
+    if model:
+        # Filter by model stored in video_metadata JSON field (MySQL compatible)
+        stmt = stmt.where(
+            ContentPackage.video_metadata.like(f'%"model": "{model}"%')
+        )
+    if sort == "oldest":
+        stmt = stmt.order_by(asc(ContentPackage.created_at)).limit(limit)
+    else:
+        stmt = stmt.order_by(desc(ContentPackage.created_at)).limit(limit)
 
     result = await session.execute(stmt)
     packages = result.scalars().all()
@@ -785,6 +798,56 @@ async def delete_video(
     await session.commit()
 
     return {"deleted": True, "content_package_id": content_package_id}
+
+
+@router.patch(
+    "/{content_package_id}/approve",
+    summary="Toggle video approval status",
+)
+async def approve_video(
+    content_package_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Toggle the approved state of a video in video_metadata.
+
+    If video_metadata.approved is truthy, sets to False. If falsy or missing, sets to True.
+    If video_metadata is None, initializes as {"approved": True}.
+    """
+    result = await session.execute(
+        select(ContentPackage).where(ContentPackage.id == content_package_id)
+    )
+    pkg = result.scalar_one_or_none()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Content package not found")
+
+    # Verify ownership (same pattern as delete_video)
+    if current_user.role != "admin":
+        if pkg.character_id:
+            from src.database.models import Character
+            char_result = await session.execute(
+                select(Character).where(Character.id == pkg.character_id)
+            )
+            char = char_result.scalar_one_or_none()
+            if char and char.user_id != current_user.id:
+                raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Toggle approved in video_metadata
+    if pkg.video_metadata is None:
+        pkg.video_metadata = {"approved": True}
+    elif isinstance(pkg.video_metadata, dict):
+        current = pkg.video_metadata.get("approved", False)
+        # Create a new dict to trigger SQLAlchemy change detection on JSON column
+        pkg.video_metadata = {**pkg.video_metadata, "approved": not current}
+    else:
+        pkg.video_metadata = {"approved": True}
+
+    await session.commit()
+
+    return {
+        "content_package_id": content_package_id,
+        "approved": pkg.video_metadata.get("approved", False),
+    }
 
 
 # -- Legend endpoints (Phase 999.2) -------------------------------------------
