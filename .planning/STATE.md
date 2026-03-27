@@ -61,6 +61,7 @@ Plan: Not started
 | Phase 999.2 P02 | 5min | 3 tasks | 5 files |
 | Phase 999.3 P01 | 4min | 1 tasks | 3 files |
 | Phase 999.3 P02 | 4min | 1 tasks | 3 files |
+| Phase 18 P02 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,8 @@ Recent decisions affecting current work:
 - [Phase 999.3]: v2 templates use 4 sentences 300-355 chars; camera mapped per theme emotional tone; MOTION_TEMPLATES alias points to V2 for backward compat
 - [Phase 999.3]: v2 system prompt uses structured CAMERA/SUBJECT/PHYSICS/ATMOSPHERE sections per OpenAI Cookbook
 - [Phase 999.3]: max_tokens 250 for v2 (4-5 sentences, 300-500 chars); _get_system_prompt()/_get_enhance_prompt() version switching
+- [Phase 18]: Video section always shown (even when empty) with centered empty state
+- [Phase 18]: BRL cost in video cards: cost_usd * 5.5 (approximate conversion)
 
 ### Pending Todos
 
@@ -115,6 +118,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T01:44:04.627Z
-Stopped at: Completed 999.3-02-PLAN.md
+Last session: 2026-03-27T15:41:12Z
+Stopped at: Completed 18-02-PLAN.md
 Resume file: None
