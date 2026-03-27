@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Ready to execute
-stopped_at: Completed 19-01-PLAN.md
-last_updated: "2026-03-27T16:13:08.957Z"
+stopped_at: Completed 19-02-PLAN.md
+last_updated: "2026-03-27T18:07:36.263Z"
 progress:
   total_phases: 13
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 4
 ---
 
 # Project State
@@ -64,6 +64,7 @@ Plan: 2 of 2
 | Phase 18 P01 | 3min | 2 tasks | 5 files |
 | Phase 18 P02 | 5min | 2 tasks | 3 files |
 | Phase 19 P01 | 5min | 2 tasks | 4 files |
+| Phase 19 P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 18]: Video section always shown (even when empty) with centered empty state
 - [Phase 18]: BRL cost in video cards: cost_usd * 5.5 (approximate conversion)
 - [Phase 19]: JSON LIKE filtering for video model in MySQL; dict copy for SQLAlchemy JSON change detection; separate useVideoGallery hook from useVideoList
+- [Phase 19]: VideoCard inline component in same file (per Phase 18 pattern)
+- [Phase 19]: Video Gerado badge uses violet color to distinguish from source badges (gemini=blue, comfyui=purple, static=zinc)
 
 ### Pending Todos
 
@@ -123,6 +126,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T16:13:08.955Z
-Stopped at: Completed 19-01-PLAN.md
+Last session: 2026-03-27T18:07:36.260Z
+Stopped at: Completed 19-02-PLAN.md
 Resume file: None
