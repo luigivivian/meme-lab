@@ -752,14 +752,19 @@ export default function GalleryPage() {
                           }`}>
                             {isApproved ? "Aprovado" : "Pendente"}
                           </span>
-                          {pkg.video_status && (
+                          {pkg.video_status === "success" && (
+                            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm bg-violet-500/20 text-violet-400 border-violet-500/30">
+                              <Video className="h-2.5 w-2.5" />
+                              Video Gerado
+                            </span>
+                          )}
+                          {pkg.video_status && pkg.video_status !== "success" && (
                             <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm ${
                               pkg.video_status === "generating" ? "bg-cyan-500/80 animate-pulse"
-                              : pkg.video_status === "success" ? "bg-cyan-500/80"
                               : "bg-rose-500/80"
                             }`}>
                               <Video className="h-2.5 w-2.5" />
-                              {pkg.video_status === "generating" ? "Gerando..." : pkg.video_status === "success" ? "Video" : "Falhou"}
+                              {pkg.video_status === "generating" ? "Gerando..." : "Falhou"}
                             </span>
                           )}
                         </div>
