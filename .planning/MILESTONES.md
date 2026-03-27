@@ -2,6 +2,19 @@
 
 ## v2.0 Pipeline Simplification, Auto-Publicacao & Multi-Tenant (Shipped: 2026-03-27)
 
+**Phases completed:** 4 phases, 8 plans, 15 tasks
+
+**Key accomplishments:**
+
+- BRL-native cost tracking via ApiUsage cost_brl column, per-model tier grouping, and credits summary API endpoint with prices_brl lookup
+- VideoCreditsCard component with per-model BRL cost breakdown table, daily budget progress bar, and all-time stats on dashboard
+- GET /dashboard/business-metrics endpoint with 5 metric groups (videos, avg cost BRL, budget, trends, packages) using period comparison queries and legacy USD-to-BRL fallback
+- 4 business StatsCards with colored icon backgrounds and trend arrow icons, plus full USD-to-BRL conversion for cost pie chart, total text, and video dialog budget
+
+---
+
+## v2.0 Pipeline Simplification, Auto-Publicacao & Multi-Tenant (Shipped: 2026-03-27)
+
 **Phases completed:** 9 phases, 23 plans, 43 tasks
 
 **Key accomplishments:**

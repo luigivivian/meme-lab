@@ -4,29 +4,24 @@
 
 Plataforma de geração e publicação automatizada de memes para Instagram. Pipeline simplificado compõe backgrounds existentes + frases, sem depender de APIs externas de imagem. Suporta múltiplos personagens e publicação automática.
 
-## Current Milestone: v2.0 Pipeline Simplification, Auto-Publicação & Multi-Tenant
+## Completed Milestone: v2.0 Pipeline Simplification, Auto-Publicacao & Multi-Tenant (shipped 2026-03-27)
 
-**Goal:** Pipeline simplificado que compõe memes (backgrounds existentes + frases) sem chamar Gemini Image API, com publicação automática e multi-tenant.
-
-**Target features:**
-- Pipeline refactor: desacoplar agentes/buscas, pipeline manual com backgrounds lisos + temas pré-configurados + composição de frases, zero chamadas Gemini Image
-- Multi-personagem pipeline: workers geram conteúdo por personagem
-- Auto-publicação Instagram: scheduler + publisher + calendar
-- Auth v2: reset de senha por email, 2FA, OAuth Google
-- Dashboard v2: histórico 30 dias, alertas de limite, relatório de custos
-- Multi-tenant: isolamento por usuário, API keys por usuário, billing
+See `.planning/milestones/v2.0-ROADMAP.md` for full details.
 
 ## Current State (updated 2026-03-27)
 
-**Sora 2 prompt engineering research complete (Phase 999.3).** VideoPromptBuilder upgraded with v2 motion templates (17 themes, three-layer framework: camera/subject/physics), structured system prompts, present continuous tense, 300-500 char sweet spot. Version switching via VIDEO_PROMPT_STYLE env var (v1/v2). 23 tests.
+**v2.0 shipped.** 13 phases, 8 plans. Full platform: pipeline simplification (static backgrounds + Pillow composition), tenant isolation, Instagram publishing & scheduling, Stripe billing, Kie.ai video generation (Sora 2 + legends), video gallery, BRL credits tracking, and business dashboard metrics.
 
-**Video legends & subtitles complete (Phase 999.2).** FFmpeg drawtext overlay on generated videos — 3 animation modes (static/fade/typewriter), word-wrap ported from image_maker.py, watermark matching Pillow style, PostProductionLayer auto-trigger (D-09), and 2 API endpoints for manual legend generation. 41 tests, 17/17 must-haves verified.
-
-**Video generation module complete (Phase 999.1).** Kie.ai Sora 2 image-to-video integration with async client, LLM-powered motion prompts (Gemini flash-lite), GCS upload for public URLs, daily budget enforcement, and 4 new API endpoints. Opt-in per content package, 10/15s duration selection, character consistency via character_id_list.
-
-**Tenant isolation complete (Phase 13).** Every API route now enforces user-scoped data access. All 5 repositories have user-aware read methods with admin bypass. Character creation sets user_id. PermissionError from repos is caught as 403 at the HTTP layer. 16/16 must-haves verified, TENANT-01 through TENANT-04 satisfied.
-
-**Auth & Quota complete.** Full authentication (register/login/JWT/refresh/logout), all API routes protected, frontend auth pages with route guards, dual Gemini key management with atomic usage tracking, and graceful static fallback when API limits are exhausted.
+**What's working:**
+- 9 trend agents feeding ~227+ events per run
+- Manual pipeline composes memes without Gemini Image API
+- Full auth flow (JWT) with tenant isolation on all endpoints
+- Instagram scheduling, publishing, and content calendar
+- Kie.ai video generation with 10 models, motion prompts, and legends
+- Video gallery with inline player, approve/delete, filters
+- BRL-native cost tracking per model, credits summary API
+- Business dashboard with trend indicators and 7d comparison
+- Stripe billing with plan enforcement
 
 **What's working:**
 - 9 trend agents feeding ~227+ events per run

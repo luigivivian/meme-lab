@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to plan
+status: v2.0 milestone complete
 stopped_at: Completed 21-02-PLAN.md
-last_updated: "2026-03-27T22:00:39.217Z"
+last_updated: "2026-03-27T22:13:02.705Z"
 progress:
   total_phases: 13
   completed_phases: 4
