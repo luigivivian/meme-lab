@@ -28,7 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 18: Job Status Sync & Management** - Fix stale/failed jobs, status sync, improved jobs page UI with progress visualization (completed 2026-03-27)
 - [x] **Phase 19: Video Gallery & Management** - Dedicated videos page, inline player, download/approve/delete, filters, video tag on images (completed 2026-03-27)
 - [x] **Phase 20: Kie.ai Credits & Cost Tracking** - Credits system per model, only charge on success, BRL cost tracking (completed 2026-03-27)
-- [ ] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density
+- [x] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density (completed 2026-03-27)
 
 ## Phase Details
 
@@ -147,7 +147,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
 | 19. Video Gallery & Management | 2/2 | Complete    | 2026-03-27 |
 | 20. Kie.ai Credits & Cost Tracking | 2/2 | Complete    | 2026-03-27 |
-| 21. Dashboard Business Metrics | 1/2 | In Progress|  |
+| 21. Dashboard Business Metrics | 2/2 | Complete   | 2026-03-27 |
 
 ### Phase 18: Job Status Sync & Management
 **Goal**: Kill stale/failed jobs still showing as running, fix job status synchronization (update to failed on request error or missing job ID), and improve the jobs page UI with better progress visualization and clear status states
@@ -211,7 +211,7 @@ Plans:
 
 Plans:
 - [x] 21-01-PLAN.md -- Backend: get_business_metrics() repo method + GET /dashboard/business-metrics endpoint
-- [ ] 21-02-PLAN.md -- Frontend: API types/hook, StatsCard extension, business cards, BRL conversion
+- [x] 21-02-PLAN.md -- Frontend: API types/hook, StatsCard extension, business cards, BRL conversion
 
 ## Backlog
 
@@ -234,7 +234,7 @@ Plans:
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader

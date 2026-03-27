@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to execute
-stopped_at: Completed 21-01-PLAN.md
-last_updated: "2026-03-27T21:47:42.759Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-03-27T21:54:09.387Z"
 progress:
   total_phases: 13
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -69,6 +69,7 @@ Plan: 2 of 2
 | Phase 20 P01 | 4min | 2 tasks | 7 files |
 | Phase 20 P02 | 2min | 2 tasks | 3 files |
 | Phase 21 P01 | 2min | 1 tasks | 3 files |
+| Phase 21 P02 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,9 @@ Recent decisions affecting current work:
 - [Phase 21]: All-time totals use separate unbounded queries (not limited to 14-day comparison window)
 - [Phase 21]: Active packages defined as ContentPackage with video_status IS NOT NULL
 - [Phase 21]: Legacy cost_brl=0 fallback applied at both period and daily level using VIDEO_USD_TO_BRL
+- [Phase 21]: VIDEO_USD_TO_BRL = 5.75 frontend constant matching backend config.py for BRL conversion
+- [Phase 21]: Arrow icons (TrendingUp/TrendingDown/Minus) rendered inside StatsCard component for reusability, not in dashboard page
+- [Phase 21]: Active packages count shown as description subtitle on Videos Gerados card (clean 4-card grid)
 
 ### Pending Todos
 
@@ -141,6 +145,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T21:47:42.757Z
-Stopped at: Completed 21-01-PLAN.md
+Last session: 2026-03-27T21:54:09.384Z
+Stopped at: Completed 21-02-PLAN.md
 Resume file: None
