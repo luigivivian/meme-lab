@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to plan
-stopped_at: Completed 19-02-PLAN.md
-last_updated: "2026-03-27T18:25:08.052Z"
+status: Ready to execute
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-03-27T18:50:24.212Z"
 progress:
   total_phases: 13
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 19 — video-gallery-management
+**Current focus:** Phase 20 — kie-ai-credits-cost-tracking
 
 ## Current Position
 
-Phase: 20
-Plan: Not started
+Phase: 20 (kie-ai-credits-cost-tracking) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Plan: Not started
 | Phase 19 P01 | 5min | 2 tasks | 4 files |
 | Phase 19 P02 | 3min | 2 tasks | 2 files |
 | Phase 19 P02 | 4min | 2 tasks | 2 files |
+| Phase 20 P01 | 4min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,9 @@ Recent decisions affecting current work:
 - [Phase 19]: Video Gerado badge uses violet color to distinguish from source badges (gemini=blue, comfyui=purple, static=zinc)
 - [Phase 19]: Inline VideoCard component in same file per Phase 18 pattern
 - [Phase 19]: Violet badge color for Video Gerado distinguishes from existing source badges
+- [Phase 20]: tier=model_id approach: per-model rows via existing unique constraint, no schema change needed
+- [Phase 20]: Legacy api_usage rows (cost_brl=0, cost_usd>0) handled by USD*BRL fallback in summary query
+- [Phase 20]: compute_video_cost_brl in config.py: prices_brl lookup with closest-duration snap, USD fallback for unknown models
 
 ### Pending Todos
 
@@ -129,6 +133,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T18:08:52.718Z
-Stopped at: Completed 19-02-PLAN.md
+Last session: 2026-03-27T18:50:24.209Z
+Stopped at: Completed 20-01-PLAN.md
 Resume file: None

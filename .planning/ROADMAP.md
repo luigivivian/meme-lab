@@ -146,7 +146,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
 | 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
 | 19. Video Gallery & Management | 2/2 | Complete    | 2026-03-27 |
-| 20. Kie.ai Credits & Cost Tracking | 0/2 | Not Started | - |
+| 20. Kie.ai Credits & Cost Tracking | 1/2 | In Progress|  |
 | 21. Dashboard Business Metrics | 0/? | Not Started | - |
 
 ### Phase 18: Job Status Sync & Management
@@ -195,7 +195,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 20-01-PLAN.md — Backend: migration, cost_brl column, compute helper, UsageRepository extension, credits summary endpoint
+- [x] 20-01-PLAN.md — Backend: migration, cost_brl column, compute helper, UsageRepository extension, credits summary endpoint
 - [ ] 20-02-PLAN.md — Frontend: API client, SWR hook, VideoCreditsCard dashboard component
 
 ### Phase 21: Dashboard Business Metrics
@@ -233,7 +233,7 @@ Plans:
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 2/2 plans complete
+**Plans:** 1/2 plans executed
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
