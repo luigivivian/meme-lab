@@ -175,7 +175,7 @@ export default function JobsPage() {
       </div>
 
       {/* Filter Tabs */}
-      {jobs.length > 0 && (
+      {!isLoading && (
         <div className="flex items-center gap-1.5 rounded-xl bg-secondary/30 p-1 w-fit">
           {filterTabs.map(({ key, label, count }) => (
             <button
