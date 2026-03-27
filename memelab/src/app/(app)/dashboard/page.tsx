@@ -25,8 +25,9 @@ import {
   useVideoBudget, useVideoStatus,
   useDashboardUsageHistory, useDashboardCostBreakdown,
   useDashboardPipelineActivity, useDashboardPublishingStats,
+  useVideoCredits,
 } from "@/hooks/use-api";
-import { imageUrl, generateVideo, type ContentPackageDB, type UsageResponse } from "@/lib/api";
+import { imageUrl, generateVideo, type ContentPackageDB, type UsageResponse, type VideoCreditsResponse } from "@/lib/api";
 import { SOURCE_COLORS, AGENT_TYPE_COLORS, PUBLISH_STATUS_COLORS } from "@/lib/constants";
 
 const DISTRIBUTION_BAR_COLORS: Record<string, string> = {
@@ -91,6 +92,9 @@ export default function DashboardPage() {
   const { data: costBreakdown } = useDashboardCostBreakdown();
   const { data: pipelineActivity } = useDashboardPipelineActivity();
   const { data: publishingStats } = useDashboardPublishingStats();
+
+  // Video credits (Phase 20)
+  const { data: videoCredits } = useVideoCredits();
 
   // Video generation state
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
@@ -768,6 +772,9 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Video Credits (Phase 20) */}
+      {videoCredits && <VideoCreditsCard data={videoCredits} />}
+
       {/* Video Generation Dialog */}
       <Dialog
         open={!!videoTarget}
@@ -950,5 +957,120 @@ function QuotaAlerts({ usageData }: { usageData: UsageResponse | undefined }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function formatBRL(value: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function VideoCreditsCard({ data }: { data: VideoCreditsResponse }) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleModels = expanded ? data.models : data.models.slice(0, 5);
+  const budgetPct =
+    data.daily_budget_brl > 0
+      ? Math.round((data.daily_spent_brl / data.daily_budget_brl) * 100)
+      : 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <DollarSign className="h-4 w-4 text-primary" />
+          Video Credits
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Summary row */}
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <p className="text-xs text-muted-foreground">Total ({data.days}d)</p>
+            <p className="text-lg font-bold font-mono">{formatBRL(data.total_spent_brl)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Videos</p>
+            <p className="text-lg font-bold">{data.total_videos}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Media/video</p>
+            <p className="text-lg font-bold font-mono">{formatBRL(data.avg_cost_brl)}</p>
+          </div>
+        </div>
+
+        {/* Daily budget bar */}
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Orcamento diario</span>
+            <span>
+              {formatBRL(data.daily_spent_brl)} / {formatBRL(data.daily_budget_brl)}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                budgetPct >= 95
+                  ? "bg-rose-500"
+                  : budgetPct >= 80
+                  ? "bg-amber-500"
+                  : "bg-emerald-500"
+              }`}
+              style={{ width: `${Math.min(budgetPct, 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Per-model table */}
+        {data.models.length > 0 && (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-muted-foreground text-xs border-b border-border/50">
+                <th className="text-left pb-2">Modelo</th>
+                <th className="text-right pb-2">Videos</th>
+                <th className="text-right pb-2">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleModels.map((m) => (
+                <tr key={m.model_id} className="border-b border-border/20 last:border-0">
+                  <td className="py-1.5 text-xs">{m.model_name}</td>
+                  <td className="py-1.5 text-right tabular-nums">{m.count}</td>
+                  <td className="py-1.5 text-right font-mono text-xs">
+                    {formatBRL(m.total_brl)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {/* Expand toggle if >5 models */}
+        {data.models.length > 5 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-xs text-primary hover:underline w-full text-center"
+          >
+            {expanded ? "Mostrar menos" : `Ver todos (${data.models.length})`}
+          </button>
+        )}
+
+        {/* Failed count info */}
+        {data.failed_count > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {data.failed_count} geracoes falharam (custo zero)
+          </p>
+        )}
+
+        {/* All-time stats */}
+        <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border/30">
+          <span>Total historico: {formatBRL(data.alltime_spent_brl)}</span>
+          <span>{data.alltime_videos} videos</span>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
