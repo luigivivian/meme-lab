@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 999.1: Video Generation — Kie.ai Sora 2** - Image-to-video via Kie.ai API, GCS upload, motion prompts, budget cap (completed 2026-03-26)
 - [x] **Phase 999.2: Video Legends & Subtitles** - FFmpeg text overlays on videos, 3 animation modes, pipeline integration (completed 2026-03-27)
 - [x] **Phase 999.3: Sora 2 Prompt Engineering Research** - V2 motion templates, three-layer framework, version switching (completed 2026-03-27)
-- [x] **Phase 18: Job Status Sync & Management** - Fix stale/failed jobs, status sync, improved jobs page UI with progress visualization (completed 2026-03-27)
+- [x] **Phase 18: Job Status Sync & Management** - Fix stale/failed jobs, status sync, improved jobs page UI with progress visualization (completed 2026-03-27)
 - [ ] **Phase 19: Video Gallery & Management** - Dedicated videos page, inline player, download/approve/delete, filters, video tag on images
 - [ ] **Phase 20: Kie.ai Credits & Cost Tracking** - Credits system per model, only charge on success, BRL cost tracking
 - [ ] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density
@@ -145,7 +145,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 999.2. Video Legends & Subtitles | 2/2 | Complete    | 2026-03-27 |
 | 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
 | 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
-| 19. Video Gallery & Management | 0/? | Not Started | - |
+| 19. Video Gallery & Management | 0/2 | Not Started | - |
 | 20. Kie.ai Credits & Cost Tracking | 0/? | Not Started | - |
 | 21. Dashboard Business Metrics | 0/? | Not Started | - |
 
@@ -175,12 +175,12 @@ Plans:
   4. Filter tabs allow filtering by status (all/completed/failed), model used, and date range
   5. In the image gallery, images that already have generated videos show a "Video Gerado" tag but all actions remain enabled for new video generations
   6. Deleting a video removes the file and clears video columns from the content package
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 19-01: TBD
-- [ ] 19-02: TBD
+- [ ] 19-01-PLAN.md — Backend approve endpoint + model/sort filters on video list, frontend API client + SWR hook + sidebar Videos entry
+- [ ] 19-02-PLAN.md — Videos gallery page with inline player, actions, filters + gallery video tag badge
 
 ### Phase 20: Kie.ai Credits & Cost Tracking
 **Goal**: Create a credits tracking system for Kie.ai API that correctly accounts costs per model using configured BRL prices, only deducting credits on successful video generation
