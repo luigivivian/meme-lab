@@ -275,30 +275,34 @@ _SYSTEM_PROMPT_V1 = (
     "- NEVER include text or dialogue"
 )
 
-# v2 system prompt -- Structured sections from OpenAI Cookbook (per D-06)
+# v2 system prompt -- Natural flowing prose for Sora 2 (no labels!)
 # Source: OpenAI Sora 2 Prompting Guide + awesome-sora2 community patterns
-# Key changes from v1: section-based output, present continuous tense,
-# one-camera-move rule, material/force descriptors, beat-based temporal flow
+# KEY LEARNING: Sora 2 reads the prompt as literal text. Labels like "CAMERA:"
+# confuse it. Output must be natural flowing sentences. Also "subtle/gentle/slowly"
+# everywhere = static video. Use decisive action verbs.
 _SYSTEM_PROMPT_V2 = (
     "You generate motion prompts for Sora 2 image-to-video AI. "
-    "You receive an image of a cartoon wizard character and describe the animation.\n\n"
-    "OUTPUT FORMAT (4-5 sentences, 300-500 characters):\n"
-    "1. CAMERA -- one clear movement: static, slow push-in, gentle dolly, or subtle parallax\n"
-    "2. SUBJECT -- primary body animation in PRESENT CONTINUOUS tense "
-    "(is raising, is turning, are gripping). Include micro-actions: breathing, blinking, weight shifts\n"
-    "3. PHYSICS -- cloth/material behavior with force descriptors: "
-    "'heavy robe fabric is swaying in gentle breeze', 'long beard is flowing with head movement'\n"
-    "4. ATMOSPHERE -- ambient motion: particle drift, light pulses, glow effects\n\n"
+    "You receive context about a cartoon wizard character and must describe VISIBLE animation.\n\n"
+    "OUTPUT: Write 3-4 sentences of FLOWING NATURAL PROSE (300-500 chars). "
+    "NO labels, NO bullet points, NO numbered lists. Just sentences.\n\n"
+    "STRUCTURE YOUR SENTENCES (but do NOT label them):\n"
+    "- First sentence: camera movement (slow push-in, static shot, gentle dolly)\n"
+    "- Second sentence: the character's MAIN ACTION with decisive verbs "
+    "(raises his staff, turns his head, lifts the goblet, slams his fist). "
+    "The action must be VISIBLE and CLEAR -- not 'subtly shifts weight'\n"
+    "- Third sentence: secondary motion and physics (robes billowing, beard swaying, "
+    "particles rising, staff crystal glowing brighter)\n"
+    "- Optional fourth: atmosphere (light shifting, wind picking up, sparkles drifting)\n\n"
     "CRITICAL RULES:\n"
-    "- PRESENT CONTINUOUS tense throughout (is walking, are floating, is glowing)\n"
+    "- The character MUST VISIBLY MOVE -- no static poses. Use strong verbs: "
+    "raises, turns, grips, leans, steps, gestures, nods, lifts, swings\n"
+    "- Present continuous tense: 'is raising', 'are floating', 'is glowing'\n"
     "- ONE camera movement only -- never combine pan + zoom + track\n"
-    "- CHARACTER is primary subject -- background is secondary ambient\n"
-    "- Temporal beats: initial state -> peak action -> gentle settling\n"
-    "- Specify materials and forces: 'silk-like', 'heavy wooden', 'gentle breeze'\n"
-    "- NO speech, NO dialogue, NO text, NO lip movement\n"
-    "- NO scene changes, NO new objects appearing\n"
-    "- Maintain cartoon cel-shading art style, portrait 4:5\n"
-    "- NEVER describe character appearance (already in the image)"
+    "- Include physical details: 'heavy fabric', 'wooden staff', 'long white beard'\n"
+    "- NO speech, NO text, NO lip movement, NO scene changes\n"
+    "- NEVER use labels like 'CAMERA:', 'SUBJECT:', 'PHYSICS:' in your output\n"
+    "- NEVER describe character appearance (already in the image)\n"
+    "- Output ONLY the motion prompt sentences, nothing else"
 )
 
 # Backward compatibility aliases (point to v2 by default)
@@ -322,26 +326,22 @@ _ENHANCE_PROMPT_V1 = (
     "- Output ONLY the enhanced prompt, nothing else"
 )
 
-# v2 enhance prompt -- Three-layer enhancement with structured output (per D-06)
-# Source: OpenAI Cookbook structured prompting approach
+# v2 enhance prompt -- Natural prose enhancement for Sora 2
 _ENHANCE_PROMPT_V2 = (
     "You are a prompt engineer for Sora 2 image-to-video AI. "
-    "Enhance the user's animation description into an optimal Sora 2 motion prompt.\n\n"
-    "OUTPUT FORMAT (4-5 sentences, 300-500 characters):\n"
-    "1. CAMERA -- add one specific camera movement if missing (prefer static or slow push-in)\n"
-    "2. SUBJECT -- make body animation precise using PRESENT CONTINUOUS tense. "
-    "Add micro-actions: breathing, weight shift, gesture follow-through\n"
-    "3. PHYSICS -- add cloth/material physics: robe sway, beard flow, staff weight, fabric draping\n"
-    "4. ATMOSPHERE -- add ambient: particles, light shifts, sparkle effects\n\n"
+    "Enhance the user's animation description into an optimal motion prompt.\n\n"
+    "OUTPUT: 3-4 sentences of FLOWING NATURAL PROSE (300-500 chars). "
+    "NO labels, NO bullet points, NO 'CAMERA:', NO 'SUBJECT:'. Just sentences.\n\n"
     "RULES:\n"
-    "- Keep the user's INTENT but enhance technically for Sora 2\n"
-    "- PRESENT CONTINUOUS tense (is moving, are drifting, is pulsing)\n"
-    "- ONE camera movement -- do not add complex camera work\n"
-    "- CHARACTER is focus -- background stays ambient\n"
-    "- Specify material + force: 'heavy fabric billowing', not just 'fabric moves'\n"
+    "- Keep the user's INTENT but make the action MORE VISIBLE and DECISIVE\n"
+    "- Replace weak verbs ('shifts', 'adjusts') with strong ones ('raises', 'turns', 'grips')\n"
+    "- Present continuous tense: is raising, are floating, is glowing\n"
+    "- Add physical details: 'heavy robe fabric billowing', 'wooden staff crystal pulsing'\n"
+    "- ONE camera movement (first sentence)\n"
+    "- Character MUST visibly move -- Sora 2 produces static video if motion is too subtle\n"
     "- PRESERVE original scene, background, art style -- NO changes\n"
     "- NO speech, NO lip movement, NO text\n"
-    "- Output ONLY the enhanced prompt, nothing else"
+    "- Output ONLY the enhanced prompt sentences, nothing else"
 )
 
 # Backward compatibility alias (point to v2 by default)
