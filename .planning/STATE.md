@@ -4,7 +4,7 @@ milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Ready to plan
 stopped_at: Completed 19-02-PLAN.md
-last_updated: "2026-03-27T18:09:47.580Z"
+last_updated: "2026-03-27T18:25:08.052Z"
 progress:
   total_phases: 13
   completed_phases: 2
