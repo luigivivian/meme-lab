@@ -147,7 +147,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
 | 19. Video Gallery & Management | 2/2 | Complete    | 2026-03-27 |
 | 20. Kie.ai Credits & Cost Tracking | 2/2 | Complete    | 2026-03-27 |
-| 21. Dashboard Business Metrics | 0/2 | Not Started | - |
+| 21. Dashboard Business Metrics | 1/2 | In Progress|  |
 
 ### Phase 18: Job Status Sync & Management
 **Goal**: Kill stale/failed jobs still showing as running, fix job status synchronization (update to failed on request error or missing job ID), and improve the jobs page UI with better progress visualization and clear status states
@@ -210,7 +210,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 21-01-PLAN.md -- Backend: get_business_metrics() repo method + GET /dashboard/business-metrics endpoint
+- [x] 21-01-PLAN.md -- Backend: get_business_metrics() repo method + GET /dashboard/business-metrics endpoint
 - [ ] 21-02-PLAN.md -- Frontend: API types/hook, StatsCard extension, business cards, BRL conversion
 
 ## Backlog
@@ -234,7 +234,7 @@ Plans:
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 2/2 plans complete
+**Plans:** 1/2 plans executed
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to plan
-stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-03-27T18:59:14.715Z"
+status: Ready to execute
+stopped_at: Completed 21-01-PLAN.md
+last_updated: "2026-03-27T21:47:42.759Z"
 progress:
   total_phases: 13
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 20 — kie-ai-credits-cost-tracking
+**Current focus:** Phase 21 — dashboard-business-metrics
 
 ## Current Position
 
-Phase: 21
-Plan: Not started
+Phase: 21 (dashboard-business-metrics) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Plan: Not started
 | Phase 19 P02 | 4min | 2 tasks | 2 files |
 | Phase 20 P01 | 4min | 2 tasks | 7 files |
 | Phase 20 P02 | 2min | 2 tasks | 3 files |
+| Phase 21 P01 | 2min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,9 @@ Recent decisions affecting current work:
 - [Phase 20]: VideoCreditsCard placed below existing dashboard content, before Dialog (per Phase 16 pattern)
 - [Phase 20]: No existing cost_usd displays modified (deferred to Phase 21 per user decision)
 - [Phase 20]: formatBRL uses Intl.NumberFormat pt-BR for locale-aware BRL formatting
+- [Phase 21]: All-time totals use separate unbounded queries (not limited to 14-day comparison window)
+- [Phase 21]: Active packages defined as ContentPackage with video_status IS NOT NULL
+- [Phase 21]: Legacy cost_brl=0 fallback applied at both period and daily level using VIDEO_USD_TO_BRL
 
 ### Pending Todos
 
@@ -137,6 +141,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T18:54:55.740Z
-Stopped at: Completed 20-02-PLAN.md
+Last session: 2026-03-27T21:47:42.757Z
+Stopped at: Completed 21-01-PLAN.md
 Resume file: None
