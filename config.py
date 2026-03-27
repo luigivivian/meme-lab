@@ -361,6 +361,10 @@ VIDEO_DAILY_BUDGET_USD = float(os.getenv("VIDEO_DAILY_BUDGET_USD", "3.0"))
 # Cost per second for standard Sora 2 tier
 VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.015"))
 
+# Prompt style for video motion templates: "v1" (original) or "v2" (Sora 2 researched)
+# Per D-05: v2 uses three-layer motion framework (OpenAI Cookbook + awesome-sora2)
+VIDEO_PROMPT_STYLE = os.getenv("VIDEO_PROMPT_STYLE", "v2")
+
 # Concurrency limiter for Kie.ai API calls
 KIE_MAX_CONCURRENT = int(os.getenv("KIE_MAX_CONCURRENT", "3"))
 
