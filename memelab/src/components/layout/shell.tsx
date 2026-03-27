@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { VideoProgressBar } from "./video-progress";
 import { pageVariants, pageTransition } from "@/lib/animations";
 import { CharacterProvider } from "@/contexts/character-context";
 
@@ -102,6 +103,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </motion.main>
           </AnimatePresence>
         </div>
+        <VideoProgressBar />
       </div>
     </CharacterProvider>
   );
