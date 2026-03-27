@@ -379,3 +379,8 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "clipflow-video-uploads")
 
 # Signed URL expiry in seconds (1 hour — video gen takes 30-120s)
 GCS_SIGNED_URL_EXPIRY = int(os.getenv("GCS_SIGNED_URL_EXPIRY", "3600"))
+
+# ===== Video Prompt Style — Phase 999.3 =====
+
+# Prompt template version: "v1" (original) or "v2" (researched Sora 2 patterns)
+VIDEO_PROMPT_STYLE = os.getenv("VIDEO_PROMPT_STYLE", "v2")
