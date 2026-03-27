@@ -1,6 +1,7 @@
-"""PostProductionLayer — executa caption, hashtag e quality em paralelo.
+"""PostProductionLayer — executa caption, hashtag, quality e legend em paralelo.
 
-Enriquece ContentPackages com legenda, hashtags e quality score.
+Enriquece ContentPackages com legenda, hashtags, quality score e
+video legend overlay (D-09 auto-trigger when VIDEO_LEGEND_ENABLED=true).
 Se qualquer worker falha, o pacote continua valido com defaults.
 """
 
@@ -8,6 +9,7 @@ import asyncio
 import logging
 import time
 
+from config import VIDEO_LEGEND_ENABLED
 from src.pipeline.models_v2 import ContentPackage
 from src.pipeline.workers.caption_worker import CaptionWorker
 from src.pipeline.workers.hashtag_worker import HashtagWorker
@@ -24,10 +26,12 @@ class PostProductionLayer:
         caption_worker: CaptionWorker | None = None,
         hashtag_worker: HashtagWorker | None = None,
         quality_worker: QualityWorker | None = None,
+        legend_worker=None,  # Optional[LegendWorker] — lazy import to avoid circular deps
     ):
         self.caption_worker = caption_worker or CaptionWorker()
         self.hashtag_worker = hashtag_worker or HashtagWorker()
         self.quality_worker = quality_worker or QualityWorker()
+        self._legend_worker = legend_worker
 
     async def enhance(self, packages: list[ContentPackage], on_step=None) -> list[ContentPackage]:
         """Enriquece todos os pacotes em paralelo."""
@@ -43,6 +47,8 @@ class PostProductionLayer:
             on_step("caption", "running", f"0/{total}")
             on_step("hashtags", "running", f"0/{total}")
             on_step("quality", "running", f"0/{total}")
+        if on_step and VIDEO_LEGEND_ENABLED:
+            on_step("legend", "pending", f"0/{total}")
 
         async def enhance_one_tracked(pkg: ContentPackage) -> ContentPackage:
             nonlocal caption_done, hashtag_done, quality_done
@@ -93,6 +99,22 @@ class PostProductionLayer:
             pkg.hashtags = hashtags
             pkg.quality_score = quality_score
 
+            # === Legend auto-trigger (D-09) ===
+            # Run AFTER caption/hashtags/quality (sequential, not in gather)
+            # Only for packages with completed videos
+            legend_result = None
+            if VIDEO_LEGEND_ENABLED and getattr(pkg, 'video_status', None) == 'success' and getattr(pkg, 'video_path', None):
+                legend_result = await self._safe_legend(pkg)
+                if legend_result:
+                    pkg.legend_status = "success"
+                    pkg.legend_path = legend_result
+                    logger.info(f"[{wo_id}] Legend auto-rendered: {legend_result}")
+                else:
+                    # Per D-11: graceful fallback, don't set failed — just skip
+                    logger.debug(f"[{wo_id}] Legend skipped or failed (graceful fallback)")
+                if on_step and VIDEO_LEGEND_ENABLED:
+                    on_step("legend", "done" if legend_result else "skipped", f"{caption_done}/{total}")
+
             pkg_elapsed = time.perf_counter() - pkg_t0
             logger.info(
                 f"[{wo_id}] PostProd completo em {pkg_elapsed:.1f}s — "
@@ -142,3 +164,30 @@ class PostProductionLayer:
         except Exception as e:
             logger.error(f"Quality falhou: {type(e).__name__}: {e}")
             return 0.0
+
+    async def _safe_legend(self, package) -> str | None:
+        """Legend overlay com fallback para None (per D-11).
+
+        Auto-triggers when VIDEO_LEGEND_ENABLED=true and package has
+        video_status='success' (per D-09).
+        """
+        try:
+            worker = self._legend_worker
+            if worker is None:
+                from src.pipeline.workers.legend_worker import LegendWorker
+                worker = LegendWorker()
+                self._legend_worker = worker  # Cache for reuse
+
+            video_path = getattr(package, 'video_path', None)
+            phrase = getattr(package, 'phrase', None)
+            if not video_path or not phrase:
+                logger.debug("Legend skipped: no video_path or phrase")
+                return None
+
+            return await worker.process(
+                video_path=video_path,
+                phrase=phrase,
+            )
+        except Exception as e:
+            logger.error(f"Legend falhou: {type(e).__name__}: {e}")
+            return None
