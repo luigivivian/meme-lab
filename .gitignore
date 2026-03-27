@@ -6,6 +6,7 @@ __pycache__/
 
 # Secrets
 .env
+gen-lang-client-*.json
 
 # Output
 output/
