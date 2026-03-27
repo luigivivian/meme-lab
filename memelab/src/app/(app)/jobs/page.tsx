@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Layers, Play, RefreshCw, CheckCircle, Clock, AlertCircle, Loader2, Video, XCircle } from "lucide-react";
+import { Layers, Play, RefreshCw, CheckCircle, Clock, AlertCircle, Loader2, Video, XCircle, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { IndeterminateProgress, Progress } from "@/components/ui/progress";
-import { useJobs, useThemes, useVideoList } from "@/hooks/use-api";
+import { useJobs, useThemes, useVideoList, useVideoProgress } from "@/hooks/use-api";
 import {
   createBatchJob,
   createBatchFromConfig,
   getJobStatus,
   imageUrl,
   videoFileUrl,
+  retryVideo,
   type JobStatus,
   type VideoListItem,
 } from "@/lib/api";
@@ -28,10 +29,184 @@ const STATUS_ICON: Record<string, typeof Clock> = {
   completed: CheckCircle,
 };
 
+function VideoProgressBar({ contentPackageId }: { contentPackageId: number }) {
+  const { data } = useVideoProgress(contentPackageId, true);
+  const progress = data?.progress ?? 0;
+  const stepLabel = data?.step_label ?? "Processando...";
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-muted-foreground">{stepLabel}</span>
+        <span className="tabular-nums text-muted-foreground">
+          {progress > 0 ? `${progress}%` : ""}
+        </span>
+      </div>
+      <Progress value={Math.max(progress, 5)} className="h-1.5" />
+    </div>
+  );
+}
+
+function VideoJobCard({
+  video,
+  expanded,
+  onToggleExpand,
+  onRetry,
+  retrying,
+}: {
+  video: VideoListItem;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onRetry: () => void;
+  retrying: boolean;
+}) {
+  const filename = (video.image_path ?? "").split(/[/\\]/).pop() ?? "";
+  const cost = video.video_metadata?.cost_usd as number | undefined;
+  const duration = video.video_metadata?.duration as number | undefined;
+  const model = video.video_metadata?.model as string | undefined;
+  const error = video.video_metadata?.error as string | undefined;
+  const genTime = video.video_metadata?.generation_time_ms as number | undefined;
+
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden">
+      {/* Thumbnail */}
+      <div className="relative aspect-video bg-secondary">
+        <img
+          src={imageUrl(filename)}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+        {/* Status Badge overlay */}
+        <div className="absolute top-2 right-2">
+          {video.video_status === "generating" ? (
+            <Badge
+              variant="secondary"
+              className="gap-1 bg-amber-500/20 text-amber-400 border-amber-500/30"
+            >
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Gerando
+            </Badge>
+          ) : video.video_status === "success" ? (
+            <Badge
+              variant="secondary"
+              className="gap-1 bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+            >
+              <CheckCircle className="h-3 w-3" />
+              Concluido
+            </Badge>
+          ) : video.video_status === "failed" ? (
+            <Badge variant="destructive" className="gap-1">
+              <XCircle className="h-3 w-3" />
+              Falhou
+            </Badge>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Card body */}
+      <div className="p-3 space-y-2">
+        {/* Phrase */}
+        <p className="text-xs line-clamp-2">{video.phrase}</p>
+
+        {/* Meta row: model, duration, cost */}
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          {model && <span>{model.split("/").pop()}</span>}
+          {duration && <span>{duration}s</span>}
+          {cost != null && <span>R${(cost * 5.5).toFixed(2)}</span>}
+          {genTime != null && <span>{(genTime / 1000).toFixed(0)}s gen</span>}
+        </div>
+
+        {/* Progress bar for generating jobs */}
+        {video.video_status === "generating" && (
+          <VideoProgressBar contentPackageId={video.content_package_id} />
+        )}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 pt-1">
+          {video.video_status === "success" && (
+            <a
+              href={videoFileUrl(video.content_package_id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1"
+            >
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full gap-1 h-7 text-xs"
+              >
+                <Play className="h-3 w-3" /> Ver Video
+              </Button>
+            </a>
+          )}
+          {video.video_status === "failed" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-1 h-7 text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
+              onClick={onRetry}
+              disabled={retrying}
+            >
+              {retrying ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RotateCcw className="h-3 w-3" />
+              )}
+              Tentar Novamente
+            </Button>
+          )}
+          {/* Expand/collapse detail */}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={onToggleExpand}
+          >
+            {expanded ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </div>
+
+        {/* Expandable detail row */}
+        {expanded && (
+          <div className="text-[10px] text-muted-foreground space-y-1 pt-2 border-t border-border/50">
+            {video.video_task_id && (
+              <p>
+                <span className="font-medium">Task ID:</span>{" "}
+                <span className="font-mono">{video.video_task_id}</span>
+              </p>
+            )}
+            {video.created_at && (
+              <p>
+                <span className="font-medium">Criado:</span>{" "}
+                {new Date(video.created_at).toLocaleString("pt-BR")}
+              </p>
+            )}
+            {error && (
+              <p className="text-rose-400">
+                <span className="font-medium">Erro:</span> {error}
+              </p>
+            )}
+            {video.video_prompt_used && (
+              <p className="line-clamp-3">
+                <span className="font-medium">Prompt:</span>{" "}
+                {video.video_prompt_used}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function JobsPage() {
   const { data: jobsData, isLoading, mutate } = useJobs();
   const { data: themesData } = useThemes();
-  const { data: videoListData } = useVideoList();
+  const { data: videoListData, mutate: mutateVideos } = useVideoList();
   const jobs = jobsData?.jobs ?? [];
   const themeKeys = themesData?.themes.map((t) => t.key) ?? [];
 
@@ -47,6 +222,10 @@ export default function JobsPage() {
   const [detailJob, setDetailJob] = useState<JobStatus | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const [expandedVideoId, setExpandedVideoId] = useState<number | null>(null);
+  const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [videoStatusFilter, setVideoStatusFilter] = useState<string>("all");
 
   const handleBatchFromConfig = async () => {
     setLaunching(true);
@@ -101,6 +280,30 @@ export default function JobsPage() {
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
   };
+
+  const handleRetryVideo = async (contentPackageId: number) => {
+    setRetryingId(contentPackageId);
+    try {
+      await retryVideo(contentPackageId);
+      mutateVideos();
+    } catch {
+      // Error handled by SWR revalidation
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  // Video filter computed variables
+  const videos = videoListData?.videos ?? [];
+  const videoFilterTabs = [
+    { key: "all", label: "Todos", count: videos.length },
+    { key: "generating", label: "Gerando", count: videos.filter((v) => v.video_status === "generating").length },
+    { key: "success", label: "Concluidos", count: videos.filter((v) => v.video_status === "success").length },
+    { key: "failed", label: "Falhou", count: videos.filter((v) => v.video_status === "failed").length },
+  ];
+  const filteredVideos = videoStatusFilter === "all"
+    ? videos
+    : videos.filter((v) => v.video_status === videoStatusFilter);
 
   const filterTabs = [
     { key: "all", label: "Todos", count: jobs.length },
@@ -416,77 +619,64 @@ export default function JobsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Video Generation Jobs */}
-      {videoListData && videoListData.videos.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Video className="h-4 w-4 text-primary" />
-                Video Jobs
-              </CardTitle>
-              <Badge variant="secondary" className="text-xs">
-                {videoListData.videos.filter((v) => v.video_status === "generating").length} gerando
-              </Badge>
+      {/* Video Jobs Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Video className="h-4 w-4 text-primary" />
+              Video Jobs
+            </CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              {videos.filter((v) => v.video_status === "generating").length} gerando
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Video Filter Tabs */}
+          <div className="flex items-center gap-1.5 rounded-xl bg-secondary/30 p-1 w-fit">
+            {videoFilterTabs.map(({ key, label, count }) => (
+              <button
+                key={key}
+                onClick={() => setVideoStatusFilter(key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  videoStatusFilter === key
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                }`}
+              >
+                {label}
+                {count > 0 && <span className="ml-1.5 tabular-nums opacity-70">{count}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* Card Grid */}
+          {filteredVideos.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredVideos.map((v) => (
+                <VideoJobCard
+                  key={v.content_package_id}
+                  video={v}
+                  expanded={expandedVideoId === v.content_package_id}
+                  onToggleExpand={() =>
+                    setExpandedVideoId((prev) =>
+                      prev === v.content_package_id ? null : v.content_package_id
+                    )
+                  }
+                  onRetry={() => handleRetryVideo(v.content_package_id)}
+                  retrying={retryingId === v.content_package_id}
+                />
+              ))}
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-              {videoListData.videos.map((v) => {
-                const filename = (v.image_path ?? "").split(/[/\\]/).pop() ?? "";
-                const cost = v.video_metadata?.cost_usd as number | undefined;
-                const duration = v.video_metadata?.duration as number | undefined;
-                const genTime = v.video_metadata?.generation_time_ms as number | undefined;
-                const error = v.video_metadata?.error as string | undefined;
-                return (
-                  <div
-                    key={v.content_package_id}
-                    className="flex items-center gap-3 rounded-xl bg-white/[0.02] px-3 py-2.5 transition-all duration-200 hover:bg-white/[0.04]"
-                  >
-                    {/* Thumbnail */}
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0">
-                      <img src={imageUrl(filename)} alt="" className="h-full w-full object-cover" />
-                    </div>
-                    {/* Info */}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs truncate">{v.phrase}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground">{v.topic}</span>
-                        {duration && <span className="text-[10px] text-muted-foreground">{duration}s</span>}
-                        {cost != null && <span className="text-[10px] text-muted-foreground">${cost.toFixed(3)}</span>}
-                        {genTime != null && <span className="text-[10px] text-muted-foreground">{(genTime / 1000).toFixed(0)}s gen</span>}
-                      </div>
-                    </div>
-                    {/* Status */}
-                    <div className="shrink-0">
-                      {v.video_status === "generating" ? (
-                        <div className="flex items-center gap-1 text-amber-400">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          <span className="text-[10px] font-medium">Gerando</span>
-                        </div>
-                      ) : v.video_status === "success" ? (
-                        <div className="flex items-center gap-1.5">
-                          <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
-                          <a href={videoFileUrl(v.content_package_id)} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 gap-1">
-                              <Play className="h-3 w-3" /> Ver
-                            </Button>
-                          </a>
-                        </div>
-                      ) : v.video_status === "failed" ? (
-                        <div className="flex items-center gap-1 text-rose-400" title={error}>
-                          <XCircle className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-medium">Falhou</span>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 gap-2">
+              <Video className="h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Nenhum video encontrado</p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
