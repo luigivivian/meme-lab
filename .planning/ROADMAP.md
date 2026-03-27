@@ -134,6 +134,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 15. Publishing & Scheduling | 0/? | Complete    | 2026-03-26 |
 | 16. Dashboard v2 | 0/? | Complete    | 2026-03-26 |
 | 17. Billing & Stripe | 1/2 | Complete    | 2026-03-26 |
+| 999.1. Video Generation — Kie.ai Sora 2 | 3/3 | Complete    | 2026-03-26 |
 
 ## Backlog
 
@@ -156,7 +157,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 2/2 plans complete
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
