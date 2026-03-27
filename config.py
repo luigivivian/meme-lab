@@ -353,29 +353,33 @@ KIE_API_KEY = os.getenv("KIE_API_KEY", "")
 VIDEO_DURATION = int(os.getenv("VIDEO_DURATION", "10"))
 
 # Default model ID for video generation
-VIDEO_MODEL = os.getenv("VIDEO_MODEL", "hailuo-2.3-fast-image-to-video")
+VIDEO_MODEL = os.getenv("VIDEO_MODEL", "hailuo/2-3-image-to-video-standard")
 
-# Available video models on Kie.ai — {model_id: {name, cost_per_second, notes}}
+# Available video models on Kie.ai — {model_id: {name, cost_per_second, max_duration, notes}}
 VIDEO_MODELS = {
-    "hailuo-2.3-fast-image-to-video": {
-        "name": "Hailuo 2.3 Fast",
+    "hailuo/2-3-image-to-video-standard": {
+        "name": "Hailuo 2.3 Standard",
         "cost_per_second": 0.005,
-        "notes": "Fast generation, good motion, best cost/quality ratio",
+        "max_duration": 6,
+        "notes": "Rapido, boa animacao, melhor custo/qualidade",
+    },
+    "hailuo/2-3-image-to-video-pro": {
+        "name": "Hailuo 2.3 Pro",
+        "cost_per_second": 0.01,
+        "max_duration": 6,
+        "notes": "Qualidade superior, detalhes finos",
     },
     "sora-2-image-to-video": {
         "name": "Sora 2 Standard",
         "cost_per_second": 0.015,
-        "notes": "OpenAI Sora 2, 480-720p, good for social media",
+        "max_duration": 15,
+        "notes": "OpenAI Sora 2, 480-720p",
     },
     "sora-2-pro-image-to-video": {
         "name": "Sora 2 Pro",
         "cost_per_second": 0.045,
-        "notes": "720p higher quality",
-    },
-    "sora-2-pro-1080p-image-to-video": {
-        "name": "Sora 2 Pro 1080p",
-        "cost_per_second": 0.06,
-        "notes": "1080p premium",
+        "max_duration": 15,
+        "notes": "720p qualidade superior",
     },
 }
 

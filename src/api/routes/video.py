@@ -50,6 +50,7 @@ async def list_video_models():
             "id": model_id,
             "name": info["name"],
             "cost_per_second": info["cost_per_second"],
+            "max_duration": info.get("max_duration", 10),
             "notes": info["notes"],
             "is_default": model_id == VIDEO_MODEL,
         })

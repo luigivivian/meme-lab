@@ -138,22 +138,37 @@ class KieSora2Client:
         """
         resolved_model = model or _get_config("VIDEO_MODEL", _VIDEO_MODEL)
 
-        payload = {
-            "model": resolved_model,
-            "input": {
-                "prompt": prompt,
-                "image_urls": [image_url],
-                "aspect_ratio": aspect_ratio,
-                "n_frames": str(duration),
-                "remove_watermark": True,
-                "upload_method": "s3",
-                "character_id_list": character_ids or [],
-            },
-        }
+        # Build model-specific payload — Hailuo and Sora 2 use different input schemas
+        if resolved_model.startswith("hailuo/"):
+            # Hailuo: image_url (singular), duration as string seconds, resolution
+            hailuo_duration = str(min(duration, 6))  # Hailuo supports up to 6s
+            payload = {
+                "model": resolved_model,
+                "input": {
+                    "prompt": prompt,
+                    "image_url": image_url,
+                    "duration": hailuo_duration,
+                    "resolution": "768P",
+                },
+            }
+        else:
+            # Sora 2 and other models: image_urls (array), n_frames, aspect_ratio
+            payload = {
+                "model": resolved_model,
+                "input": {
+                    "prompt": prompt,
+                    "image_urls": [image_url],
+                    "aspect_ratio": aspect_ratio,
+                    "n_frames": str(duration),
+                    "remove_watermark": True,
+                    "upload_method": "s3",
+                    "character_id_list": character_ids or [],
+                },
+            }
 
         logger.info(
-            "Creating video task: model=%s duration=%ds aspect=%s chars=%d",
-            resolved_model, duration, aspect_ratio, len(character_ids or []),
+            "Creating video task: model=%s duration=%ds",
+            resolved_model, duration,
         )
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:

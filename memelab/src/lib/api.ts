@@ -1185,6 +1185,7 @@ export interface VideoModel {
   id: string;
   name: string;
   cost_per_second: number;
+  max_duration: number;
   notes: string;
   is_default: boolean;
 }
