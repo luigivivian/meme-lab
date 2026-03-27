@@ -179,7 +179,11 @@ async def _generate_video_task(
                 return
 
             uploader = GCSUploader()
-            blob_name = f"video-inputs/{Path(bg_path).name}"
+            # Unique blob name per upload — prevents stale signed URL issues
+            import time as _time
+            ts = int(_time.time())
+            stem = Path(bg_path).stem
+            blob_name = f"video-inputs/{stem}_{ts}{Path(bg_path).suffix}"
             signed_url = uploader.upload_image(bg_path, blob_name)
 
             # Generate video via Kie.ai Sora 2
