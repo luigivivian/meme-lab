@@ -254,3 +254,10 @@ export function useDashboardPublishingStats() {
     errorRetryCount: 1,
   });
 }
+
+export function useVideoCredits(days = 30) {
+  return useSWR(`video-credits-${days}`, () => api.getVideoCredits(days), {
+    refreshInterval: 60000,
+    errorRetryCount: 1,
+  });
+}

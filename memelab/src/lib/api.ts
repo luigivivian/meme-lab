@@ -1360,6 +1360,36 @@ export async function getDashboardPublishingStats(): Promise<PublishingStatsResp
   return request<PublishingStatsResponse>("/dashboard/publishing-stats");
 }
 
+// ── Video Credits (Phase 20) ──────────────────────────────────────────
+
+export interface ModelCostBreakdown {
+  model_id: string;
+  model_name: string;
+  count: number;
+  total_brl: number;
+  avg_brl: number;
+}
+
+export interface VideoCreditsResponse {
+  days: number;
+  total_spent_brl: number;
+  total_spent_usd: number;
+  total_videos: number;
+  avg_cost_brl: number;
+  alltime_spent_brl: number;
+  alltime_videos: number;
+  models: ModelCostBreakdown[];
+  failed_count: number;
+  failed_zero_cost: boolean;
+  daily_budget_brl: number;
+  daily_spent_brl: number;
+  daily_remaining_brl: number;
+}
+
+export async function getVideoCredits(days = 30): Promise<VideoCreditsResponse> {
+  return request<VideoCreditsResponse>(`/generate/video/credits/summary?days=${days}`);
+}
+
 // --- Content Export ---
 export const exportContentPack = (packageId: number) =>
   `${BASE}/content/${packageId}/export`;
