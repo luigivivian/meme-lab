@@ -1,167 +1,120 @@
-# Clip-Flow
+# Mago Mestre — Gerador de Imagens Consistentes
 
-Automacao de memes "O Mago Mestre" para Instagram (@omagomestre). Pipeline que busca trends virais, gera frases engracadas via Claude API, e cria imagens formatadas com estilo mistico medieval.
+Notebook Jupyter/Colab para geração de imagens do personagem **O Mago Mestre** usando Google Gemini com referências visuais.
+
+## Arquivo principal
+
+- [mago_mestre_generator.ipynb](mago_mestre_generator.ipynb) — notebook completo (11 células funcionais)
 
 ## Stack
 
-- **Python 3.14** / Windows 11
-- **Pillow** — composicao de imagens 1080x1350 (4:5 Instagram)
-- **Anthropic SDK** — Claude API para geracao de frases e analise de trends
-- **trendspyg** — Google Trends RSS (substitui pytrends, arquivado em 2025)
-- **feedparser** — RSS feeds (Reddit + Sensacionalista)
-- **APScheduler** — agendamento automatico do pipeline
+- `google-genai` (SDK oficial Google)
+- `Pillow` (PIL) para manipulação de imagens
+- `tqdm` para progresso em lote
+- Ambiente: Google Colab (primário) ou Jupyter local
 
-## Estrutura do Projeto
+## Modelos Gemini (ordem de prioridade)
 
-```
-clip-flow/
-  config.py                  # Configuracoes centralizadas (imagem, prompts, pipeline)
-  requirements.txt
-  .env                       # ANTHROPIC_API_KEY (nao committar)
-  assets/
-    character_model.md       # DNA do personagem + prompts AI para gerar backgrounds consistentes
-    backgrounds/             # Imagens de fundo do Mago (.jpg/.png/.webp) — cartoon mistico medieval
-    fonts/                   # Fontes customizadas (.ttf/.otf) — fallback: Impact/Arial do Windows
-  output/                    # Imagens geradas (gitignored)
-  src/
-    cli.py                   # CLI original: --topic "tema" --count N / --text "frase"
-    phrases.py               # generate_phrases(topic, count) via Claude API
-    image_maker.py           # create_image(text, bg_path) — composicao Pillow com vinheta, glow, contorno
-    pipeline_cli.py          # CLI do pipeline: --mode once|schedule --count N --interval N
-    pipeline/
-      models.py              # Dataclasses: TrendItem, AnalyzedTopic, GeneratedContent, PipelineResult
-      orchestrator.py        # Coordena: agents -> aggregator -> analyzer -> generator
-      scheduler.py           # APScheduler BlockingScheduler com IntervalTrigger
-      agents/
-        base.py              # BaseSourceAgent (ABC): fetch() -> list[TrendItem]
-        google_trends.py     # GoogleTrendsAgent — trendspyg RSS (geo="BR")
-        reddit_memes.py      # RedditMemesAgent — RSS via feedparser (6 subreddits)
-        rss_feeds.py         # RSSFeedAgent — feedparser (reddit RSS + sensacionalista)
-      processors/
-        aggregator.py        # TrendAggregator — merge, dedup por similaridade, boost multi-fonte
-        analyzer.py          # ClaudeAnalyzer — Claude seleciona melhores temas para humor
-        generator.py         # ContentGenerator — wrapper de phrases.py + image_maker.py
+```python
+MODELOS_IMAGEM = [
+    "gemini-2.5-flash-image",  # Nano Banana Flash — único modelo usado (500 RPD, 15 RPM)
+]
 ```
 
-## Como Executar
+**Modelos disponíveis na API (confirmados):**
+- `models/gemini-2.0-flash-exp-image-generation`
+- `models/gemini-2.5-flash-image`
+- `models/gemini-3-pro-image-preview`
+- `models/gemini-3.1-flash-image-preview`
+- `models/imagen-4.0-generate-001`
+- `models/imagen-4.0-ultra-generate-001`
+- `models/imagen-4.0-fast-generate-001`
 
+**DEPRECIADO — não usar:** `gemini-2.0-flash-lite` (retorna 404)
+
+## Configurações padrão
+
+| Parâmetro | Valor | Notas |
+|-----------|-------|-------|
+| `TEMPERATURA` | `0.85` | criatividade (0.0–2.0) |
+| `N_REFERENCIAS` | `3` | imagens de referência por geração (mínimo para consistência, máx 14) |
+| `RESOLUCAO_MAX_REF` | `1024` | limite de redimensionamento das refs |
+| `MAX_TENTATIVAS_429` | `2` | retries ao receber rate limit |
+| `ESPERA_BASE_429` | `60s` | base de espera (dobra a cada tentativa) |
+| Aspect ratio | `4:5` | 1080×1350px vertical |
+
+## Diretórios
+
+```
+assets/backgrounds/mago/   ← imagens de referência do personagem
+generated_mago/            ← saída das imagens geradas
+```
+
+**Google Drive (Colab):**
+```
+/content/drive/MyDrive/clip-flow/assets/backgrounds/mago   ← refs no Drive
+/content/drive/MyDrive/clip-flow/output/mago_gerado        ← saída no Drive
+```
+
+## API Key
+
+- No Colab: configurar em **Secrets** (ícone 🔑) como `GOOGLE_API_KEY`
+- Local: `export GOOGLE_API_KEY='sua-chave'`
+- Cliente: `genai.Client(api_key=GOOGLE_API_KEY)`
+
+## Fluxo das células
+
+| Célula | Função |
+|--------|--------|
+| 1 | Setup e dependências, carrega API key |
+| 2 | Carrega imagens de referência (local / Drive / upload) |
+| 3 | Define `CHARACTER_DNA`, `COMPOSITION`, `NEGATIVE_TRAITS`, 13 situações em `SITUACOES` |
+| 4 | Configura cliente Gemini e funções de geração (`gerar_imagem`, `_tentar_gerar`) |
+| 5 | Geração individual — configurar `SITUACAO` e executar |
+| 6 | Geração em lote — lista `LOTE`, configura `N_REFS_LOTE` e `PAUSA_SEGUNDOS` |
+| 7 | Refinamento img2img — usa imagem gerada como nova referência |
+| 8 | Preview grid de todas as imagens geradas |
+| 9 | Download como ZIP, para Drive, ou individual |
+| 10 | Copia aprovadas para `assets/backgrounds/mago/` |
+| 11 | Diagnóstico: `resumo_estado()`, `testar_api()`, `listar_modelos_imagem()` |
+
+## 13 situações pré-definidas
+
+`sabedoria` | `confusao` | `segunda_feira` | `vitoria` | `tecnologia` |
+`cafe` | `comida` | `trabalho` | `relaxando` | `meditando` |
+`relacionamento` | `confronto` | `surpresa` | `custom`
+
+Para situação livre: `SITUACAO = "custom"` + preencher `ACAO_CUSTOM` e `CENARIO_CUSTOM` em inglês.
+
+## DNA do personagem (traços imutáveis)
+
+Definido em `CHARACTER_DNA` (célula 3). Pontos críticos:
+- Barba: longa, branca/prateada, ondulada até o peito
+- Chapéu: pontudo, azul-cinza (`#4A5568`), nunca remover
+- Robe: azul midnight escuro (`#1A1A3E`) com bordados dourados
+- Cajado: madeira escura com ponta brilhante dourada (`#FFD54F`)
+- Estilo: cartoon semi-realista, cel-shading suave
+- Composição: vertical 4:5, personagem no terço inferior, topo 35–40% livre para texto
+
+## Limites e cotas
+
+- **Cota gratuita:** ~15 imagens/dia (Google AI Studio)
+- **Reset:** meia-noite UTC
+- **429 RESOURCE_EXHAUSTED:** aguarda `ESPERA_BASE_429`s e tenta próximo modelo
+- **404 NOT_FOUND:** passa imediatamente ao próximo modelo
+- Para cota maior: ativar billing no Google AI Studio
+
+## Pipeline integration
+
+Após aprovar imagens, copiar para assets via **Célula 10** e rodar:
 ```bash
-# CLI manual (frase avulsa ou por tema)
-python -m src.cli --topic "segunda-feira" --count 5
-python -m src.cli --text "Voce nao passa... da primeira fase"
-
-# Pipeline automatizado (uma vez)
-python -m src.pipeline_cli --mode once --count 5 --verbose
-
-# Pipeline com agendamento
-python -m src.pipeline_cli --mode schedule --interval 6 --count 5
+python -m src.pipeline_cli --mode once
 ```
 
-## Fluxo do Pipeline
+## Diagnóstico rápido
 
+```python
+resumo_estado()        # status geral
+testar_api()           # testa conectividade
+listar_modelos_imagem()  # modelos disponíveis na sua API key
 ```
-[Google Trends] + [Reddit RSS] + [RSS Feeds]
-        |                |              |
-        v                v              v
-            [TrendAggregator]
-            merge + dedup + ranking
-                    |
-                    v
-            [ClaudeAnalyzer]
-            seleciona N melhores temas
-            retorna JSON com gandalf_topic + humor_angle
-                    |
-                    v
-            [ContentGenerator]
-            generate_phrases() + create_image()
-                    |
-                    v
-              output/*.png
-```
-
-## Estilo Visual — Mago Mistico Medieval
-
-A composicao de imagem segue camadas nesta ordem:
-
-```
-1. Background (assets/backgrounds/)  — imagem do mago cartoon mistico
-2. Overlay azul noturno              — OVERLAY_COLOR (10,10,30, alpha 150)
-3. Vinheta escura nas bordas         — VIGNETTE_STRENGTH=180
-4. Glow dourado sutil no centro      — GLOW_COLOR (255,200,80, alpha 25)
-5. Texto com contorno preto          — cor pergaminho + stroke 3px
-6. Watermark dourado                 — @omagomestre canto inferior direito
-```
-
-**Paleta de cores:**
-- Texto: branco pergaminho `(255, 248, 220)` com contorno preto 3px
-- Overlay: azul noturno `(10, 10, 30, 150)`
-- Watermark: dourado sutil `(200, 180, 130, 120)`
-- Glow: dourado `(255, 200, 80, 25)`
-
-**Posicao do texto:** terco superior (`TEXT_VERTICAL_POSITION=0.35`) — area inferior reservada para o personagem do mago no background.
-
-**Character Model completo:** ver `assets/character_model.md` para DNA do personagem, prompts por plataforma (Midjourney/Leonardo/DALL-E/Flux), variacoes de cenario, e checklist de consistencia.
-
-**Prompt base para gerar backgrounds (resumo):**
-```
-Semi-realistic cartoon elderly wizard, long white wavy beard, tall pointed
-blue-grey hat, dark midnight blue robes with subtle gold trim, gnarled wooden
-staff with golden glow, bright blue twinkling eyes, warm wise expression.
-Dark moody fantasy atmosphere, soft golden lighting. Vertical 4:5 ratio,
-character centered in lower third, upper area open for text overlay.
-```
-
-## Configuracoes Importantes (config.py)
-
-- `IMAGE_WIDTH=1080, IMAGE_HEIGHT=1350` — formato Instagram 4:5
-- `FONT_SIZE=60` — fonte principal das frases
-- `TEXT_STROKE_WIDTH=3` — contorno preto para legibilidade
-- `TEXT_VERTICAL_POSITION=0.35` — texto no terco superior
-- `WATERMARK_TEXT="@omagomestre"` — marca d'agua
-- `PIPELINE_IMAGES_PER_RUN=5` — imagens por execucao
-- `PIPELINE_INTERVAL_HOURS=6` — intervalo entre execucoes
-- `PIPELINE_PHRASES_PER_TOPIC=1` — frases por tema selecionado
-- `PIPELINE_GOOGLE_TRENDS_GEO="BR"` — Google Trends Brasil
-
-## Modelo Claude
-
-Usar `claude-sonnet-4-20250514` para todas as chamadas (phrases.py e analyzer.py).
-
-## Tom do Conteudo — CRITICO
-
-O conteudo DEVE ser **VIRAL, ENGRACADO, LEVE e RELATABLE**. Estilo memes brasileiros do Twitter/TikTok.
-
-**FAZER:**
-- Humor sobre cotidiano (trabalho, segunda-feira, wifi, transito, comida)
-- Frases que geram identificacao ("MEU DEUS SOU EU")
-- Ironia leve estilo Museu de Memes / Chapolin Sincero
-- Tom de "tio sabio zoeiro"
-
-**NAO FAZER:**
-- NUNCA frases desmotivacionais, negativas, pessimistas
-- NUNCA humor acido, ofensivo ou grosseiro
-- NUNCA politica, religiao, temas polemicos
-- NUNCA conteudo que magoa ou desanima
-
-Exemplos corretos:
-- "Eu no domingo a noite fingindo que segunda nao existe"
-- "WiFi caiu e eu descobri que nao sei viver sem internet"
-- "Cafe e o unico relacionamento estavel que eu mantenho"
-
-## Decisoes Tecnicas
-
-- **Reddit JSON API bloqueada (403)** — usar RSS via feedparser em vez de JSON API
-- **Acentos em filenames** — usar `unicodedata.normalize("NFKD", slug)` para remover
-- **Pipeline tolerante a falhas** — se um agent falha, os outros continuam normalmente
-- **JSON parsing robusto** — analyzer.py tem 3 fallbacks (direto, code block, regex)
-- **Fontes** — prioriza assets/fonts/, fallback para Windows system fonts (Impact, Arial)
-
-## Requisitos
-
-- `ANTHROPIC_API_KEY` configurada no `.env`
-- Python 3.12+ (usa `type | None` syntax)
-- Dependencias: `pip install -r requirements.txt`
-
-## Idioma
-
-O projeto, comentarios, prompts e mensagens de log sao em **portugues brasileiro**. Manter esse padrao.

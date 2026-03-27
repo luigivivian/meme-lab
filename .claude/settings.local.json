@@ -24,7 +24,14 @@
       "Bash(git add -A)",
       "Bash(git commit -m \"snapshot antes de estrutura-agents\" --allow-empty)",
       "Bash(git checkout -b estrutura-agents)",
-      "Bash(git switch -c estrutura-agents)"
+      "Bash(git switch -c estrutura-agents)",
+      "Bash(python -c \"from src.pipeline.agents.async_base import AsyncSourceAgent, SyncAgentAdapter; print\\(''Fase 0 async_base OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.monitoring import MonitoringLayer; print\\(''Fase 1 monitoring OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.broker import TrendBroker; print\\(''Fase 2 broker OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.curator import CuratorAgent; print\\(''Fase 3 curator OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.workers.phrase_worker import PhraseWorker; from src.pipeline.workers.image_worker import ImageWorker; from src.pipeline.workers.generation_layer import GenerationLayer; print\\(''Fase 4 workers OK''\\)\")",
+      "Bash(python -c \"from src.pipeline.workers.caption_worker import CaptionWorker; from src.pipeline.workers.hashtag_worker import HashtagWorker; from src.pipeline.workers.quality_worker import QualityWorker; from src.pipeline.workers.post_production import PostProductionLayer; print\\(''Fase 5 pos-producao OK''\\)\")",
+      "Bash(python -m pip install code-review-graph)"
     ]
   }
 }

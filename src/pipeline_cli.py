@@ -21,9 +21,9 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["once", "schedule"],
+        choices=["once", "schedule", "agents"],
         default="once",
-        help="Modo: 'once' para executar uma vez, 'schedule' para agendamento automático",
+        help="Modo: 'once' (sequencial), 'schedule' (agendado), 'agents' (multi-agente paralelo)",
     )
     parser.add_argument(
         "--count",
@@ -53,6 +53,23 @@ def main():
         action="store_true",
         help="Forçar uso de backgrounds estáticos (ignora config)",
     )
+    parser.add_argument(
+        "--phrase-context",
+        action="store_true",
+        help="Background contextualizado pela frase (mais coerente, mais lento)",
+    )
+    parser.add_argument(
+        "--theme-tags",
+        nargs="+",
+        default=None,
+        help="Lista de situacao_keys para forcar temas visuais (ex: cafe meditando confronto)",
+    )
+    parser.add_argument(
+        "--cost-mode",
+        choices=["normal", "eco", "ultra-eco"],
+        default=None,
+        help="Modo de custo: 'normal' (padrao), 'eco' (Flash Lite + sem A/B), 'ultra-eco' (sem Gemini trends)",
+    )
 
     args = parser.parse_args()
     setup_logging(args.verbose)
@@ -68,6 +85,12 @@ def main():
         use_comfyui = True
     elif args.no_comfyui:
         use_comfyui = False
+
+    # Aplicar cost_mode global
+    if args.cost_mode:
+        import config as _cfg
+        _cfg.COST_MODE = args.cost_mode
+        logging.getLogger("clip-flow").info(f"Cost mode: {args.cost_mode}")
 
     if args.mode == "once":
         from src.pipeline.orchestrator import PipelineOrchestrator
@@ -88,6 +111,43 @@ def main():
             for c in result.content:
                 print(f"  - {c.phrase[:60]}...")
                 print(f"    -> {c.image_path}")
+        if result.errors:
+            print(f"\nErros ({len(result.errors)}):")
+            for err in result.errors:
+                print(f"  ! {err}")
+        print(f"{'=' * 50}")
+
+    elif args.mode == "agents":
+        import asyncio
+        from src.pipeline.async_orchestrator import AsyncPipelineOrchestrator
+
+        from config import COST_MODE
+        orchestrator = AsyncPipelineOrchestrator(
+            images_per_run=images_per_run,
+            use_comfyui=use_comfyui,
+            use_phrase_context=args.phrase_context,
+            theme_tags=args.theme_tags,
+            cost_mode=COST_MODE,
+        )
+        result = asyncio.run(orchestrator.run())
+
+        print(f"\n{'=' * 50}")
+        print("Resultado do pipeline multi-agente:")
+        print(f"  Trends coletados:    {result.trends_fetched}")
+        print(f"  Eventos enfileirados:{result.trend_events_queued}")
+        print(f"  Work orders:         {result.work_orders_emitted}")
+        print(f"  Imagens geradas:     {result.images_generated}")
+        print(f"  Pacotes produzidos:  {result.packages_produced}")
+        if result.content:
+            print("\nConteudo gerado:")
+            for pkg in result.content:
+                print(f"  - {pkg.phrase[:60]}...")
+                print(f"    -> {pkg.image_path}")
+                if pkg.caption:
+                    print(f"    Legenda: {pkg.caption[:80]}...")
+                if pkg.hashtags:
+                    print(f"    Hashtags: {' '.join(pkg.hashtags[:5])}...")
+                print(f"    Quality: {pkg.quality_score:.2f}")
         if result.errors:
             print(f"\nErros ({len(result.errors)}):")
             for err in result.errors:

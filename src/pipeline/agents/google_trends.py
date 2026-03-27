@@ -1,5 +1,42 @@
+import re
+
 from src.pipeline.agents.base import BaseSourceAgent
 from src.pipeline.models import TrendItem, TrendSource
+
+
+def _parse_traffic(traffic_str: str) -> float:
+    """Parse traffic string like '10K+', '1.5M+', '500' into a numeric value.
+
+    Returns a score between 0.0 and 1.0 based on traffic magnitude.
+    """
+    if not traffic_str:
+        return 0.5  # default when no traffic data
+
+    clean = str(traffic_str).replace("+", "").replace(",", "").strip()
+    match = re.search(r'(\d+\.?\d*)\s*([KMBkmb]?)', clean)
+    if not match:
+        return 0.5
+
+    number = float(match.group(1))
+    suffix = match.group(2).upper()
+
+    multipliers = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000}
+    traffic_num = number * multipliers.get(suffix, 1)
+
+    # Score mapping: <1K -> 0.4, 1K-10K -> 0.5, 10K-100K -> 0.6,
+    # 100K-1M -> 0.7, 1M-10M -> 0.8, 10M+ -> 0.95
+    if traffic_num >= 10_000_000:
+        return 0.95
+    elif traffic_num >= 1_000_000:
+        return 0.85
+    elif traffic_num >= 100_000:
+        return 0.7
+    elif traffic_num >= 10_000:
+        return 0.6
+    elif traffic_num >= 1_000:
+        return 0.5
+    else:
+        return 0.4
 
 
 class GoogleTrendsAgent(BaseSourceAgent):
@@ -21,21 +58,7 @@ class GoogleTrendsAgent(BaseSourceAgent):
             items = []
             for trend in trends:
                 traffic = trend.get("traffic", "")
-                # Estimar score baseado no tráfego
-                score = 0.5
-                if traffic:
-                    traffic_str = str(traffic).replace("+", "").replace(",", "").replace(".", "")
-                    # Extrair número
-                    num = ""
-                    for c in traffic_str:
-                        if c.isdigit():
-                            num += c
-                    if num:
-                        traffic_num = int(num)
-                        if "K" in str(traffic) or "k" in str(traffic) or traffic_num >= 1000:
-                            score = 0.7
-                        if "M" in str(traffic) or traffic_num >= 100000:
-                            score = 0.9
+                score = _parse_traffic(traffic)
 
                 item = TrendItem(
                     title=trend.get("trend", trend.get("title", "")),

@@ -5,11 +5,6 @@ incluindo DNA do personagem, cenario tematico e composicao.
 """
 
 import logging
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
 
 logger = logging.getLogger("clip-flow.prompt_builder")
 
@@ -80,6 +75,23 @@ SCENE_TEMPLATES = {
         "peaceful sleeping expression, sitting in wooden chair, "
         "hat covering eyes, staff leaning nearby, floating blue particles"
     ),
+    # Alias: relaxando = descanso (compatibilidade com SITUACOES do gemini_client)
+    "relaxando": (
+        "blissfully asleep expression, sitting in comfortable wooden chair, "
+        "hat tipped over eyes, hands folded on belly, staff leaning against wall"
+    ),
+    "meditando": (
+        "eyes closed, serene peaceful smile, sitting cross-legged, "
+        "staff hovering beside, subtle ethereal blue-gold aura radiating outward"
+    ),
+    "confronto": (
+        "stern determined expression, staff raised high with intense golden energy, "
+        "one hand extended forward in STOP gesture, dramatic wind blowing robes"
+    ),
+    "surpresa": (
+        "wide eyes of genuine shock, mouth open in surprise, both hands raised, "
+        "hat blown slightly back, exclamation sparks floating around"
+    ),
     "internet": (
         "looking at glowing crystal ball like a screen, surprised amused expression, "
         "hat slightly askew, blue glow reflecting on face"
@@ -131,6 +143,17 @@ KEYWORD_MAP = {
     "sucesso": "vitoria",
     "confuso": "confusao",
     "entender": "confusao",
+    "medita": "meditando",
+    "zen": "meditando",
+    "yoga": "meditando",
+    "relaxa": "relaxando",
+    "descanso": "relaxando",
+    "confronto": "confronto",
+    "briga": "confronto",
+    "nao passa": "confronto",
+    "surpresa": "surpresa",
+    "choque": "surpresa",
+    "espanto": "surpresa",
 }
 
 
@@ -188,6 +211,24 @@ REFERENCE_MAP = {
         "mago_mestre_tomando_cafe_1.png",
         "mago_mestre_com_copo_1.png",
     ],
+    # Aliases para compatibilidade com SITUACOES do gemini_client
+    "relaxando": [
+        "mago_mestre_dormindo_1.png",
+        "mago_mestre_meditando_1.png",
+    ],
+    "meditando": [
+        "mago_mestre_meditando_1.png",
+        "image2_mago_mestre_meditando_1.png",
+    ],
+    "confronto": [
+        "grey_wizard_staff_raised_1.png",
+        "grey_wizard_casting_magic_1.png",
+        "mago_mestre_invocando_criatura_1.png",
+    ],
+    "surpresa": [
+        "grey_wizard_casting_magic_1.png",
+        "mago_mestre_olhando_cristal_1.png",
+    ],
     "generico": [
         "grey_wizard_front_pose_1.png",
         "grey_wizard_portrait_1.png",
@@ -196,12 +237,13 @@ REFERENCE_MAP = {
 }
 
 
-def select_reference_image(topic, reference_dir: str | None = None) -> str | None:
+def select_reference_image(topic, reference_dir: str | None = None, situacao_key: str = "") -> str | None:
     """Seleciona a melhor imagem de referencia para um topico.
 
     Args:
         topic: AnalyzedTopic ou string com o tema.
         reference_dir: Diretorio com as imagens de referencia.
+        situacao_key: Chave de situacao definida pelo Curator (prioridade sobre keyword matching).
 
     Returns:
         Caminho absoluto da imagem de referencia, ou None.
@@ -218,17 +260,22 @@ def select_reference_image(topic, reference_dir: str | None = None) -> str | Non
         logger.warning(f"Diretorio de referencias nao encontrado: {reference_dir}")
         return None
 
-    # Determinar cenario
-    if isinstance(topic, str):
-        combined = topic.lower()
+    # Determinar cenario — prioridade: situacao_key > keyword matching
+    if situacao_key and situacao_key in REFERENCE_MAP:
+        scene_key = situacao_key
+    elif situacao_key and situacao_key in SCENE_TEMPLATES:
+        scene_key = situacao_key
     else:
-        combined = f"{topic.gandalf_topic} {topic.humor_angle}".lower()
+        if isinstance(topic, str):
+            combined = topic.lower()
+        else:
+            combined = f"{topic.gandalf_topic} {topic.humor_angle}".lower()
 
-    scene_key = "generico"
-    for keyword, key in KEYWORD_MAP.items():
-        if keyword in combined:
-            scene_key = key
-            break
+        scene_key = "generico"
+        for keyword, key in KEYWORD_MAP.items():
+            if keyword in combined:
+                scene_key = key
+                break
 
     # Buscar imagens de referencia para o cenario
     candidates = REFERENCE_MAP.get(scene_key, REFERENCE_MAP["generico"])
@@ -248,42 +295,50 @@ def select_reference_image(topic, reference_dir: str | None = None) -> str | Non
     return chosen
 
 
-def _match_scene(topic: str, humor_angle: str) -> str:
-    """Mapeia um topico + angulo de humor para um template de cenario."""
+def _match_scene(topic: str, humor_angle: str, situacao_key: str = "") -> str:
+    """Mapeia um topico + angulo de humor para um template de cenario.
+
+    Se situacao_key fornecida e valida, usa direto (sem keyword matching).
+    """
+    if situacao_key and situacao_key in SCENE_TEMPLATES:
+        logger.debug(f"Cenario via situacao_key: {situacao_key}")
+        return SCENE_TEMPLATES[situacao_key]
+
     combined = f"{topic} {humor_angle}".lower()
     for keyword, scene_key in KEYWORD_MAP.items():
         if keyword in combined:
+            logger.debug(f"Cenario via keyword '{keyword}': {scene_key}")
             return SCENE_TEMPLATES[scene_key]
+    logger.debug("Cenario fallback: generico")
     return SCENE_TEMPLATES["generico"]
 
 
-def build_prompt(topic) -> str:
+def build_prompt(topic, situacao_key: str = "") -> str:
     """Constroi prompt completo para geracao de imagem a partir de um topico analisado.
 
     Versao estatica — zero API calls, rapido e gratis.
     Aceita AnalyzedTopic ou string.
     """
     if isinstance(topic, str):
-        scene = _match_scene(topic, "")
+        scene = _match_scene(topic, "", situacao_key=situacao_key)
     else:
-        scene = _match_scene(topic.gandalf_topic, topic.humor_angle)
+        scene = _match_scene(topic.gandalf_topic, topic.humor_angle, situacao_key=situacao_key)
 
     prompt = f"{CHARACTER_DNA}, {scene}, {COMPOSITION}"
-    logger.debug(f"Prompt estatico gerado: {prompt[:100]}...")
+    logger.debug(f"Prompt estatico gerado (situacao={situacao_key}): {prompt[:100]}...")
     return prompt
 
 
-def build_prompt_with_claude(topic) -> str:
-    """Usa Claude para gerar um prompt de imagem mais criativo e especifico.
+def build_prompt_with_llm(topic, situacao_key: str = "") -> str:
+    """Gera prompt hibrido: SCENE_TEMPLATE obrigatorio + detalhes criativos via LLM.
+
+    A cena base (CHARACTER_DNA + SCENE_TEMPLATE + COMPOSITION) e sempre inclusa.
+    O LLM apenas adiciona detalhes ambientais criativos (iluminacao, particulas, mood).
+    Isso garante que o tema visual e SEMPRE respeitado, independente do modelo LLM.
 
     Fallback para build_prompt() se a API falhar.
     Aceita AnalyzedTopic ou string.
     """
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key or api_key == "your-api-key-here":
-        logger.warning("ANTHROPIC_API_KEY nao configurada, usando prompt estatico")
-        return build_prompt(topic)
-
     if isinstance(topic, str):
         gandalf_topic = topic
         humor_angle = "humor leve e relatable"
@@ -291,44 +346,54 @@ def build_prompt_with_claude(topic) -> str:
         gandalf_topic = topic.gandalf_topic
         humor_angle = topic.humor_angle
 
+    # Base obrigatoria: cena deterministica do SCENE_TEMPLATES
+    scene = _match_scene(gandalf_topic, humor_angle, situacao_key=situacao_key)
+
     try:
-        import anthropic
+        from src.llm_client import generate
 
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=300,
-            system=(
-                "Voce gera prompts curtos para Stable Diffusion / Flux. "
-                "O personagem e SEMPRE o mesmo: um mago idoso cartoon semi-realista "
-                "com barba branca longa, chapeu pontudo cinza-azulado, tunica azul noturno "
-                "com detalhes dourados, cajado de madeira com brilho dourado, olhos azuis. "
-                "Responda APENAS com o prompt em ingles, uma unica linha, sem explicacao."
+        # LLM gera APENAS detalhes extras (iluminacao, particulas, mood)
+        extras = generate(
+            system_prompt=(
+                "You generate SHORT creative detail additions for Stable Diffusion prompts. "
+                "You receive a base scene description of an elderly wizard character. "
+                "Add ONLY 2-3 short atmospheric/lighting/particle details in English. "
+                "Examples: 'warm golden rim light, dust motes floating, soft bokeh background' "
+                "or 'dramatic volumetric fog, blue magical particles, cinematic lighting'. "
+                "Reply with ONLY the extra details, no explanation, no character description, "
+                "no pose, no expression — those are already in the base prompt."
             ),
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Crie um prompt de imagem para o cenario: '{gandalf_topic}' "
-                    f"com angulo de humor: '{humor_angle}'. "
-                    f"O mago deve estar no terco inferior, area superior livre para texto. "
-                    f"Formato vertical 4:5, atmosfera escura mistica com iluminacao dourada. "
-                    f"Comece com 'ohwx_mago' como trigger word."
-                ),
-            }],
+            user_message=(
+                f"Base scene: '{scene}'\n"
+                f"Topic context: '{gandalf_topic}' with humor angle: '{humor_angle}'\n"
+                f"Visual theme: '{situacao_key}'\n"
+                f"Add 2-3 atmospheric detail phrases (lighting, particles, mood):"
+            ),
+            max_tokens=100,
+            tier="lite",
+        ).strip()
+
+        # Limpar resposta do LLM (remover aspas, prefixos comuns)
+        extras = extras.strip('"\'').strip()
+        if extras.lower().startswith("here"):
+            extras = ""
+        if extras.lower().startswith("base scene"):
+            extras = ""
+
+        # Montar prompt hibrido: DNA + cena obrigatoria + extras LLM + composicao
+        # CHARACTER_DNA ja começa com "ohwx_mago, ..."
+        parts = [CHARACTER_DNA, scene]
+        if extras and len(extras) < 200:
+            parts.append(extras)
+        parts.append(COMPOSITION)
+
+        prompt = ", ".join(parts)
+        logger.info(
+            f"Prompt hibrido (situacao={situacao_key}): "
+            f"scene='{scene[:60]}...' extras='{extras[:60]}...'"
         )
-        prompt = message.content[0].text.strip()
-
-        # Garantir trigger word
-        if not prompt.lower().startswith("ohwx_mago"):
-            prompt = f"ohwx_mago, {prompt}"
-
-        # Garantir composicao
-        if "vertical" not in prompt.lower():
-            prompt += f", {COMPOSITION}"
-
-        logger.info(f"Prompt via Claude: {prompt[:100]}...")
         return prompt
 
     except Exception as e:
-        logger.warning(f"Falha no Claude para prompt de imagem: {e}")
-        return build_prompt(topic)
+        logger.warning(f"Falha no LLM para extras de prompt: {e}")
+        return build_prompt(topic, situacao_key=situacao_key)

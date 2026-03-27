@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 import unicodedata
@@ -23,6 +24,9 @@ from config import (
     TEXT_VERTICAL_POSITION,
     FONTS_DIR,
     OUTPUT_DIR,
+    GENERATED_MEMES_DIR,
+    LAYOUT_TEMPLATES,
+    LAYOUT_DEFAULT,
 )
 
 
@@ -144,13 +148,24 @@ def _create_vignette_fast(width: int, height: int, strength: int) -> Image.Image
     return dark
 
 
-def _create_glow_layer(width: int, height: int, glow_color: tuple) -> Image.Image:
-    """Cria camada de brilho dourado sutil no centro — efeito mistico."""
+def _create_glow_layer(
+    width: int,
+    height: int,
+    glow_color: tuple,
+    text_vertical_position: float = TEXT_VERTICAL_POSITION,
+) -> Image.Image:
+    """Cria camada de brilho dourado sutil centralizada na posicao do texto.
+
+    Args:
+        width: largura da imagem.
+        height: altura da imagem.
+        glow_color: cor RGBA do glow (ex: 255,200,80,15).
+        text_vertical_position: posicao vertical do texto (0.0=topo, 1.0=base).
+    """
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(glow)
 
-    # Circulo de luz suave no centro-superior
-    cx, cy = width // 2, int(height * 0.35)
+    cx, cy = width // 2, int(height * text_vertical_position)
     radius = int(width * 0.5)
     r, g, b, a = glow_color
 
@@ -163,22 +178,52 @@ def _create_glow_layer(width: int, height: int, glow_color: tuple) -> Image.Imag
     return glow
 
 
-def create_image(text: str, background_path: str, output_path: str | None = None) -> str:
-    """Cria imagem com texto sobreposto no estilo Mago Mistico.
+def create_image(
+    text: str,
+    background_path: str,
+    output_path: str | None = None,
+    watermark_text: str = "",
+    layout: str | None = None,
+) -> str:
+    """Cria imagem com texto sobreposto usando layout configuravel.
 
-    Composicao: background -> overlay azul noturno -> vinheta -> glow dourado -> texto com contorno -> watermark
+    Composicao: background -> overlay -> vinheta -> glow -> texto com contorno -> watermark
 
     Args:
-        text: Frase para sobrepor na imagem
-        background_path: Caminho da imagem de fundo
-        output_path: Caminho de saida (opcional, gera automaticamente)
+        text: Frase para sobrepor na imagem.
+        background_path: Caminho da imagem de fundo.
+        output_path: Caminho de saida (opcional, gera automaticamente).
+        watermark_text: Texto do watermark (None = usa WATERMARK_TEXT do config).
+        layout: Template de layout ("bottom", "top", "center", "split_top").
+            None = usa LAYOUT_DEFAULT do config.
 
     Returns:
-        Caminho do arquivo gerado
+        Caminho do arquivo gerado.
     """
-    # Abrir e redimensionar background
-    bg = Image.open(background_path).convert("RGBA")
-    bg = _crop_center(bg, IMAGE_WIDTH, IMAGE_HEIGHT)
+    wm = watermark_text
+
+    # Resolver layout template
+    layout_name = layout or LAYOUT_DEFAULT
+    layout_config = LAYOUT_TEMPLATES.get(layout_name, LAYOUT_TEMPLATES[LAYOUT_DEFAULT])
+    text_vpos = layout_config.get("text_vertical_position", TEXT_VERTICAL_POSITION)
+    text_align = layout_config.get("text_align", "center")
+    margin_left = layout_config.get("margin_left", 80)
+
+    # Detect solid color hex string (per D-01, D-03)
+    if isinstance(background_path, str) and background_path.startswith("#"):
+        hex_color = background_path.lstrip("#")
+        if len(hex_color) == 3:
+            hex_color = "".join(c * 2 for c in hex_color)
+        if len(hex_color) != 6:
+            raise ValueError(f"Invalid hex color: {background_path}")
+        try:
+            r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        except ValueError:
+            raise ValueError(f"Invalid hex color: {background_path}")
+        bg = Image.new("RGBA", (IMAGE_WIDTH, IMAGE_HEIGHT), (r, g, b, 255))
+    else:
+        bg = Image.open(background_path).convert("RGBA")
+        bg = _crop_center(bg, IMAGE_WIDTH, IMAGE_HEIGHT)
 
     # 1. Overlay azul noturno semi-transparente
     overlay = Image.new("RGBA", (IMAGE_WIDTH, IMAGE_HEIGHT), OVERLAY_COLOR)
@@ -188,16 +233,16 @@ def create_image(text: str, background_path: str, output_path: str | None = None
     vignette = _create_vignette_fast(IMAGE_WIDTH, IMAGE_HEIGHT, VIGNETTE_STRENGTH)
     bg = Image.alpha_composite(bg, vignette)
 
-    # 3. Glow dourado sutil no centro
-    glow = _create_glow_layer(IMAGE_WIDTH, IMAGE_HEIGHT, GLOW_COLOR)
+    # 3. Glow dourado posicionado na area do texto
+    glow = _create_glow_layer(IMAGE_WIDTH, IMAGE_HEIGHT, GLOW_COLOR, text_vpos)
     bg = Image.alpha_composite(bg, glow)
 
     draw = ImageDraw.Draw(bg)
     font = _load_font(FONT_SIZE)
     watermark_font = _load_font(WATERMARK_FONT_SIZE)
 
-    # Quebrar texto em linhas
-    margin = 80
+    # Margem depende do alinhamento
+    margin = margin_left if text_align == "left" else 80
     max_text_width = IMAGE_WIDTH - (margin * 2)
     lines = _wrap_text(text.upper(), font, max_text_width)
 
@@ -209,17 +254,25 @@ def create_image(text: str, background_path: str, output_path: str | None = None
         line_heights.append(bbox[3] - bbox[1])
     total_height = sum(line_heights) + line_spacing * (len(lines) - 1)
 
-    # Posicao vertical configuravel (terco superior por padrao)
-    y = int(IMAGE_HEIGHT * TEXT_VERTICAL_POSITION) - (total_height // 2)
-    y = max(margin, y)  # Nao deixar sair do topo
+    # Posicao vertical baseada no layout
+    y = int(IMAGE_HEIGHT * text_vpos) - (total_height // 2)
+    y = max(margin, y)
+    y = min(y, IMAGE_HEIGHT - total_height - 70)
 
     # Desenhar cada linha com contorno + sombra
     for i, line in enumerate(lines):
         bbox = font.getbbox(line)
         text_width = bbox[2] - bbox[0]
-        x = (IMAGE_WIDTH - text_width) // 2
 
-        # Sombra suave (offset maior, com blur simulado por multiplas camadas)
+        # Alinhamento horizontal
+        if text_align == "left":
+            x = margin
+        elif text_align == "right":
+            x = IMAGE_WIDTH - text_width - margin
+        else:
+            x = (IMAGE_WIDTH - text_width) // 2
+
+        # Sombra suave
         for s in range(3):
             offset = SHADOW_OFFSET + s
             shadow_alpha = SHADOW_COLOR[3] if len(SHADOW_COLOR) > 3 else 200
@@ -236,28 +289,57 @@ def create_image(text: str, background_path: str, output_path: str | None = None
 
         y += line_heights[i] + line_spacing
 
-    # Watermark dourado sutil no canto inferior
-    wm_bbox = watermark_font.getbbox(WATERMARK_TEXT)
-    wm_width = wm_bbox[2] - wm_bbox[0]
-    wm_x = IMAGE_WIDTH - wm_width - 20
-    wm_y = IMAGE_HEIGHT - 50
-    draw.text(
-        (wm_x, wm_y), WATERMARK_TEXT, font=watermark_font,
-        fill=WATERMARK_COLOR,
-    )
+    # Watermark — so aplica se wm nao for vazio (exportacao aplica separadamente)
+    if wm:
+        wm_bbox = watermark_font.getbbox(wm)
+        wm_width = wm_bbox[2] - wm_bbox[0]
+        if layout_name == "split_top":
+            wm_x = 20  # Canto inferior esquerdo
+        else:
+            wm_x = IMAGE_WIDTH - wm_width - 20  # Canto inferior direito
+        wm_y = IMAGE_HEIGHT - 50
+        draw.text(
+            (wm_x, wm_y), wm, font=watermark_font,
+            fill=WATERMARK_COLOR,
+        )
 
     # Converter para RGB e salvar
     final = bg.convert("RGB")
 
     if output_path is None:
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        GENERATED_MEMES_DIR.mkdir(parents=True, exist_ok=True)
         slug = "_".join(text.lower().split()[:4])
         slug = unicodedata.normalize("NFKD", slug).encode("ascii", "ignore").decode()
         slug = "".join(c for c in slug if c.isalnum() or c == "_")[:40]
-        output_path = str(OUTPUT_DIR / f"{slug}.png")
+        output_path = str(GENERATED_MEMES_DIR / f"{slug}.png")
 
     final.save(output_path, quality=95)
     return output_path
+
+
+def stamp_watermark(image_path: str, watermark_text: str | None = None) -> bytes:
+    """Aplica watermark numa imagem e retorna os bytes PNG.
+
+    Usado pelo export para aplicar watermark dinamicamente sem alterar o original.
+    """
+    wm = watermark_text if watermark_text is not None else WATERMARK_TEXT
+    if not wm:
+        with open(image_path, "rb") as f:
+            return f.read()
+
+    img = Image.open(image_path).convert("RGBA")
+    draw = ImageDraw.Draw(img)
+    font = _load_font(WATERMARK_FONT_SIZE)
+
+    wm_bbox = font.getbbox(wm)
+    wm_width = wm_bbox[2] - wm_bbox[0]
+    wm_x = img.width - wm_width - 20
+    wm_y = img.height - 50
+    draw.text((wm_x, wm_y), wm, font=font, fill=WATERMARK_COLOR)
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", quality=95)
+    return buf.getvalue()
 
 
 def create_placeholder_background(output_path: str) -> str:

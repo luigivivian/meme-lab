@@ -5,10 +5,20 @@
       "unet_name": "flux1-dev-Q4_K_S.gguf"
     }
   },
+  "2": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": ["1", 0],
+      "clip": ["4", 0],
+      "lora_name": "mago_mestre_v1.safetensors",
+      "strength_model": 0.85,
+      "strength_clip": 0.85
+    }
+  },
   "3": {
     "class_type": "ModelSamplingFlux",
     "inputs": {
-      "model": ["1", 0],
+      "model": ["2", 0],
       "max_shift": 1.15,
       "base_shift": 0.5,
       "width": 1080,
@@ -26,7 +36,7 @@
   "5": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["4", 0],
+      "clip": ["2", 1],
       "text": "PLACEHOLDER_PROMPT"
     }
   },
