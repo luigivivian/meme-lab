@@ -61,6 +61,62 @@ async def list_video_models():
     return {"models": models, "default": VIDEO_MODEL, "usd_to_brl": VIDEO_USD_TO_BRL}
 
 
+@router.post("/preview-prompt", summary="Preview video prompt without calling Kie.ai (free)")
+async def preview_prompt(
+    req: VideoGenerateRequest,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Generate and return the motion prompt that would be sent to Kie.ai — no API call, no cost."""
+    result = await session.execute(
+        select(ContentPackage).where(ContentPackage.id == req.content_package_id)
+    )
+    pkg = result.scalar_one_or_none()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Content package not found")
+
+    meta = pkg.image_metadata if isinstance(pkg.image_metadata, dict) else {}
+    theme_key = meta.get("theme_key") or meta.get("situacao_key") or "generico"
+    scene = meta.get("scene") or ""
+    pose = meta.get("pose") or ""
+
+    if not scene:
+        bg = pkg.background_path or pkg.image_path or ""
+        if bg:
+            scene = Path(bg).stem.replace("_", " ").split("2026")[0].strip()
+
+    if theme_key == "generico" and scene:
+        from src.video_gen.video_prompt_builder import _get_templates
+        for key in _get_templates().keys():
+            if key in scene.lower().replace(" ", "_") or key in scene.lower():
+                theme_key = key
+                break
+
+    prompt_builder = VideoPromptBuilder()
+    if req.custom_prompt:
+        prompt = prompt_builder.enhance_user_prompt(req.custom_prompt, theme_key)
+    else:
+        prompt = prompt_builder.build_motion_prompt(
+            theme_key=theme_key, phrase_context=pkg.phrase or "",
+            pose=pose, scene=scene,
+        )
+
+    model_info = VIDEO_MODELS.get(req.model or VIDEO_MODEL, {})
+    valid_durations = model_info.get("durations", [5, 10])
+    snapped_duration = min(valid_durations, key=lambda d: abs(d - req.duration))
+
+    return {
+        "prompt": prompt,
+        "prompt_length": len(prompt),
+        "theme_key": theme_key,
+        "scene": scene,
+        "pose": pose,
+        "model": req.model or VIDEO_MODEL,
+        "duration": snapped_duration,
+        "valid": len(prompt) >= 20,
+    }
+
+
 # -- Helper functions ---------------------------------------------------------
 
 
@@ -149,29 +205,29 @@ async def _generate_video_task(
                     if theme and theme.video_prompt_notes:
                         theme_notes = theme.video_prompt_notes
 
-            # Determine theme_key from image_metadata or work_order
-            theme_key = "generico"
-            if pkg.image_metadata and isinstance(pkg.image_metadata, dict):
-                theme_key = pkg.image_metadata.get("theme_key", theme_key)
-                theme_key = pkg.image_metadata.get("situacao_key", theme_key)
+            # ── Extract scene context from metadata, phrase, or filename ──
+            meta = pkg.image_metadata if isinstance(pkg.image_metadata, dict) else {}
 
-            # Build scene context from image filename + phrase for better prompts
-            bg_path_str = pkg.background_path or pkg.image_path or ""
-            image_filename = Path(bg_path_str).stem if bg_path_str else ""
-            # Convert filename like "mago_coletando_frutas_20260309" to readable scene
-            scene_hint = image_filename.replace("_", " ").split("2026")[0].strip() if image_filename else ""
+            theme_key = meta.get("theme_key") or meta.get("situacao_key") or "generico"
+            scene = meta.get("scene") or ""
+            pose = meta.get("pose") or ""
 
-            # Try to infer theme_key from scene hint if still generic
-            if theme_key == "generico" and scene_hint:
+            # Fallback: derive scene from filename if metadata is empty
+            if not scene:
+                bg_path_str = pkg.background_path or pkg.image_path or ""
+                if bg_path_str:
+                    fname = Path(bg_path_str).stem
+                    scene = fname.replace("_", " ").split("2026")[0].strip()
+
+            # Infer theme_key from scene if still generic
+            if theme_key == "generico" and scene:
                 from src.video_gen.video_prompt_builder import _get_templates
-                known_keys = _get_templates().keys()
-                for key in known_keys:
-                    if key in scene_hint.lower().replace(" ", "_") or key in scene_hint.lower():
+                for key in _get_templates().keys():
+                    if key in scene.lower().replace(" ", "_") or key in scene.lower():
                         theme_key = key
-                        logger.info("Inferred theme_key=%s from scene '%s'", key, scene_hint)
                         break
 
-            # Build motion prompt — use custom prompt if provided, else auto-generate
+            # ── Build motion prompt ──
             prompt_builder = VideoPromptBuilder()
             if custom_prompt:
                 motion_prompt = prompt_builder.enhance_user_prompt(custom_prompt, theme_key)
@@ -179,9 +235,28 @@ async def _generate_video_task(
                 motion_prompt = prompt_builder.build_motion_prompt(
                     theme_key=theme_key,
                     phrase_context=pkg.phrase or "",
-                    scene=scene_hint,
+                    pose=pose,
+                    scene=scene,
                     video_prompt_notes=theme_notes,
                 )
+
+            # ── Validate prompt before calling paid API ──
+            if not motion_prompt or len(motion_prompt) < 20:
+                logger.error("Video task %d: prompt too short (%d chars), aborting",
+                             content_package_id, len(motion_prompt or ""))
+                pkg.video_status = "failed"
+                pkg.video_metadata = {"error": "Generated prompt too short"}
+                await session.commit()
+                return
+
+            if len(motion_prompt) > 5000:
+                motion_prompt = motion_prompt[:5000]
+
+            logger.info(
+                "Video task %d: model=%s duration=%ds theme=%s scene='%s' prompt='%s'",
+                content_package_id, model or "default", duration,
+                theme_key, scene[:40], motion_prompt[:80],
+            )
 
             # Upload background image to GCS for public URL (per D-04)
             bg_path = pkg.background_path or pkg.image_path
