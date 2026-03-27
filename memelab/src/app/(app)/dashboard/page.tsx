@@ -900,7 +900,7 @@ export default function DashboardPage() {
                     onClick={() => setVideoDuration(10)}
                     disabled={videoGenerating}
                   >
-                    10s — $0.15
+                    10s — R$ 0,86
                   </Button>
                   <Button
                     variant={videoDuration === 15 ? "default" : "outline"}
@@ -909,7 +909,7 @@ export default function DashboardPage() {
                     onClick={() => setVideoDuration(15)}
                     disabled={videoGenerating}
                   >
-                    15s — $0.23
+                    15s — R$ 1,32
                   </Button>
                 </div>
               </div>
