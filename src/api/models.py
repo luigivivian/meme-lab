@@ -272,3 +272,17 @@ class VideoBudgetResponse(BaseModel):
     spent_today_usd: float
     remaining_usd: float
     videos_remaining_estimate: int  # at current duration
+
+
+# ===== Video Legend (Phase 999.2) =====
+
+class LegendRequest(BaseModel):
+    """Request to add text legend overlay to a video."""
+    content_package_id: int
+    mode: str = "static"  # "static" | "fade" | "typewriter" (per D-05, D-08)
+
+
+class LegendBatchRequest(BaseModel):
+    """Request to add text legend overlay to multiple videos."""
+    content_package_ids: list[int]
+    mode: str = "static"  # "static" | "fade" | "typewriter" (per D-05, D-08)
