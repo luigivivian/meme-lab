@@ -135,7 +135,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 16. Dashboard v2 | 0/? | Complete    | 2026-03-26 |
 | 17. Billing & Stripe | 1/2 | Complete    | 2026-03-26 |
 | 999.1. Video Generation — Kie.ai Sora 2 | 3/3 | Complete    | 2026-03-26 |
-| 999.2. Video Legends & Subtitles | 0/2 | Planned    | - |
+| 999.2. Video Legends & Subtitles | 1/2 | Complete    | 2026-03-27 |
 
 ## Backlog
 
@@ -182,15 +182,15 @@ Plans:
 **Cost:** Zero (local FFmpeg processing).
 **Depends on:** Phase 999.1 (needs videos to overlay)
 **Requirements:** LEG-01, LEG-02, LEG-03, LEG-04, LEG-05, LEG-06, LEG-07, LEG-08
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 999.2-01-PLAN.md — Foundation: config constants, DB migration, LegendRenderer module with 3 animation modes
+- [x] 999.2-01-PLAN.md — Foundation: config constants, DB migration, LegendRenderer module with 3 animation modes
 - [ ] 999.2-02-PLAN.md — Pipeline + API: LegendWorker, API endpoints (single + batch), PostProduction integration
 
 ### Phase 999.3: Sora 2 Prompt Engineering Research (BACKLOG)
 
-**Goal:** Research prompt engineering techniques from awesome-sora2 and apply proven patterns to VideoPromptBuilder, improving motion prompt quality and video output consistency.
+**Goal:** Apply researched Sora 2 prompt engineering patterns (three-layer motion framework, present continuous tense, structured system prompts) to VideoPromptBuilder, with v1/v2 version switching via config.
 
 **Scope:**
 - Research: Study https://github.com/ZeroLu/awesome-sora2 techniques, best practices, and community patterns
@@ -202,8 +202,9 @@ Plans:
 
 **Cost:** Zero (research + code changes only).
 **Depends on:** Phase 999.1 (uses VideoPromptBuilder)
-**Requirements:** TBD
-**Plans:** 0 plans
+**Requirements:** D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD
+- [ ] 999.3-01-PLAN.md — v2 motion templates (17 themes, three-layer framework), config constant, version switching, test scaffold
+- [ ] 999.3-02-PLAN.md — v2 system prompts (structured CAMERA/SUBJECT/PHYSICS/ATMOSPHERE sections), LLM wiring, additional tests
