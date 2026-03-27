@@ -98,13 +98,13 @@ MOTION_TEMPLATES_V1: dict[str, str] = {
 # Source: OpenAI Sora 2 Prompting Guide + WaveSpeedAI + awesome-sora2 community
 
 MOTION_TEMPLATES_V2: dict[str, str] = {
-    # Camera: slow push-in -- contemplative theme benefits from gradual intimacy
+    # Camera: slow push-in -- contemplative but with visible gesture (raising hand/staff)
     "sabedoria": (
         "Slow push-in from medium shot. "
-        "The wizard is gently stroking his long beard with one hand, head nodding slowly in contemplation. "
-        "His staff crystal is pulsing with a steady warm glow as his chest rises with calm breathing. "
-        "Robes are swaying softly with each breath, magical particles are drifting upward, "
-        "warm golden rim light is catching the fabric edges."
+        "The wizard raises one hand thoughtfully to his chin, then extends it forward with an open palm as if presenting wisdom. "
+        "His staff crystal flares brighter as he lifts the staff slightly, tilting his head with a knowing nod. "
+        "Heavy robes swing with the arm gesture, long white beard sways with the head movement, "
+        "golden magical particles burst upward from his open palm."
     ),
     # Camera: static with subtle instability -- mirrors the confused state
     "confusao": (
@@ -138,13 +138,13 @@ MOTION_TEMPLATES_V2: dict[str, str] = {
         "Pointed hat fabric is shifting with his head movement, "
         "cool blue light is dancing across his face and beard."
     ),
-    # Camera: slow push-in -- warm intimate framing for cozy theme
+    # Camera: slow push-in -- coffee drinking with visible lift/sip/exhale motion
     "cafe": (
         "Slow push-in from medium shot. "
-        "The wizard is cradling an ornate mug with both hands, bringing it close to inhale the steam. "
-        "His eyes are closing contentedly, chest expanding with a deep satisfied breath. "
-        "Warm steam is curling upward with faint golden sparkles, "
-        "robe sleeves are draping softly over his wrists, soft warm rim light on his face."
+        "The wizard lifts an ornate mug to his lips with both hands, takes a long sip, and pulls it away with a satisfied exhale. "
+        "His eyes close as he tilts his head back, then snap open wide with the caffeine kick. "
+        "Warm steam billows upward from the mug with golden sparkles, "
+        "heavy robe sleeves slide down his forearms as he raises the mug, beard catching the rising steam."
     ),
     # Camera: gentle dolly forward -- draws viewer into the cauldron scene
     "comida": (
@@ -162,29 +162,29 @@ MOTION_TEMPLATES_V2: dict[str, str] = {
         "Ink trails are transforming into tiny floating runes, "
         "robe sleeve is brushing the parchment edge with each stroke."
     ),
-    # Camera: static with gentle parallax -- calm scene needs minimal movement
+    # Camera: slow push-in -- relaxing but with visible stretch/yawn motion
     "relaxando": (
-        "Static camera with gentle parallax from nearby furniture. "
-        "The wizard is reclining in a chair, hat slowly tipping over his eyes. "
-        "His chest is rising and falling with deep slow breaths, fingers twitching in his lap. "
-        "The staff is glowing faintly nearby, "
-        "soft ambient particles are drifting lazily in the warm light."
+        "Slow push-in from medium shot. "
+        "The wizard stretches both arms wide overhead in a long satisfying yawn, fingers splaying outward. "
+        "His hat slides forward over his eyes as he sinks deeper into the chair, one hand reaching up to push it back. "
+        "Heavy robe fabric is draping and shifting with the stretch, "
+        "the staff nearby pulses with a warm golden glow, soft particles drifting upward."
     ),
-    # Camera: static locked-off with subtle depth shift -- emphasizes stillness
+    # Camera: slow push-in -- meditation needs visible arm/hand motion to avoid static output
     "meditando": (
-        "Static locked-off camera with subtle depth shift. "
-        "The wizard is sitting cross-legged, chest rising slowly with deep rhythmic breathing. "
-        "His robes are settling gently with each exhale, hands resting on his knees. "
-        "A blue-gold aura is pulsing rhythmically outward from his body, "
-        "luminous particles are ascending slowly in the still air."
+        "Slow push-in from medium shot. "
+        "The wizard raises both hands from his knees to chest height, palms turning upward in a sweeping gesture. "
+        "His head tilts back as he lifts his chin toward the sky, eyes closing with concentration. "
+        "A blue-gold energy wave bursts outward from his palms, heavy robe sleeves sliding down his forearms, "
+        "luminous particles are swirling upward around his body in a spiraling column."
     ),
-    # Camera: very slow push-in -- intimate framing for emotional theme
+    # Camera: slow push-in -- emotional theme with visible crystal lift and head turn
     "relacionamento": (
-        "Very slow push-in with intimate framing. "
-        "The wizard is holding a glowing heart crystal, turning it gently between his fingers. "
-        "He is looking at it with a knowing smile, eyes softening with warmth. "
-        "A pink aura is flowing between his hands, "
-        "robe fabric is shifting with his gentle arm movements, soft warm light pulsing."
+        "Slow push-in from medium shot. "
+        "The wizard raises a glowing heart crystal high in one hand, turning it to catch the light, then presses it against his chest. "
+        "He closes his eyes and tilts his head to the side with a deep knowing smile. "
+        "A pink energy wave pulses outward from the crystal as he clutches it, "
+        "heavy robe fabric swings with the arm motion, soft warm light flaring around his hands."
     ),
     # Camera: subtle push-in low angle -- dramatic power framing
     "confronto": (
@@ -202,21 +202,21 @@ MOTION_TEMPLATES_V2: dict[str, str] = {
         "Bright sparkles are bursting around his head in a flash, "
         "heavy robe fabric is swinging with the sudden startled movement."
     ),
-    # Camera: static with screen-glow parallax -- light from crystal creates depth
+    # Camera: slow push-in -- internet browsing with visible lean-in and reaction
     "internet": (
-        "Static camera with screen-glow parallax on the face. "
-        "The wizard is peering into a glowing crystal ball, leaning in close with curiosity. "
-        "His expression is shifting from curiosity to amusement, eyebrows rising. "
-        "Blue light is dancing across his face, "
-        "his long beard is catching the reflected glow, faint sparkles drifting."
+        "Slow push-in from medium shot. "
+        "The wizard leans forward sharply toward a glowing crystal ball, gripping it with both hands and pulling it closer. "
+        "His eyebrows shoot up in surprise as he jerks his head back, then leans in again with wide curious eyes. "
+        "Blue light flares across his face with each reaction, "
+        "heavy robes shifting with his animated forward-backward movement, beard swinging with each jolt."
     ),
-    # Camera: slow push-in -- versatile default with gentle movement
+    # Camera: slow push-in -- generic needs clear staff gesture for reliable animation
     "generico": (
         "Slow push-in from medium shot. "
-        "The wizard is shifting his weight slowly, adjusting his grip on the staff. "
-        "He is looking around with calm awareness, beard swaying with his head movement. "
-        "The crystal tip is pulsing with a rhythmic golden glow, "
-        "robes are flowing gently, ambient particles are drifting in the light."
+        "The wizard lifts his staff and swings it forward in a deliberate arc, planting it firmly on the ground. "
+        "He turns his head to look directly at the viewer, beard swaying with the sharp head turn. "
+        "The crystal tip flares with a bright golden burst on impact, "
+        "heavy robes are swinging with the momentum of the staff swing, particles erupting upward."
     ),
     # Camera: static with gentle ambient drift -- casual everyday feel
     "cotidiano": (
@@ -226,13 +226,13 @@ MOTION_TEMPLATES_V2: dict[str, str] = {
         "Faint sparkles are drifting lazily around him, "
         "robe fabric is settling with his casual posture, warm ambient light glowing softly."
     ),
-    # Camera: static with very slow push-in -- peaceful sleeping scene
+    # Camera: slow push-in -- sleeping but with visible startle/shift motion
     "descanso": (
-        "Static camera with very slow push-in. "
-        "The wizard is sleeping in a wooden chair, head nodding forward gently. "
-        "His chest is rising and falling with slow peaceful breaths, hand twitching in his lap. "
-        "His hat is drooping over his eyes, soft blue particles are floating peacefully, "
-        "robe fabric is draped loosely over the armrest."
+        "Slow push-in from medium shot. "
+        "The wizard is dozing in a wooden chair when his head drops forward suddenly, startling him half-awake. "
+        "He jerks his head back up, one hand reaching to catch his hat as it slides off, then slumps back down. "
+        "His heavy robes shift and resettle with the sudden movement, "
+        "soft blue particles swirl around him as the staff nearby flickers with a sleepy golden glow."
     ),
 }
 
@@ -281,23 +281,32 @@ _SYSTEM_PROMPT_V1 = (
 # confuse it. Output must be natural flowing sentences. Also "subtle/gentle/slowly"
 # everywhere = static video. Use decisive action verbs.
 _SYSTEM_PROMPT_V2 = (
-    "You generate motion prompts for Sora 2 image-to-video AI. "
+    "You generate motion prompts for image-to-video AI models (Hailuo, Kling, Wan). "
     "You receive context about a cartoon wizard character and must describe VISIBLE animation.\n\n"
+    "CRITICAL CONTEXT: Image-to-video models are EXTREMELY conservative — they try to keep "
+    "the input image unchanged. If you describe subtle motion ('slowly rising', 'gently settling', "
+    "'softly pulsing'), the model will produce a STATIC image with zero animation. "
+    "You MUST describe EXAGGERATED, DRAMATIC physical motion to get ANY visible movement.\n\n"
     "OUTPUT: Write 3-4 sentences of FLOWING NATURAL PROSE (300-500 chars). "
     "NO labels, NO bullet points, NO numbered lists. Just sentences.\n\n"
     "STRUCTURE YOUR SENTENCES (but do NOT label them):\n"
     "- First sentence: camera movement (slow push-in, static shot, gentle dolly)\n"
-    "- Second sentence: the character's MAIN ACTION with decisive verbs "
-    "(raises his staff, turns his head, lifts the goblet, slams his fist). "
-    "The action must be VISIBLE and CLEAR -- not 'subtly shifts weight'\n"
-    "- Third sentence: secondary motion and physics (robes billowing, beard swaying, "
-    "particles rising, staff crystal glowing brighter)\n"
-    "- Optional fourth: atmosphere (light shifting, wind picking up, sparkles drifting)\n\n"
+    "- Second sentence: the character's MAIN ACTION with STRONG DECISIVE verbs "
+    "(raises his staff high, turns his head sharply, lifts the goblet overhead, slams his fist down). "
+    "The action must be a LARGE VISIBLE MOVEMENT — arms moving, body turning, objects being lifted\n"
+    "- Third sentence: REACTIVE physics from the main action (robes swinging with the turn, "
+    "beard whipping with the head movement, liquid sloshing in the goblet)\n"
+    "- Fourth sentence: secondary motion and atmosphere (particles bursting, light flaring, "
+    "wind picking up)\n\n"
     "CRITICAL RULES:\n"
-    "- The character MUST VISIBLY MOVE -- no static poses. Use strong verbs: "
-    "raises, turns, grips, leans, steps, gestures, nods, lifts, swings\n"
+    "- The character MUST perform a CLEAR PHYSICAL ACTION — moving arms, turning body, "
+    "lifting objects, leaning forward, stepping, gesturing broadly. "
+    "BANNED weak verbs: 'shifts', 'settles', 'adjusts', 'rests', 'sits'. "
+    "REQUIRED strong verbs: raises, swings, turns, lifts, reaches, pulls, pushes, throws, grabs, slams\n"
+    "- Even for calm themes (meditation, rest), the character must DO something visible: "
+    "raises hands to chest, lifts head upward, extends arms outward, opens eyes wide\n"
     "- Present continuous tense: 'is raising', 'are floating', 'is glowing'\n"
-    "- ONE camera movement only -- never combine pan + zoom + track\n"
+    "- ONE camera movement only — never combine pan + zoom + track\n"
     "- Include physical details: 'heavy fabric', 'wooden staff', 'long white beard'\n"
     "- NO speech, NO text, NO lip movement, NO scene changes\n"
     "- NEVER use labels like 'CAMERA:', 'SUBJECT:', 'PHYSICS:' in your output\n"
@@ -330,18 +339,22 @@ _ENHANCE_PROMPT_V1 = (
 
 # v2 enhance prompt -- Natural prose enhancement for Sora 2
 _ENHANCE_PROMPT_V2 = (
-    "You are a prompt engineer for Sora 2 image-to-video AI. "
+    "You are a prompt engineer for image-to-video AI (Hailuo, Kling, Wan). "
     "Enhance the user's animation description into an optimal motion prompt.\n\n"
+    "CRITICAL: Image-to-video models are EXTREMELY conservative. Subtle descriptions "
+    "('gently', 'slowly', 'softly') produce STATIC videos. You must AMPLIFY all motion.\n\n"
     "OUTPUT: 3-4 sentences of FLOWING NATURAL PROSE (300-500 chars). "
     "NO labels, NO bullet points, NO 'CAMERA:', NO 'SUBJECT:'. Just sentences.\n\n"
     "RULES:\n"
-    "- Keep the user's INTENT but make the action MORE VISIBLE and DECISIVE\n"
-    "- Replace weak verbs ('shifts', 'adjusts') with strong ones ('raises', 'turns', 'grips')\n"
+    "- Keep the user's INTENT but make the action DRAMATICALLY MORE VISIBLE\n"
+    "- Replace ALL weak verbs ('shifts', 'adjusts', 'settles', 'rests') with "
+    "STRONG ones ('raises', 'swings', 'turns', 'lifts', 'reaches', 'grabs')\n"
+    "- The character MUST perform a clear physical action with arms, body, or head\n"
+    "- Add reactive physics: motion CAUSES something (robes swing, beard whips, liquid sloshes)\n"
     "- Present continuous tense: is raising, are floating, is glowing\n"
     "- Add physical details: 'heavy robe fabric billowing', 'wooden staff crystal pulsing'\n"
     "- ONE camera movement (first sentence)\n"
-    "- Character MUST visibly move -- Sora 2 produces static video if motion is too subtle\n"
-    "- PRESERVE original scene, background, art style -- NO changes\n"
+    "- PRESERVE original scene, background, art style — NO changes\n"
     "- NO speech, NO lip movement, NO text\n"
     "- Output ONLY the enhanced prompt sentences, nothing else"
 )

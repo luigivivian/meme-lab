@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: in_progress
-stopped_at: Starting Phase 18
-last_updated: "2026-03-27"
+status: Phase complete — ready for verification
+stopped_at: Completed 18-02-PLAN.md
+last_updated: "2026-03-27T15:42:31.337Z"
 progress:
   total_phases: 13
-  completed_phases: 9
-  total_plans: 23
-  completed_plans: 23
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 18 — Job Status Sync & Management
+**Current focus:** Phase 18 — job-status-sync-management
 
 ## Current Position
 
-Phase: 18
-Plan: Not started
+Phase: 18 (job-status-sync-management) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Plan: Not started
 | Phase 999.2 P02 | 5min | 3 tasks | 5 files |
 | Phase 999.3 P01 | 4min | 1 tasks | 3 files |
 | Phase 999.3 P02 | 4min | 1 tasks | 3 files |
+| Phase 18 P01 | 3min | 2 tasks | 5 files |
 | Phase 18 P02 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
@@ -103,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase 999.3]: v2 templates use 4 sentences 300-355 chars; camera mapped per theme emotional tone; MOTION_TEMPLATES alias points to V2 for backward compat
 - [Phase 999.3]: v2 system prompt uses structured CAMERA/SUBJECT/PHYSICS/ATMOSPHERE sections per OpenAI Cookbook
 - [Phase 999.3]: max_tokens 250 for v2 (4-5 sentences, 300-500 chars); _get_system_prompt()/_get_enhance_prompt() version switching
+- [Phase 18]: Stale scanner checks Kie.ai task status before marking as failed (avoids false positives)
+- [Phase 18]: Progress endpoint queries Kie.ai live for generating jobs, returns from DB for terminal states
 - [Phase 18]: Video section always shown (even when empty) with centered empty state
 - [Phase 18]: BRL cost in video cards: cost_usd * 5.5 (approximate conversion)
 
@@ -118,6 +121,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T15:41:12Z
+Last session: 2026-03-27T15:42:31.333Z
 Stopped at: Completed 18-02-PLAN.md
 Resume file: None

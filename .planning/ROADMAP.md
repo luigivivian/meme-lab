@@ -144,7 +144,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 999.1. Video Generation — Kie.ai Sora 2 | 3/3 | Complete    | 2026-03-26 |
 | 999.2. Video Legends & Subtitles | 2/2 | Complete    | 2026-03-27 |
 | 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
-| 18. Job Status Sync & Management | 0/2 | Not Started | - |
+| 18. Job Status Sync & Management | 1/2 | In Progress|  |
 | 19. Video Gallery & Management | 0/? | Not Started | - |
 | 20. Kie.ai Credits & Cost Tracking | 0/? | Not Started | - |
 | 21. Dashboard Business Metrics | 0/? | Not Started | - |
@@ -161,7 +161,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01-PLAN.md -- Backend: stale job scanner, retry endpoint, progress step labels, kie_client transient retry
+- [x] 18-01-PLAN.md -- Backend: stale job scanner, retry endpoint, progress step labels, kie_client transient retry
 - [ ] 18-02-PLAN.md -- Frontend: jobs page card grid, progress bars, retry button, expandable detail rows
 
 ### Phase 19: Video Gallery & Management
@@ -231,7 +231,7 @@ Plans:
 **Depends on:** Nothing (uses GCS instead of Phase 14 CDN)
 **Research:** `.planning/research/kie-ai-sora2-research.md`
 **Requirements:** VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
-**Plans:** 3/3 plans complete
+**Plans:** 1/2 plans executed
 
 Plans:
 - [x] 999.1-01-PLAN.md — Foundation: DB migration (video columns + video_prompt_notes), config constants, GCS uploader
