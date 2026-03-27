@@ -20,6 +20,8 @@ from config import (
     VIDEO_DAILY_BUDGET_USD,
     VIDEO_LEGEND_ENABLED,
     VIDEO_LEGEND_MODE,
+    VIDEO_MODEL,
+    VIDEO_MODELS,
     KIE_API_KEY,
     GENERATED_VIDEOS_DIR,
 )
@@ -37,6 +39,21 @@ from src.database.models import ContentPackage, Theme
 logger = logging.getLogger("clip-flow.api.video")
 
 router = APIRouter(prefix="/generate/video", tags=["Video Generation"])
+
+
+@router.get("/models", summary="List available video generation models")
+async def list_video_models():
+    """Return available Kie.ai models with pricing and default selection."""
+    models = []
+    for model_id, info in VIDEO_MODELS.items():
+        models.append({
+            "id": model_id,
+            "name": info["name"],
+            "cost_per_second": info["cost_per_second"],
+            "notes": info["notes"],
+            "is_default": model_id == VIDEO_MODEL,
+        })
+    return {"models": models, "default": VIDEO_MODEL}
 
 
 # -- Helper functions ---------------------------------------------------------
@@ -86,6 +103,7 @@ async def _generate_video_task(
     character_ids: list[str],
     user_id: int,
     custom_prompt: str = "",
+    model: str = "",
 ):
     """Background task: generate video for a content package.
 
@@ -167,6 +185,7 @@ async def _generate_video_task(
                 duration=duration,
                 character_ids=character_ids if character_ids else None,
                 output_dir=str(GENERATED_VIDEOS_DIR),
+                model=model or None,
             )
 
             if gen_result:
@@ -350,6 +369,7 @@ async def generate_video(
         character_ids=req.character_ids,
         user_id=current_user.id,
         custom_prompt=req.custom_prompt,
+        model=req.model,
     )
 
     return VideoStatusResponse(
@@ -463,6 +483,7 @@ async def generate_video_batch(
             duration=req.duration,
             character_ids=req.character_ids,
             user_id=current_user.id,
+            model=req.model,
         )
 
     return responses

@@ -119,6 +119,7 @@ class KieSora2Client:
         duration: int = 10,
         character_ids: list[str] | None = None,
         aspect_ratio: str = "portrait",
+        model: str | None = None,
     ) -> str:
         """Submit an image-to-video generation task.
 
@@ -135,10 +136,10 @@ class KieSora2Client:
         Raises:
             KieAPIError: On API errors (401, 402, 422, 429, 500+).
         """
-        model = _get_config("VIDEO_MODEL", _VIDEO_MODEL)
+        resolved_model = model or _get_config("VIDEO_MODEL", _VIDEO_MODEL)
 
         payload = {
-            "model": model,
+            "model": resolved_model,
             "input": {
                 "prompt": prompt,
                 "image_urls": [image_url],
@@ -151,8 +152,8 @@ class KieSora2Client:
         }
 
         logger.info(
-            "Creating Sora 2 task: model=%s duration=%ds aspect=%s chars=%d",
-            model, duration, aspect_ratio, len(character_ids or []),
+            "Creating video task: model=%s duration=%ds aspect=%s chars=%d",
+            resolved_model, duration, aspect_ratio, len(character_ids or []),
         )
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -328,6 +329,7 @@ class KieSora2Client:
         duration: int = 10,
         character_ids: list[str] | None = None,
         output_dir: str | None = None,
+        model: str | None = None,
     ) -> VideoGenerationResult | None:
         """Full pipeline: create task -> poll -> download video.
 
@@ -348,6 +350,7 @@ class KieSora2Client:
                 prompt=prompt,
                 duration=duration,
                 character_ids=character_ids,
+                model=model,
             )
         except (KieAPIError, httpx.HTTPError) as e:
             logger.error("Failed to create video task: %s", e)

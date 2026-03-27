@@ -198,6 +198,12 @@ export function useVideoList() {
   });
 }
 
+export function useVideoModels() {
+  return useSWR("video-models", () => api.getVideoModels(), {
+    revalidateOnFocus: false,
+  });
+}
+
 export function useVideoProgress(contentPackageId: number | null, enabled = false) {
   return useSWR(
     contentPackageId && enabled ? `video-progress-${contentPackageId}` : null,

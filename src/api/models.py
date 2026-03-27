@@ -247,6 +247,7 @@ class VideoGenerateRequest(BaseModel):
     duration: int = 10  # 10 or 15 seconds (per D-08)
     character_ids: list[str] = []  # Kie.ai character_id_list (per D-10)
     custom_prompt: str = ""  # User animation description (enhanced by LLM before sending)
+    model: str = ""  # Kie.ai model ID (empty = use VIDEO_MODEL default from config)
 
 
 class VideoBatchRequest(BaseModel):
@@ -254,6 +255,7 @@ class VideoBatchRequest(BaseModel):
     content_package_ids: list[int]
     duration: int = 10
     character_ids: list[str] = []
+    model: str = ""
 
 
 class VideoStatusResponse(BaseModel):

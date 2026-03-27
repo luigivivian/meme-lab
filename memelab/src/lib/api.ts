@@ -1110,6 +1110,8 @@ export interface VideoGenerateRequest {
   content_package_id: number;
   duration: number; // 10 or 15
   character_ids?: string[];
+  custom_prompt?: string;
+  model?: string;
 }
 
 export interface VideoStatusResponse {
@@ -1146,6 +1148,22 @@ export const generateVideoBatch = (params: {
 
 export const getVideoStatus = (contentPackageId: number) =>
   request<VideoStatusResponse>(`/generate/video/status/${contentPackageId}`);
+
+export interface VideoModel {
+  id: string;
+  name: string;
+  cost_per_second: number;
+  notes: string;
+  is_default: boolean;
+}
+
+export interface VideoModelsResponse {
+  models: VideoModel[];
+  default: string;
+}
+
+export const getVideoModels = () =>
+  request<VideoModelsResponse>("/generate/video/models");
 
 export interface VideoProgressResponse {
   content_package_id: number;

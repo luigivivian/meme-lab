@@ -352,14 +352,38 @@ KIE_API_KEY = os.getenv("KIE_API_KEY", "")
 # Default video duration in seconds: 10 or 15 (per D-08)
 VIDEO_DURATION = int(os.getenv("VIDEO_DURATION", "10"))
 
-# Sora 2 model ID (per D-07: standard tier by default)
-VIDEO_MODEL = os.getenv("VIDEO_MODEL", "sora-2-image-to-video")
+# Default model ID for video generation
+VIDEO_MODEL = os.getenv("VIDEO_MODEL", "hailuo-2.3-fast-image-to-video")
+
+# Available video models on Kie.ai — {model_id: {name, cost_per_second, notes}}
+VIDEO_MODELS = {
+    "hailuo-2.3-fast-image-to-video": {
+        "name": "Hailuo 2.3 Fast",
+        "cost_per_second": 0.005,
+        "notes": "Fast generation, good motion, best cost/quality ratio",
+    },
+    "sora-2-image-to-video": {
+        "name": "Sora 2 Standard",
+        "cost_per_second": 0.015,
+        "notes": "OpenAI Sora 2, 480-720p, good for social media",
+    },
+    "sora-2-pro-image-to-video": {
+        "name": "Sora 2 Pro",
+        "cost_per_second": 0.045,
+        "notes": "720p higher quality",
+    },
+    "sora-2-pro-1080p-image-to-video": {
+        "name": "Sora 2 Pro 1080p",
+        "cost_per_second": 0.06,
+        "notes": "1080p premium",
+    },
+}
 
 # Hard daily budget cap in USD (per D-09: $3.00 default = ~20 standard videos/day)
 VIDEO_DAILY_BUDGET_USD = float(os.getenv("VIDEO_DAILY_BUDGET_USD", "3.0"))
 
-# Cost per second for standard Sora 2 tier
-VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.015"))
+# Cost per second (fallback — overridden per-model from VIDEO_MODELS)
+VIDEO_COST_PER_SECOND = float(os.getenv("VIDEO_COST_PER_SECOND", "0.005"))
 
 # Prompt style for video motion templates: "v1" (original) or "v2" (Sora 2 researched)
 # Per D-05: v2 uses three-layer motion framework (OpenAI Cookbook + awesome-sora2)

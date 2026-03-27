@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { IndeterminateProgress } from "@/components/ui/progress";
-import { useDriveImages, useDriveThemes, useThemes, useContentPackages, useVideoBudget, useVideoStatus, useVideoList } from "@/hooks/use-api";
+import { useDriveImages, useDriveThemes, useThemes, useContentPackages, useVideoBudget, useVideoStatus, useVideoList, useVideoModels } from "@/hooks/use-api";
 import {
   imageUrl,
   composeMeme,
@@ -97,10 +97,12 @@ export default function GalleryPage() {
   const [videoTarget, setVideoTarget] = useState<ContentPackageDB | null>(null);
   const [videoDuration, setVideoDuration] = useState<10 | 15>(10);
   const [videoPrompt, setVideoPrompt] = useState("");
+  const [videoModel, setVideoModel] = useState("");
   const [videoGenerating, setVideoGenerating] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoSuccess, setVideoSuccess] = useState(false);
   const { data: budgetData } = useVideoBudget();
+  const { data: modelsData } = useVideoModels();
   const { data: pollingStatus } = useVideoStatus(videoTarget?.id ?? null, videoGenerating);
 
   if (videoGenerating && pollingStatus?.video_status && pollingStatus.video_status !== "generating") {
@@ -119,7 +121,12 @@ export default function GalleryPage() {
     setVideoError(null);
     setVideoSuccess(false);
     try {
-      await generateVideo({ content_package_id: videoTarget.id, duration: videoDuration, custom_prompt: videoPrompt || undefined });
+      await generateVideo({
+        content_package_id: videoTarget.id,
+        duration: videoDuration,
+        custom_prompt: videoPrompt || undefined,
+        model: videoModel || undefined,
+      });
     } catch (err) {
       setVideoGenerating(false);
       setVideoError(err instanceof Error ? err.message : "Erro ao gerar video");
@@ -982,11 +989,42 @@ export default function GalleryPage() {
                 />
                 <p className="text-[10px] text-muted-foreground">Descreva a animacao desejada. Sera aprimorado por IA antes de enviar ao Sora 2. Deixe vazio para animacao automatica.</p>
               </div>
+              {/* Model selector */}
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Modelo</label>
+                <div className="grid gap-1.5">
+                  {modelsData?.models.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setVideoModel(m.id)}
+                      disabled={videoGenerating}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
+                        (videoModel === m.id || (!videoModel && m.is_default))
+                          ? "bg-primary/15 border border-primary/40 text-foreground"
+                          : "bg-secondary/50 border border-transparent text-muted-foreground hover:bg-secondary/80"
+                      }`}
+                    >
+                      <div className="text-left">
+                        <span className="font-medium">{m.name}</span>
+                        <p className="text-[10px] opacity-70">{m.notes}</p>
+                      </div>
+                      <span className="text-[10px] tabular-nums ml-2 flex-shrink-0">
+                        ${m.cost_per_second}/s
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Duracao</label>
                 <div className="flex gap-2">
-                  <Button variant={videoDuration === 10 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(10)} disabled={videoGenerating}>10s — $0.175</Button>
-                  <Button variant={videoDuration === 15 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(15)} disabled={videoGenerating}>15s — $0.20</Button>
+                  {(() => {
+                    const cps = modelsData?.models.find((m) => m.id === (videoModel || modelsData?.default))?.cost_per_second ?? 0.015;
+                    return (<>
+                      <Button variant={videoDuration === 10 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(10)} disabled={videoGenerating}>10s — ${(cps * 10).toFixed(2)}</Button>
+                      <Button variant={videoDuration === 15 ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setVideoDuration(15)} disabled={videoGenerating}>15s — ${(cps * 15).toFixed(2)}</Button>
+                    </>);
+                  })()}
                 </div>
               </div>
               <Button onClick={handleGenerateVideo} disabled={videoGenerating || videoSuccess} className={`w-full gap-2 ${videoGenerating ? "pulse-glow" : ""}`}>
