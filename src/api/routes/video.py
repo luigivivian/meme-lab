@@ -507,6 +507,45 @@ async def get_video_status(
     )
 
 
+@router.get("/progress/{content_package_id}", summary="Live Kie.ai task progress")
+async def get_video_progress(
+    content_package_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Query Kie.ai for real-time task progress (state + percentage)."""
+    result = await session.execute(
+        select(ContentPackage).where(ContentPackage.id == content_package_id)
+    )
+    pkg = result.scalar_one_or_none()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Content package not found")
+
+    if not pkg.video_task_id or pkg.video_status != "generating":
+        return {
+            "content_package_id": pkg.id,
+            "state": pkg.video_status or "none",
+            "progress": 100 if pkg.video_status == "success" else 0,
+        }
+
+    try:
+        from src.video_gen.kie_client import KieSora2Client
+        client = KieSora2Client()
+        task_data = await client.get_task_status(pkg.video_task_id)
+        return {
+            "content_package_id": pkg.id,
+            "state": task_data.get("state", "unknown"),
+            "progress": int(str(task_data.get("progress", "0")).replace("%", "")),
+        }
+    except Exception as e:
+        logger.warning("Failed to get Kie.ai progress for %s: %s", pkg.video_task_id, e)
+        return {
+            "content_package_id": pkg.id,
+            "state": "generating",
+            "progress": -1,
+        }
+
+
 @router.get("/list", summary="List content packages with video status")
 async def list_videos(
     status: str | None = None,

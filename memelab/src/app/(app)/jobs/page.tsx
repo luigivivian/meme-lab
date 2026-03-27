@@ -46,6 +46,7 @@ export default function JobsPage() {
 
   const [detailJob, setDetailJob] = useState<JobStatus | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const handleBatchFromConfig = async () => {
     setLaunching(true);
@@ -160,6 +161,31 @@ export default function JobsPage() {
         </Card>
       </div>
 
+      {/* Filter Tabs */}
+      {jobs.length > 0 && (
+        <div className="flex items-center gap-1.5 rounded-xl bg-secondary/30 p-1 w-fit">
+          {[
+            { key: "all", label: "Todos", count: jobs.length },
+            { key: "running", label: "Executando", count: jobs.filter((j) => j.status === "running").length },
+            { key: "completed", label: "Concluidos", count: jobs.filter((j) => j.status === "completed").length },
+            { key: "failed", label: "Falhas", count: jobs.filter((j) => j.status === "failed" || j.failed > 0).length },
+          ].map(({ key, label, count }) => (
+            <button
+              key={key}
+              onClick={() => setStatusFilter(key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                statusFilter === key
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+              }`}
+            >
+              {label}
+              {count > 0 && <span className="ml-1.5 tabular-nums opacity-70">{count}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Jobs List */}
       {isLoading ? (
         <div className="space-y-2">
@@ -167,14 +193,21 @@ export default function JobsPage() {
             <Skeleton key={i} className="h-16 rounded-xl" />
           ))}
         </div>
-      ) : jobs.length > 0 ? (
+      ) : jobs.length > 0 ? (() => {
+        const filtered = statusFilter === "all" ? jobs
+          : statusFilter === "failed" ? jobs.filter((j) => j.status === "failed" || j.failed > 0)
+          : jobs.filter((j) => j.status === statusFilter);
+        return filtered.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Historico de Jobs</CardTitle>
+            <CardTitle className="text-base">
+              Historico de Jobs
+              {statusFilter !== "all" && <span className="text-muted-foreground font-normal ml-2 text-sm">({filtered.length})</span>}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <motion.div className="space-y-2 max-h-[500px] overflow-auto" variants={staggerContainer} initial="initial" animate="animate">
-            {jobs.map((job) => {
+            {filtered.map((job) => {
               const Icon = STATUS_ICON[job.status] ?? AlertCircle;
               const jobProgress = job.total > 0 ? Math.round((job.done / job.total) * 100) : 0;
               return (
@@ -225,7 +258,15 @@ export default function JobsPage() {
             </motion.div>
           </CardContent>
         </Card>
-      ) : (
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
+              <Layers className="h-8 w-8 text-muted-foreground" />
+              <p className="text-muted-foreground">Nenhum job com status &quot;{statusFilter}&quot;</p>
+            </CardContent>
+          </Card>
+        );
+      })() : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
             <Layers className="h-8 w-8 text-muted-foreground" />

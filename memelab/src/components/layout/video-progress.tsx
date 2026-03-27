@@ -1,10 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Video, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2 } from "lucide-react";
-import { useVideoList } from "@/hooks/use-api";
-import { imageUrl } from "@/lib/api";
+import { useVideoList, useVideoProgress } from "@/hooks/use-api";
+import { imageUrl, type VideoListItem } from "@/lib/api";
+
+function ProgressRow({ v }: { v: VideoListItem }) {
+  const { data } = useVideoProgress(v.content_package_id, v.video_status === "generating");
+  const pct = data?.progress ?? 0;
+  const state = data?.state ?? "waiting";
+
+  const stateLabel: Record<string, string> = {
+    waiting: "Na fila",
+    processing: "Processando",
+    running: "Gerando",
+    completed: "Finalizando",
+    failed: "Falhou",
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      {v.image_path && (
+        <img
+          src={imageUrl(v.image_path.split(/[/\\]/).pop() ?? "")}
+          alt=""
+          className="h-8 w-8 rounded object-cover flex-shrink-0"
+        />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground truncate">
+            {v.phrase || v.topic || `#${v.content_package_id}`}
+          </p>
+          <span className="text-[10px] text-muted-foreground/70 ml-2 flex-shrink-0 tabular-nums">
+            {pct > 0 ? `${pct}%` : stateLabel[state] || state}
+          </span>
+        </div>
+        <div className="mt-1 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-primary to-violet-400 transition-all duration-700 ease-out"
+            style={{ width: `${Math.max(pct, 3)}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function VideoProgressBar() {
   const { data } = useVideoList();
@@ -50,32 +92,11 @@ export function VideoProgressBar() {
           </div>
         </button>
 
-        {/* Active generations — always visible */}
+        {/* Active generations with real progress */}
         {generating.length > 0 && (
           <div className="px-4 pb-2 space-y-2">
             {generating.map((v) => (
-              <div key={v.content_package_id} className="flex items-center gap-3">
-                {v.image_path && (
-                  <img
-                    src={imageUrl(v.image_path.split(/[/\\]/).pop() ?? "")}
-                    alt=""
-                    className="h-8 w-8 rounded object-cover flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">
-                    {v.phrase || v.topic || `#${v.content_package_id}`}
-                  </p>
-                  <div className="mt-1 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full bg-gradient-to-r from-primary to-violet-400"
-                      initial={{ width: "10%" }}
-                      animate={{ width: "85%" }}
-                      transition={{ duration: 120, ease: "linear" }}
-                    />
-                  </div>
-                </div>
-              </div>
+              <ProgressRow key={v.content_package_id} v={v} />
             ))}
           </div>
         )}

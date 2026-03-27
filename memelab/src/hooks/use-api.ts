@@ -198,6 +198,14 @@ export function useVideoList() {
   });
 }
 
+export function useVideoProgress(contentPackageId: number | null, enabled = false) {
+  return useSWR(
+    contentPackageId && enabled ? `video-progress-${contentPackageId}` : null,
+    () => (contentPackageId ? api.getVideoProgress(contentPackageId) : null),
+    { refreshInterval: 3000, errorRetryCount: 1 }
+  );
+}
+
 export function useDashboardUsageHistory() {
   return useSWR("dashboard-usage-history", () => api.getDashboardUsageHistory(), {
     refreshInterval: 60000,

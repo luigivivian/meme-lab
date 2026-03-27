@@ -1147,6 +1147,15 @@ export const generateVideoBatch = (params: {
 export const getVideoStatus = (contentPackageId: number) =>
   request<VideoStatusResponse>(`/generate/video/status/${contentPackageId}`);
 
+export interface VideoProgressResponse {
+  content_package_id: number;
+  state: string;
+  progress: number;
+}
+
+export const getVideoProgress = (contentPackageId: number) =>
+  request<VideoProgressResponse>(`/generate/video/progress/${contentPackageId}`);
+
 export const getVideoBudget = () =>
   request<VideoBudgetResponse>("/generate/video/budget");
 
