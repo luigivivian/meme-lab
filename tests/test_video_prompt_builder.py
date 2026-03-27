@@ -1,11 +1,13 @@
-"""Tests for VideoPromptBuilder v2 templates and version switching.
+"""Tests for VideoPromptBuilder v2 templates, system prompts, and version switching.
 
 Validates research-based template structure per Phase 999.3 decisions:
 - D-02: All 17 themes present in v2
 - D-03: Three-layer motion (camera + subject + physics)
 - D-04: 4-5 sentences, 300-500 chars per template
 - D-05: VIDEO_PROMPT_STYLE version switching
+- D-06: System prompt structured sections (CAMERA/SUBJECT/PHYSICS/ATMOSPHERE)
 - D-07: 500 char prompt cap
+- D-08: Technique reference comments
 """
 
 import re
@@ -23,6 +25,14 @@ from src.video_gen.video_prompt_builder import (
     MOTION_TEMPLATES_V2,
     VideoPromptBuilder,
     _get_templates,
+    _SYSTEM_PROMPT,
+    _SYSTEM_PROMPT_V1,
+    _SYSTEM_PROMPT_V2,
+    _ENHANCE_PROMPT,
+    _ENHANCE_PROMPT_V1,
+    _ENHANCE_PROMPT_V2,
+    _get_system_prompt,
+    _get_enhance_prompt,
 )
 
 
@@ -48,12 +58,12 @@ def test_v2_all_17_themes():
 # -- D-02: V1 preserved unchanged ------------------------------------------
 
 def test_v1_preserved_unchanged():
-    """V1 templates have all 17 keys; spot-check 3 themes start with expected text."""
+    """V1 templates have all 17 keys and contain original v1 text."""
     assert len(MOTION_TEMPLATES_V1) == 17
     # v1 templates start with lowercase "wizard" (no camera direction prefix)
-    assert MOTION_TEMPLATES_V1["sabedoria"].startswith("wizard slowly strokes")
-    assert MOTION_TEMPLATES_V1["cafe"].startswith("wizard holds ornate mug")
-    assert MOTION_TEMPLATES_V1["generico"].startswith("wizard stands with staff")
+    assert "wizard slowly strokes" in MOTION_TEMPLATES_V1["sabedoria"]
+    assert "wizard holds ornate mug" in MOTION_TEMPLATES_V1["cafe"]
+    assert "wizard stands with staff" in MOTION_TEMPLATES_V1["generico"]
 
 
 # -- D-04: Template length 300-500 chars ------------------------------------
@@ -115,7 +125,7 @@ def test_v2_three_layers():
         assert has_continuous, f"Theme '{theme}' missing present continuous"
 
 
-# -- D-05: Version switching ------------------------------------------------
+# -- D-05: Version switching (templates) ------------------------------------
 
 def test_version_switching_v1(monkeypatch):
     """Setting VIDEO_PROMPT_STYLE to 'v1' returns V1 templates."""
@@ -135,7 +145,6 @@ def test_version_switching_v2(monkeypatch):
 
 def test_version_switching_default(monkeypatch):
     """Without VIDEO_PROMPT_STYLE set, default returns V2."""
-    # Temporarily remove from config module to trigger env var fallback
     import config
     monkeypatch.delattr(config, "VIDEO_PROMPT_STYLE", raising=False)
     monkeypatch.delenv("VIDEO_PROMPT_STYLE", raising=False)
@@ -165,3 +174,94 @@ def test_config_constant_exists():
     """VIDEO_PROMPT_STYLE exists in config and is v1 or v2."""
     from config import VIDEO_PROMPT_STYLE
     assert VIDEO_PROMPT_STYLE in ("v1", "v2")
+
+
+# =========================================================================
+# Plan 02 tests -- System prompt structure and version-aware selection
+# =========================================================================
+
+
+# -- D-06: System prompt v2 structured sections ----------------------------
+
+def test_system_prompt_v2_sections():
+    """_SYSTEM_PROMPT_V2 contains CAMERA, SUBJECT, PHYSICS, ATMOSPHERE sections."""
+    for section in ["CAMERA", "SUBJECT", "PHYSICS", "ATMOSPHERE"]:
+        assert section in _SYSTEM_PROMPT_V2, (
+            f"Missing section label '{section}' in _SYSTEM_PROMPT_V2"
+        )
+
+
+def test_system_prompt_v2_present_continuous_rule():
+    """_SYSTEM_PROMPT_V2 contains PRESENT CONTINUOUS tense instruction."""
+    assert "PRESENT CONTINUOUS" in _SYSTEM_PROMPT_V2
+
+
+def test_system_prompt_v2_char_limit():
+    """_SYSTEM_PROMPT_V2 contains the 300-500 character output range instruction."""
+    assert "300-500" in _SYSTEM_PROMPT_V2
+
+
+def test_system_prompt_v2_one_camera_rule():
+    """_SYSTEM_PROMPT_V2 contains ONE camera movement constraint."""
+    assert "ONE camera" in _SYSTEM_PROMPT_V2 or "one clear" in _SYSTEM_PROMPT_V2
+
+
+# -- D-06: Enhance prompt v2 structured sections ----------------------------
+
+def test_enhance_prompt_v2_sections():
+    """_ENHANCE_PROMPT_V2 contains CAMERA, SUBJECT, PHYSICS, ATMOSPHERE sections."""
+    for section in ["CAMERA", "SUBJECT", "PHYSICS", "ATMOSPHERE"]:
+        assert section in _ENHANCE_PROMPT_V2, (
+            f"Missing section label '{section}' in _ENHANCE_PROMPT_V2"
+        )
+
+
+# -- System prompt version switching ----------------------------------------
+
+def test_system_prompt_switching_v1(monkeypatch):
+    """_get_system_prompt() returns v1 when style='v1'."""
+    import config
+    monkeypatch.setattr(config, "VIDEO_PROMPT_STYLE", "v1")
+    result = _get_system_prompt()
+    assert result is _SYSTEM_PROMPT_V1
+
+
+def test_system_prompt_switching_v2(monkeypatch):
+    """_get_system_prompt() returns v2 when style='v2'."""
+    import config
+    monkeypatch.setattr(config, "VIDEO_PROMPT_STYLE", "v2")
+    result = _get_system_prompt()
+    assert result is _SYSTEM_PROMPT_V2
+
+
+# -- Enhance prompt version switching ---------------------------------------
+
+def test_enhance_prompt_switching_v1(monkeypatch):
+    """_get_enhance_prompt() returns v1 when style='v1'."""
+    import config
+    monkeypatch.setattr(config, "VIDEO_PROMPT_STYLE", "v1")
+    result = _get_enhance_prompt()
+    assert result is _ENHANCE_PROMPT_V1
+
+
+def test_enhance_prompt_switching_v2(monkeypatch):
+    """_get_enhance_prompt() returns v2 when style='v2'."""
+    import config
+    monkeypatch.setattr(config, "VIDEO_PROMPT_STYLE", "v2")
+    result = _get_enhance_prompt()
+    assert result is _ENHANCE_PROMPT_V2
+
+
+# -- V1 prompts preserved --------------------------------------------------
+
+def test_v1_prompts_preserved():
+    """_SYSTEM_PROMPT_V1 contains original v1 text (2-4 sentences, max 300 chars)."""
+    assert "2-4 sentences" in _SYSTEM_PROMPT_V1 or "max 300 chars" in _SYSTEM_PROMPT_V1
+
+
+# -- Backward compatibility aliases for prompts ----------------------------
+
+def test_backward_compat_prompt_aliases():
+    """_SYSTEM_PROMPT and _ENHANCE_PROMPT are aliases for their v2 versions."""
+    assert _SYSTEM_PROMPT is _SYSTEM_PROMPT_V2
+    assert _ENHANCE_PROMPT is _ENHANCE_PROMPT_V2

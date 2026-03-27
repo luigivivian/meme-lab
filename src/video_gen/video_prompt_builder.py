@@ -18,97 +18,82 @@ logger = logging.getLogger("clip-flow.video_prompt_builder")
 
 MOTION_TEMPLATES_V1: dict[str, str] = {
     "sabedoria": (
-        "The wizard slowly strokes his long beard with one hand, head nodding gently. "
-        "His other hand grips the staff as the crystal tip pulses with blue glow. "
-        "Robes sway with his breathing, magical particles drift upward around him."
+        "wizard slowly strokes his beard thoughtfully, staff crystal pulses "
+        "with faint blue glow, subtle magical particles drift upward"
     ),
     "confusao": (
-        "The wizard tilts his head side to side in confusion, eyebrows furrowing. "
-        "He shifts his weight between feet, one hand scratches under his hat. "
-        "His staff wobbles slightly in his grip, small sparkles pop around his head."
+        "wizard tilts his head back and forth in confusion, magical question "
+        "marks float and pop around him, hat wobbles slightly"
     ),
     "segunda_feira": (
-        "The wizard raises a coffee goblet to his lips with both hands, sipping slowly. "
-        "His eyes droop heavily then snap open with a blink. His shoulders slump, "
-        "chest rises with a deep sigh. Steam curls from the mug with golden sparkles."
+        "wizard drowsily sips from coffee goblet, steam rises with golden "
+        "sparkles, eyes droop then snap open, slight head nod"
     ),
     "vitoria": (
-        "The wizard thrusts his staff upward triumphantly, arm fully extended. "
-        "His body leans back with the motion, robes billow outward. "
-        "He pumps his fist, beard swaying with the celebration. Golden particles erupt."
+        "wizard raises staff triumphantly overhead, golden magical particles "
+        "erupt from staff tip, robes billow with celebration energy"
     ),
     "tecnologia": (
-        "The wizard leans forward curiously, poking at a glowing crystal with one finger. "
-        "His head tilts, eyes widen, then he pulls back startled. "
-        "His hat shifts as he scratches his head in bewilderment. Digital runes flicker."
+        "wizard pokes at a glowing crystal device with curiosity, digital "
+        "runes flicker around it, hat tilts as he leans in"
     ),
     "cafe": (
-        "The wizard cradles an ornate mug with both hands, bringing it close to inhale the steam. "
-        "He takes a long sip, eyes closing contentedly. His chest expands with a satisfied breath, "
-        "shoulders relaxing down. Magical sparkles rise from the mug."
+        "wizard holds ornate mug with both hands, steam curls upward with "
+        "magical sparkles, content smile deepens, gentle breathing motion"
     ),
     "comida": (
-        "The wizard stirs a bubbling cauldron with a large ladle, leaning in to smell. "
-        "He tastes from the ladle, eyes rolling with delight. His free hand gestures approvingly, "
-        "beard swinging with his animated movements. Colorful vapors swirl."
+        "wizard stirs bubbling cauldron, colorful potion vapors rise and "
+        "swirl, floating ingredients orbit lazily, focused expression"
     ),
     "trabalho": (
-        "The wizard hunches over parchment, quill moving rapidly in his hand. "
-        "He pauses, looks up thinking, then returns to writing with intensity. "
-        "His other hand taps the desk impatiently. Ink trails transform into floating runes."
+        "wizard writes on parchment at desk, quill moves with magical trail, "
+        "ink transforms into tiny floating runes, focused gaze"
     ),
     "relaxando": (
-        "The wizard reclines in a chair, arms crossed over his chest. His hat slowly tips "
-        "over his eyes. His chest rises and falls with deep, slow breaths. "
-        "One hand dangles limply, fingers twitching. Staff leans nearby, glowing faintly."
+        "wizard dozes in chair, hat tips over eyes, chest rises and falls "
+        "with slow breathing, staff leans and glows faintly"
     ),
     "meditando": (
-        "The wizard sits cross-legged, hands resting on knees, palms up. "
-        "His chest rises slowly with deep breathing, robes settling with each exhale. "
-        "His head tilts slightly upward, a serene expression. Blue-gold aura pulses outward."
+        "wizard sits in deep meditation, ethereal blue-gold aura pulses "
+        "outward in waves, staff hovers gently, serene stillness"
     ),
     "relacionamento": (
-        "The wizard holds a glowing heart crystal between both hands, turning it gently. "
-        "He looks at it with a knowing smile, then glances up warmly. "
-        "His shoulders shift as he brings the crystal closer to his chest. Pink aura flows."
+        "wizard holds glowing heart-shaped crystal, soft pink and blue "
+        "magical aura shifts and flows between hands, gentle knowing expression"
     ),
     "confronto": (
-        "The wizard plants his staff firmly on the ground, both hands gripping tight. "
-        "He steps forward with one foot, robes whipping in dramatic wind. "
-        "His jaw clenches, eyes narrow with determination. Golden energy crackles from the staff tip."
+        "wizard plants staff firmly, golden energy bursts from tip, robes "
+        "whip in dramatic wind, stern determined gaze forward"
     ),
     "surpresa": (
-        "The wizard jolts backward, eyes going wide, hat flying up from his head briefly. "
-        "Both hands shoot up in shock, fingers splayed. He stumbles back half a step, "
-        "then catches himself on his staff. Sparkles burst around him."
+        "wizard jolts with wide eyes, hat blows back slightly, hands raise "
+        "in shock, exclamation-shaped sparkles pop around head"
     ),
     "internet": (
-        "The wizard peers into a glowing crystal ball, leaning in close. "
-        "His expression shifts from curiosity to surprise to amusement rapidly. "
-        "One hand waves dismissively, the other adjusts his hat. Blue light dances on his face."
+        "wizard gazes into glowing crystal ball with shifting expressions, "
+        "blue light reflects on face, occasional surprised reaction"
     ),
     "generico": (
-        "The wizard shifts his weight, adjusting his grip on the staff. "
-        "He looks around slowly, beard swaying with the head turn. "
-        "His chest rises with a calm breath, robes flowing gently. "
-        "The crystal tip pulses with rhythmic magical glow, particles drift."
+        "wizard stands with staff, subtle magical glow from crystal tip "
+        "pulses rhythmically, robes sway gently in ambient breeze"
     ),
     "cotidiano": (
-        "The wizard leans casually on his staff, crossing one ankle over the other. "
-        "He raises an ale mug for a relaxed sip, then wipes his beard with his sleeve. "
-        "His body sways slightly, easy posture. Faint sparkles drift around."
+        "wizard leans on staff casually, takes a relaxed sip from ale mug, "
+        "faint sparkles drift lazily around him, easy-going posture"
     ),
     "descanso": (
-        "The wizard sleeps in a wooden chair, head nodding forward and catching himself. "
-        "His chest rises and falls with slow breaths, hat drooping over his eyes. "
-        "One hand twitches in his lap. Soft blue particles float around peacefully."
+        "wizard peacefully sleeps in wooden chair, hat droops forward, "
+        "chest rises and falls slowly, soft blue particles float around"
     ),
 }
 
 
 # -- v2 templates -- Three-layer motion framework (OpenAI Cookbook + awesome-sora2) --
-# Each template: 4-5 sentences, 300-500 chars
-# Structure: [Camera macro] + [Subject primary + micro] + [Physics/atmosphere]
+# Per D-02: All 17 themes updated with researched patterns.
+# Per D-03: Camera movement + temporal flow + physics focus.
+# Per D-04: 4-5 sentences, 300-500 chars per template.
+# Per D-08: Technique reference comments for future maintainers.
+# Each template: [Camera macro] + [Subject primary + micro] + [Physics/atmosphere]
 # Tense: present continuous throughout ("is raising", "are drifting")
 # Source: OpenAI Sora 2 Prompting Guide + WaveSpeedAI + awesome-sora2 community
 
@@ -273,81 +258,126 @@ def _get_templates() -> dict[str, str]:
     return MOTION_TEMPLATES_V2
 
 
-# -- System prompt for LLM ------------------------------------------------
-# v2 structured prompt -- Three-layer motion framework (OpenAI Cookbook + awesome-sora2)
-# Sections: Camera / Subject / Physics / Atmosphere (per D-06)
+# -- System prompts for LLM -----------------------------------------------
 
+# Original v1 system prompts -- preserved for fallback (per D-05)
 _SYSTEM_PROMPT_V1 = (
     "You generate SHORT motion/animation prompts for Sora 2 image-to-video AI. "
-    "You receive an image of a cartoon wizard character and must describe the animation.\n\n"
-    "CRITICAL RULES:\n"
+    "You receive context about a wizard character meme and must describe the MOTION and CAMERA movement.\n\n"
+    "RULES:\n"
     "- Output ONLY the motion prompt (2-4 sentences, max 300 chars)\n"
-    "- CHARACTER MUST MOVE: describe specific body movements — head turning, arms gesturing, "
-    "hands gripping staff tighter, shoulders shifting, beard swaying, eyes blinking or looking around, "
-    "chest rising with breath, weight shifting between feet, robes flowing with body motion\n"
-    "- CHARACTER is the PRIMARY subject of animation — background is secondary\n"
-    "- Background: add ambient motion (particles, wind, light shifts) but keep the SAME scene\n"
-    "- Camera: static or very slow push-in. NO fast zooms, NO cuts\n"
-    "- NO speech, NO dialogue, NO lip movement, NO text, NO words appearing\n"
-    "- NO scene changes, NO new objects, NO dramatic lighting changes\n"
+    "- Describe character MOVEMENT (gestures, expressions, body language)\n"
+    "- Describe CAMERA movement (slow zoom, pan, static, push in)\n"
+    "- Describe AMBIENT motion (particles, wind, magical effects)\n"
     "- Keep the cartoon cel-shading art style\n"
-    "- Portrait 4:5 aspect ratio\n"
-    "- NEVER describe character appearance (already in the image)\n"
-    "- Think: the character COMES ALIVE — natural idle animation like a video game character waiting"
+    "- Portrait 4:5 aspect ratio composition\n"
+    "- NEVER describe the character's appearance (that's in the image)\n"
+    "- NEVER include text or dialogue"
 )
 
-# v2 structured prompt — Three-layer motion framework (OpenAI Cookbook + awesome-sora2)
+# v2 system prompt -- Structured sections from OpenAI Cookbook (per D-06)
+# Source: OpenAI Sora 2 Prompting Guide + awesome-sora2 community patterns
+# Key changes from v1: section-based output, present continuous tense,
+# one-camera-move rule, material/force descriptors, beat-based temporal flow
 _SYSTEM_PROMPT_V2 = (
     "You generate motion prompts for Sora 2 image-to-video AI. "
-    "You receive context about a wizard character meme and must describe the MOTION and CAMERA movement.\n\n"
-    "OUTPUT FORMAT (4-5 sentences, 300-500 chars):\n"
-    "1. CAMERA: One clear camera movement (static, slow push-in, gentle dolly, subtle parallax)\n"
-    "2. SUBJECT: Primary character animation in present continuous tense "
+    "You receive an image of a cartoon wizard character and describe the animation.\n\n"
+    "OUTPUT FORMAT (4-5 sentences, 300-500 characters):\n"
+    "1. CAMERA -- one clear movement: static, slow push-in, gentle dolly, or subtle parallax\n"
+    "2. SUBJECT -- primary body animation in PRESENT CONTINUOUS tense "
     "(is raising, is turning, are gripping). Include micro-actions: breathing, blinking, weight shifts\n"
-    "3. PHYSICS: Cloth behavior (robes swaying, beard flowing), particle effects, material interactions\n"
-    "4. ATMOSPHERE: Lighting shifts, ambient motion (wind, sparkles, glow pulses)\n\n"
-    "RULES:\n"
-    "- Use PRESENT CONTINUOUS tense (is walking, are floating, is glowing)\n"
-    "- ONE camera movement per prompt -- do not combine pan + zoom + track\n"
+    "3. PHYSICS -- cloth/material behavior with force descriptors: "
+    "'heavy robe fabric is swaying in gentle breeze', 'long beard is flowing with head movement'\n"
+    "4. ATMOSPHERE -- ambient motion: particle drift, light pulses, glow effects\n\n"
+    "CRITICAL RULES:\n"
+    "- PRESENT CONTINUOUS tense throughout (is walking, are floating, is glowing)\n"
+    "- ONE camera movement only -- never combine pan + zoom + track\n"
     "- CHARACTER is primary subject -- background is secondary ambient\n"
-    "- Describe motion in beats: initial state -> peak action -> settling\n"
-    "- Include material descriptors: 'heavy robe fabric', 'wooden staff'\n"
+    "- Temporal beats: initial state -> peak action -> gentle settling\n"
+    "- Specify materials and forces: 'silk-like', 'heavy wooden', 'gentle breeze'\n"
     "- NO speech, NO dialogue, NO text, NO lip movement\n"
     "- NO scene changes, NO new objects appearing\n"
-    "- Maintain cartoon cel-shading art style\n"
-    "- Portrait 4:5 aspect ratio\n"
+    "- Maintain cartoon cel-shading art style, portrait 4:5\n"
     "- NEVER describe character appearance (already in the image)"
 )
 
-_ENHANCE_PROMPT = (
+# Backward compatibility aliases (point to v2 by default)
+_SYSTEM_PROMPT = _SYSTEM_PROMPT_V2
+
+
+# -- Enhance prompts for LLM -----------------------------------------------
+
+# Original v1 enhance prompt -- preserved for fallback (per D-05)
+_ENHANCE_PROMPT_V1 = (
     "You are a prompt engineer for Sora 2 image-to-video AI. "
     "The user described how they want a cartoon wizard character animated. Enhance it.\n\n"
     "RULES:\n"
     "- Keep the user's INTENT but make it technically precise for Sora 2\n"
-    "- Output 2-4 sentences, max 500 chars\n"
-    "- CHARACTER MUST BE THE FOCUS of animation — body, arms, head, expressions\n"
-    "- Use PRESENT CONTINUOUS tense for motion descriptions\n"
-    "- Add specific body mechanics: breathing, weight shift, gesture follow-through\n"
+    "- Output 2-4 sentences, max 300 chars\n"
+    "- CHARACTER MUST BE THE FOCUS of animation -- body, arms, head, expressions\n"
     "- Add ambient effects: particles, cloth physics, hair/beard sway\n"
     "- Camera: static or slow push-in\n"
-    "- PRESERVE: original background, scene, art style — NO changes\n"
+    "- PRESERVE: original background, scene, art style -- NO changes\n"
     "- NO speech, NO lip movement, NO text\n"
     "- Output ONLY the enhanced prompt, nothing else"
 )
 
+# v2 enhance prompt -- Three-layer enhancement with structured output (per D-06)
+# Source: OpenAI Cookbook structured prompting approach
+_ENHANCE_PROMPT_V2 = (
+    "You are a prompt engineer for Sora 2 image-to-video AI. "
+    "Enhance the user's animation description into an optimal Sora 2 motion prompt.\n\n"
+    "OUTPUT FORMAT (4-5 sentences, 300-500 characters):\n"
+    "1. CAMERA -- add one specific camera movement if missing (prefer static or slow push-in)\n"
+    "2. SUBJECT -- make body animation precise using PRESENT CONTINUOUS tense. "
+    "Add micro-actions: breathing, weight shift, gesture follow-through\n"
+    "3. PHYSICS -- add cloth/material physics: robe sway, beard flow, staff weight, fabric draping\n"
+    "4. ATMOSPHERE -- add ambient: particles, light shifts, sparkle effects\n\n"
+    "RULES:\n"
+    "- Keep the user's INTENT but enhance technically for Sora 2\n"
+    "- PRESENT CONTINUOUS tense (is moving, are drifting, is pulsing)\n"
+    "- ONE camera movement -- do not add complex camera work\n"
+    "- CHARACTER is focus -- background stays ambient\n"
+    "- Specify material + force: 'heavy fabric billowing', not just 'fabric moves'\n"
+    "- PRESERVE original scene, background, art style -- NO changes\n"
+    "- NO speech, NO lip movement, NO text\n"
+    "- Output ONLY the enhanced prompt, nothing else"
+)
+
+# Backward compatibility alias (point to v2 by default)
+_ENHANCE_PROMPT = _ENHANCE_PROMPT_V2
+
+
+# -- Version-aware prompt selection ----------------------------------------
+
 
 def _get_system_prompt() -> str:
-    """Return system prompt based on VIDEO_PROMPT_STYLE config."""
+    """Return active system prompt based on VIDEO_PROMPT_STYLE config.
+
+    Per D-06: v2 uses structured sections (CAMERA/SUBJECT/PHYSICS/ATMOSPHERE).
+    """
     try:
         from config import VIDEO_PROMPT_STYLE
         style = VIDEO_PROMPT_STYLE
     except (ImportError, AttributeError):
-        style = "v2"
-    return _SYSTEM_PROMPT_V2 if style == "v2" else _SYSTEM_PROMPT_V1
+        style = os.getenv("VIDEO_PROMPT_STYLE", "v2")
+
+    if style == "v1":
+        return _SYSTEM_PROMPT_V1
+    return _SYSTEM_PROMPT_V2
 
 
-# Alias for backward compatibility
-_SYSTEM_PROMPT = _SYSTEM_PROMPT_V2
+def _get_enhance_prompt() -> str:
+    """Return active enhance prompt based on VIDEO_PROMPT_STYLE config."""
+    try:
+        from config import VIDEO_PROMPT_STYLE
+        style = VIDEO_PROMPT_STYLE
+    except (ImportError, AttributeError):
+        style = os.getenv("VIDEO_PROMPT_STYLE", "v2")
+
+    if style == "v1":
+        return _ENHANCE_PROMPT_V1
+    return _ENHANCE_PROMPT_V2
 
 
 # -- Builder class ---------------------------------------------------------
@@ -414,10 +444,11 @@ class VideoPromptBuilder:
             user_message = "\n".join(parts)
 
             # Call LLM with tier="lite" for cost efficiency (~$0.001/prompt)
+            # Per D-07: max_tokens 250 for v2 (4-5 sentences, 300-500 chars)
             raw = generate(
                 system_prompt=_get_system_prompt(),
                 user_message=user_message,
-                max_tokens=200,
+                max_tokens=250,
                 tier="lite",
             )
 
@@ -466,17 +497,19 @@ class VideoPromptBuilder:
         try:
             from src.llm_client import generate
 
-            base_motion = MOTION_TEMPLATES.get(theme_key, MOTION_TEMPLATES.get("generico", ""))
+            templates = _get_templates()
+            base_motion = templates.get(theme_key, templates.get("generico", ""))
             user_message = (
                 f"User's animation idea: {user_input}\n"
                 f"Theme context: {theme_key or 'general'}\n"
                 f"Reference motion style: {base_motion}"
             )
 
+            # Per D-07: max_tokens 250 for v2 (4-5 sentences, 300-500 chars)
             raw = generate(
-                system_prompt=_ENHANCE_PROMPT,
+                system_prompt=_get_enhance_prompt(),
                 user_message=user_message,
-                max_tokens=200,
+                max_tokens=250,
                 tier="lite",
             )
             prompt = self._clean_llm_response(raw)
@@ -484,25 +517,25 @@ class VideoPromptBuilder:
             if not prompt or len(prompt) < 10:
                 return self._build_safe_prompt(user_input)
 
+            # Per D-07: Cap at 500 chars (research: 300-500 sweet spot for i2v)
             if len(prompt) > 500:
                 prompt = prompt[:500].rsplit(" ", 1)[0]
 
-            logger.info("Enhanced user prompt: %s → %s", user_input[:40], prompt[:80])
+            logger.info("Enhanced user prompt: %s -> %s", user_input[:40], prompt[:80])
             return prompt
 
         except Exception as e:
-            logger.warning("LLM enhance failed: %s — using safe wrapper", e)
+            logger.warning("LLM enhance failed: %s -- using safe wrapper", e)
             return self._build_safe_prompt(user_input)
 
     @staticmethod
     def _build_safe_prompt(user_input: str) -> str:
         """Wrap user input with safe Sora 2 directives when LLM is unavailable."""
         return (
-            f"{user_input}. "
-            "Static camera, very slow push-in. "
-            "Preserve original scene, lighting, and background. "
-            "No speech, no text. Subtle animation only. "
-            "Maintain cartoon cel-shading art style."
+            f"Static camera, locked-off shot. {user_input}. "
+            "Character is the primary subject of animation. "
+            "Robe fabric is swaying gently, ambient particles are drifting. "
+            "Maintain cartoon cel-shading art style, portrait 4:5."
         )
 
     def get_fallback_prompt(self, theme_key: str) -> str:
