@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Wand2, RotateCcw, Sparkles, Loader2, CheckCircle2, Video, DollarSign, Package, ThumbsUp, ThumbsDown, Download, Play, XCircle, Trash2, Send } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/animations";
@@ -40,6 +41,7 @@ function inferSource(filename: string): string {
 }
 
 export default function GalleryPage() {
+  const router = useRouter();
   const [themeFilter, setThemeFilter] = useState<string>("");
   const [sourceFilter, setSourceFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<"" | "background" | "meme">("");
@@ -119,7 +121,6 @@ export default function GalleryPage() {
     if (!videoTarget) return;
     setVideoGenerating(true);
     setVideoError(null);
-    setVideoSuccess(false);
     try {
       await generateVideo({
         content_package_id: videoTarget.id,
@@ -127,6 +128,10 @@ export default function GalleryPage() {
         custom_prompt: videoPrompt || undefined,
         model: videoModel || undefined,
       });
+      // Dispatch succeeded — close dialog and go to jobs page
+      setVideoTarget(null);
+      setVideoGenerating(false);
+      router.push("/jobs");
     } catch (err) {
       setVideoGenerating(false);
       setVideoError(err instanceof Error ? err.message : "Erro ao gerar video");
