@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Ready to plan
-stopped_at: Completed 999.1-03-PLAN.md
-last_updated: "2026-03-26T06:01:25.165Z"
+stopped_at: Completed 999.3-02-PLAN.md
+last_updated: "2026-03-27T01:43:03Z"
 progress:
   total_phases: 8
   completed_phases: 2
@@ -54,6 +54,7 @@ Plan: Not started
 | Phase 999.1 P01 | 2min | 2 tasks | 6 files |
 | Phase 999.1 P02 | 3min | 2 tasks | 3 files |
 | Phase 999.1 P03 | 3min | 2 tasks | 4 files |
+| Phase 999.3 P02 | 4min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,8 @@ Recent decisions affecting current work:
 - [Phase 999.1]: 17 motion templates for full theme coverage (15 core + cotidiano + descanso)
 - [Phase 999.1]: Background video task uses get_session_factory() for independent DB sessions (request session unavailable in BackgroundTasks)
 - [Phase 999.1]: Budget enforcement: pre-check estimated cost before generation, track actual cost after completion via kie_video service
+- [Phase 999.3]: v2 system prompt uses structured CAMERA/SUBJECT/PHYSICS/ATMOSPHERE sections per OpenAI Cookbook
+- [Phase 999.3]: max_tokens 250 for v2 (4-5 sentences, 300-500 chars); _get_system_prompt()/_get_enhance_prompt() version switching
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T05:56:19.479Z
-Stopped at: Completed 999.1-03-PLAN.md
+Last session: 2026-03-27T01:43:03Z
+Stopped at: Completed 999.3-02-PLAN.md
 Resume file: None
