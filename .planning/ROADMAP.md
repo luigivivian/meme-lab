@@ -147,7 +147,7 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 18. Job Status Sync & Management | 1/2 | Complete    | 2026-03-27 |
 | 19. Video Gallery & Management | 2/2 | Complete    | 2026-03-27 |
 | 20. Kie.ai Credits & Cost Tracking | 2/2 | Complete    | 2026-03-27 |
-| 21. Dashboard Business Metrics | 0/? | Not Started | - |
+| 21. Dashboard Business Metrics | 0/2 | Not Started | - |
 
 ### Phase 18: Job Status Sync & Management
 **Goal**: Kill stale/failed jobs still showing as running, fix job status synchronization (update to failed on request error or missing job ID), and improve the jobs page UI with better progress visualization and clear status states
@@ -206,11 +206,12 @@ Plans:
   1. All spending/cost values on the dashboard display in BRL (not USD)
   2. Dashboard cards show: total videos generated, average cost per video, remaining Kie.ai budget, total trends collected, active content packages
   3. Cards are visually improved with icons, trend indicators (up/down arrows), and comparative data (vs previous period)
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 21-01: TBD
+- [ ] 21-01-PLAN.md -- Backend: get_business_metrics() repo method + GET /dashboard/business-metrics endpoint
+- [ ] 21-02-PLAN.md -- Frontend: API types/hook, StatsCard extension, business cards, BRL conversion
 
 ## Backlog
 
