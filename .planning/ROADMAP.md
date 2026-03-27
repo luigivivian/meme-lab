@@ -203,8 +203,8 @@ Plans:
 **Cost:** Zero (research + code changes only).
 **Depends on:** Phase 999.1 (uses VideoPromptBuilder)
 **Requirements:** D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 999.3-01-PLAN.md — v2 motion templates (17 themes, three-layer framework), config constant, version switching, test scaffold
+- [x] 999.3-01-PLAN.md — v2 motion templates (17 themes, three-layer framework), config constant, version switching, test scaffold
 - [ ] 999.3-02-PLAN.md — v2 system prompts (structured CAMERA/SUBJECT/PHYSICS/ATMOSPHERE sections), LLM wiring, additional tests

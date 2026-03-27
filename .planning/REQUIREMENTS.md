@@ -84,14 +84,14 @@ Tracked for backlog phases. Not in current milestone but planned and allocated.
 
 ### Video Legends & Subtitles (Phase 999.2)
 
-- [ ] **LEG-01**: LegendRenderer renders text on video matching image_maker.py style (white text 255,255,255, black stroke 2px, shadow offset 3px)
-- [ ] **LEG-02**: Three animation modes: static (default, full duration), fade-in (0.5s then stays), typewriter (line-by-line ~30 chars/sec)
-- [ ] **LEG-03**: Watermark overlay matches image_maker.py style (bottom-right, 22pt, gold @magomestre420)
-- [ ] **LEG-04**: Word-wrap uses Pillow font metrics (getbbox) identical to image_maker.py _wrap_text()
-- [ ] **LEG-05**: Legend worker integrates into pipeline with auto-trigger and graceful FFmpeg failure fallback
-- [ ] **LEG-06**: API endpoints POST /generate/video/legend and /legend/batch with mode parameter override
-- [ ] **LEG-07**: Config constants VIDEO_LEGEND_ENABLED (default false), VIDEO_LEGEND_MODE (default static), VIDEO_LEGEND_FONT_SIZE (default 48)
-- [ ] **LEG-08**: ContentPackage has legend_status and legend_path columns for tracking
+- [x] **LEG-01**: LegendRenderer renders text on video matching image_maker.py style (white text 255,255,255, black stroke 2px, shadow offset 3px)
+- [x] **LEG-02**: Three animation modes: static (default, full duration), fade-in (0.5s then stays), typewriter (line-by-line ~30 chars/sec)
+- [x] **LEG-03**: Watermark overlay matches image_maker.py style (bottom-right, 22pt, gold @magomestre420)
+- [x] **LEG-04**: Word-wrap uses Pillow font metrics (getbbox) identical to image_maker.py _wrap_text()
+- [x] **LEG-05**: Legend worker integrates into pipeline with auto-trigger and graceful FFmpeg failure fallback
+- [x] **LEG-06**: API endpoints POST /generate/video/legend and /legend/batch with mode parameter override
+- [x] **LEG-07**: Config constants VIDEO_LEGEND_ENABLED (default false), VIDEO_LEGEND_MODE (default static), VIDEO_LEGEND_FONT_SIZE (default 48)
+- [x] **LEG-08**: ContentPackage has legend_status and legend_path columns for tracking
 
 ## Future Requirements
 
@@ -189,14 +189,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VID-08 | Phase 999.1 | Complete |
 | VID-09 | Phase 999.1 | Complete |
 | VID-10 | Phase 999.1 | Complete |
-| LEG-01 | Phase 999.2 | Pending |
-| LEG-02 | Phase 999.2 | Pending |
-| LEG-03 | Phase 999.2 | Pending |
-| LEG-04 | Phase 999.2 | Pending |
-| LEG-05 | Phase 999.2 | Pending |
-| LEG-06 | Phase 999.2 | Pending |
-| LEG-07 | Phase 999.2 | Pending |
-| LEG-08 | Phase 999.2 | Pending |
+| LEG-01 | Phase 999.2 | Complete |
+| LEG-02 | Phase 999.2 | Complete |
+| LEG-03 | Phase 999.2 | Complete |
+| LEG-04 | Phase 999.2 | Complete |
+| LEG-05 | Phase 999.2 | Complete |
+| LEG-06 | Phase 999.2 | Complete |
+| LEG-07 | Phase 999.2 | Complete |
+| LEG-08 | Phase 999.2 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 40 total (24 original + 16 VIRAL)
