@@ -102,6 +102,19 @@ export default function JobsPage() {
     );
   };
 
+  const filterTabs = [
+    { key: "all", label: "Todos", count: jobs.length },
+    { key: "running", label: "Executando", count: jobs.filter((j) => j.status === "running" || j.status === "queued").length },
+    { key: "completed", label: "Concluidos", count: jobs.filter((j) => j.status === "completed" && j.failed === 0).length },
+    { key: "with_failures", label: "Com falhas", count: jobs.filter((j) => j.failed > 0).length },
+  ];
+
+  const filteredJobs = statusFilter === "all" ? jobs
+    : statusFilter === "running" ? jobs.filter((j) => j.status === "running" || j.status === "queued")
+    : statusFilter === "completed" ? jobs.filter((j) => j.status === "completed" && j.failed === 0)
+    : statusFilter === "with_failures" ? jobs.filter((j) => j.failed > 0)
+    : jobs;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -162,21 +175,9 @@ export default function JobsPage() {
       </div>
 
       {/* Filter Tabs */}
-      {jobs.length > 0 && (() => {
-        const counts = {
-          all: jobs.length,
-          running: jobs.filter((j) => j.status === "running" || j.status === "queued").length,
-          completed: jobs.filter((j) => j.status === "completed" && j.failed === 0).length,
-          with_failures: jobs.filter((j) => j.failed > 0).length,
-        };
-        return (
+      {jobs.length > 0 && (
         <div className="flex items-center gap-1.5 rounded-xl bg-secondary/30 p-1 w-fit">
-          {([
-            { key: "all", label: "Todos", count: counts.all },
-            { key: "running", label: "Executando", count: counts.running },
-            { key: "completed", label: "Concluidos", count: counts.completed },
-            { key: "with_failures", label: "Com falhas", count: counts.with_failures },
-          ] as const).map(({ key, label, count }) => (
+          {filterTabs.map(({ key, label, count }) => (
             <button
               key={key}
               onClick={() => setStatusFilter(key)}
@@ -191,8 +192,7 @@ export default function JobsPage() {
             </button>
           ))}
         </div>
-        );
-      })()}
+      )}
 
       {/* Jobs List */}
       {isLoading ? (
@@ -201,23 +201,17 @@ export default function JobsPage() {
             <Skeleton key={i} className="h-16 rounded-xl" />
           ))}
         </div>
-      ) : jobs.length > 0 ? (() => {
-        const filtered = statusFilter === "all" ? jobs
-          : statusFilter === "running" ? jobs.filter((j) => j.status === "running" || j.status === "queued")
-          : statusFilter === "completed" ? jobs.filter((j) => j.status === "completed" && j.failed === 0)
-          : statusFilter === "with_failures" ? jobs.filter((j) => j.failed > 0)
-          : jobs;
-        return filtered.length > 0 ? (
+      ) : filteredJobs.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
               Historico de Jobs
-              {statusFilter !== "all" && <span className="text-muted-foreground font-normal ml-2 text-sm">({filtered.length})</span>}
+              {statusFilter !== "all" && <span className="text-muted-foreground font-normal ml-2 text-sm">({filteredJobs.length})</span>}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <motion.div className="space-y-2 max-h-[500px] overflow-auto" variants={staggerContainer} initial="initial" animate="animate">
-            {filtered.map((job) => {
+            {filteredJobs.map((job) => {
               const Icon = STATUS_ICON[job.status] ?? AlertCircle;
               const jobProgress = job.total > 0 ? Math.round((job.done / job.total) * 100) : 0;
               return (
@@ -268,19 +262,13 @@ export default function JobsPage() {
             </motion.div>
           </CardContent>
         </Card>
-        ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
-              <Layers className="h-8 w-8 text-muted-foreground" />
-              <p className="text-muted-foreground">Nenhum job com status &quot;{statusFilter}&quot;</p>
-            </CardContent>
-          </Card>
-        );
-      })() : (
+      ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
             <Layers className="h-8 w-8 text-muted-foreground" />
-            <p className="text-muted-foreground">Nenhum job encontrado</p>
+            <p className="text-muted-foreground">
+              {jobs.length === 0 ? "Nenhum job encontrado" : `Nenhum job "${filterTabs.find((t) => t.key === statusFilter)?.label ?? statusFilter}"`}
+            </p>
           </CardContent>
         </Card>
       )}
