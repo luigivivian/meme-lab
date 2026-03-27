@@ -296,3 +296,31 @@ class LegendBatchRequest(BaseModel):
     """Request to add text legend overlay to multiple videos."""
     content_package_ids: list[int]
     mode: str = "static"  # "static" | "fade" | "typewriter" (per D-05, D-08)
+
+
+# ===== Video Credits (Phase 20) =====
+
+class ModelCostBreakdown(BaseModel):
+    """Per-model cost breakdown in the credits summary."""
+    model_id: str
+    model_name: str
+    count: int
+    total_brl: float
+    avg_brl: float
+
+
+class VideoCreditsResponse(BaseModel):
+    """GET /generate/video/credits/summary response."""
+    days: int
+    total_spent_brl: float
+    total_spent_usd: float
+    total_videos: int
+    avg_cost_brl: float
+    alltime_spent_brl: float
+    alltime_videos: int
+    models: list[ModelCostBreakdown]
+    failed_count: int
+    failed_zero_cost: bool
+    daily_budget_brl: float
+    daily_spent_brl: float
+    daily_remaining_brl: float

@@ -66,3 +66,78 @@ def test_compute_cost_brl_unknown_model():
     result = compute_video_cost_brl("unknown-model-xyz", 10)
     expected = round(10 * VIDEO_COST_PER_SECOND * VIDEO_USD_TO_BRL, 2)
     assert result == expected
+
+
+# -- Task 2: Repository, endpoint, and response model tests --
+
+def test_credits_summary_schema():
+    """CRED-03: VideoCreditsResponse has all required fields with correct types."""
+    from src.api.models import VideoCreditsResponse, ModelCostBreakdown
+    # Verify all fields exist by instantiation
+    resp = VideoCreditsResponse(
+        days=30,
+        total_spent_brl=5.24,
+        total_spent_usd=0.91,
+        total_videos=2,
+        avg_cost_brl=2.62,
+        alltime_spent_brl=10.48,
+        alltime_videos=4,
+        models=[
+            ModelCostBreakdown(
+                model_id="hailuo/2-3-image-to-video-standard",
+                model_name="Hailuo 2.3 Standard",
+                count=2,
+                total_brl=5.24,
+                avg_brl=2.62,
+            )
+        ],
+        failed_count=0,
+        failed_zero_cost=True,
+        daily_budget_brl=17.25,
+        daily_spent_brl=2.62,
+        daily_remaining_brl=14.63,
+    )
+    assert resp.days == 30
+    assert resp.total_spent_brl == 5.24
+    assert len(resp.models) == 1
+    assert resp.models[0].model_id == "hailuo/2-3-image-to-video-standard"
+    assert resp.failed_zero_cost is True
+
+
+def test_increment_signature():
+    """UsageRepository.increment() accepts cost_brl and model parameters."""
+    from src.database.repositories.usage_repo import UsageRepository
+    sig = inspect.signature(UsageRepository.increment)
+    params = list(sig.parameters.keys())
+    assert "cost_brl" in params, "increment() missing cost_brl parameter"
+    assert "model" in params, "increment() missing model parameter"
+    # Verify defaults
+    assert sig.parameters["cost_brl"].default == 0.0
+    assert sig.parameters["model"].default is None
+
+
+def test_video_credits_response_fields():
+    """VideoCreditsResponse serializes correctly with all fields."""
+    from src.api.models import VideoCreditsResponse
+    data = {
+        "days": 7,
+        "total_spent_brl": 0.0,
+        "total_spent_usd": 0.0,
+        "total_videos": 0,
+        "avg_cost_brl": 0.0,
+        "alltime_spent_brl": 0.0,
+        "alltime_videos": 0,
+        "models": [],
+        "failed_count": 0,
+        "failed_zero_cost": True,
+        "daily_budget_brl": 17.25,
+        "daily_spent_brl": 0.0,
+        "daily_remaining_brl": 17.25,
+    }
+    resp = VideoCreditsResponse(**data)
+    serialized = resp.model_dump()
+    assert serialized["days"] == 7
+    assert serialized["daily_budget_brl"] == 17.25
+    assert serialized["models"] == []
+    assert "total_spent_brl" in serialized
+    assert "alltime_spent_brl" in serialized

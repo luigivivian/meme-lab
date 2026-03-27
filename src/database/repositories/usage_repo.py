@@ -97,6 +97,8 @@ class UsageRepository:
         tier: str,
         status: str = "success",
         cost_usd: float = 0.0,
+        cost_brl: float = 0.0,
+        model: str | None = None,
     ) -> int:
         """Atomically increment usage counter. Returns new count.
 
@@ -112,6 +114,8 @@ class UsageRepository:
             date=today_utc,
             usage_count=1,
             cost_usd=cost_usd,
+            cost_brl=cost_brl,
+            model=model,
             status=status,
         )
 
@@ -124,6 +128,7 @@ class UsageRepository:
                 set_={
                     "usage_count": ApiUsage.usage_count + 1,
                     "cost_usd": ApiUsage.cost_usd + cost_usd,
+                    "cost_brl": ApiUsage.cost_brl + cost_brl,
                 },
             )
         else:
@@ -133,6 +138,7 @@ class UsageRepository:
             stmt = stmt.on_duplicate_key_update(
                 usage_count=ApiUsage.usage_count + 1,
                 cost_usd=ApiUsage.cost_usd + cost_usd,
+                cost_brl=ApiUsage.cost_brl + cost_brl,
             )
 
         await self.session.execute(stmt)
@@ -396,3 +402,129 @@ class UsageRepository:
         )
         rows = result.all()
         return [{"service": row.service, "cost_usd": round(float(row.cost or 0), 6)} for row in rows]
+
+    async def get_credits_summary(self, user_id: int, days: int = 30) -> dict:
+        """Get BRL credits summary for kie_video service.
+
+        Returns per-model breakdown, time-range totals, all-time totals,
+        failed count, and daily budget info.
+        """
+        from datetime import timedelta
+        from config import VIDEO_MODELS, VIDEO_DAILY_BUDGET_USD, VIDEO_USD_TO_BRL
+
+        cutoff = datetime.utcnow().replace(
+            hour=0, minute=0, second=0, microsecond=0,
+        ) - timedelta(days=days)
+
+        # Per-model breakdown (within date range)
+        result = await self.session.execute(
+            select(
+                ApiUsage.tier,
+                func.sum(ApiUsage.cost_brl).label("total_brl"),
+                func.sum(ApiUsage.cost_usd).label("total_usd"),
+                func.sum(ApiUsage.usage_count).label("count"),
+            )
+            .where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.service == "kie_video",
+                ApiUsage.status == "success",
+                ApiUsage.date >= cutoff,
+            )
+            .group_by(ApiUsage.tier)
+        )
+        rows = result.all()
+
+        models = []
+        total_brl = 0.0
+        total_usd = 0.0
+        total_videos = 0
+        for row in rows:
+            row_brl = float(row.total_brl or 0)
+            row_usd = float(row.total_usd or 0)
+            row_count = int(row.count or 0)
+            # Legacy rows have cost_brl=0 but cost_usd>0: fallback conversion
+            if row_brl == 0 and row_usd > 0:
+                row_brl = round(row_usd * VIDEO_USD_TO_BRL, 2)
+            model_info = VIDEO_MODELS.get(row.tier, {})
+            model_name = model_info.get("name", row.tier)
+            models.append({
+                "model_id": row.tier,
+                "model_name": model_name,
+                "count": row_count,
+                "total_brl": round(row_brl, 2),
+                "avg_brl": round(row_brl / row_count, 2) if row_count > 0 else 0.0,
+            })
+            total_brl += row_brl
+            total_usd += row_usd
+            total_videos += row_count
+
+        avg_cost_brl = round(total_brl / total_videos, 2) if total_videos > 0 else 0.0
+
+        # All-time totals
+        alltime_result = await self.session.execute(
+            select(
+                func.sum(ApiUsage.cost_brl).label("total_brl"),
+                func.sum(ApiUsage.cost_usd).label("total_usd"),
+                func.sum(ApiUsage.usage_count).label("count"),
+            )
+            .where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.service == "kie_video",
+                ApiUsage.status == "success",
+            )
+        )
+        alltime = alltime_result.one()
+        alltime_brl = float(alltime.total_brl or 0)
+        alltime_usd = float(alltime.total_usd or 0)
+        alltime_videos = int(alltime.count or 0)
+        if alltime_brl == 0 and alltime_usd > 0:
+            alltime_brl = round(alltime_usd * VIDEO_USD_TO_BRL, 2)
+
+        # Failed count (rows where status != "success" for kie_video)
+        failed_result = await self.session.execute(
+            select(func.count()).select_from(ApiUsage).where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.service == "kie_video",
+                ApiUsage.status != "success",
+                ApiUsage.date >= cutoff,
+            )
+        )
+        failed_count = failed_result.scalar_one_or_none() or 0
+
+        # Daily budget in BRL
+        daily_budget_brl = round(VIDEO_DAILY_BUDGET_USD * VIDEO_USD_TO_BRL, 2)
+
+        # Daily spent BRL (sum cost_brl for today)
+        today_utc = self._get_pt_today_start_utc()
+        daily_result = await self.session.execute(
+            select(
+                func.sum(ApiUsage.cost_brl).label("brl"),
+                func.sum(ApiUsage.cost_usd).label("usd"),
+            ).where(
+                ApiUsage.user_id == user_id,
+                ApiUsage.service == "kie_video",
+                ApiUsage.date == today_utc,
+                ApiUsage.status == "success",
+            )
+        )
+        daily_row = daily_result.one()
+        daily_spent_brl = float(daily_row.brl or 0)
+        if daily_spent_brl == 0 and (daily_row.usd or 0) > 0:
+            daily_spent_brl = round(float(daily_row.usd) * VIDEO_USD_TO_BRL, 2)
+        daily_remaining_brl = round(max(0, daily_budget_brl - daily_spent_brl), 2)
+
+        return {
+            "days": days,
+            "total_spent_brl": round(total_brl, 2),
+            "total_spent_usd": round(total_usd, 6),
+            "total_videos": total_videos,
+            "avg_cost_brl": avg_cost_brl,
+            "alltime_spent_brl": round(alltime_brl, 2),
+            "alltime_videos": alltime_videos,
+            "models": models,
+            "failed_count": failed_count,
+            "failed_zero_cost": True,  # Failed generations never call increment()
+            "daily_budget_brl": daily_budget_brl,
+            "daily_spent_brl": round(daily_spent_brl, 2),
+            "daily_remaining_brl": daily_remaining_brl,
+        }

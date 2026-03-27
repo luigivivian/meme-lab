@@ -32,6 +32,7 @@ from src.api.models import (
     VideoStatusResponse,
     VideoBudgetResponse,
     VideoProgressDetailResponse,
+    VideoCreditsResponse,
     LegendRequest,
     LegendBatchRequest,
 )
@@ -69,6 +70,27 @@ async def list_video_models():
             "is_default": model_id == VIDEO_MODEL,
         })
     return {"models": models, "default": VIDEO_MODEL, "usd_to_brl": VIDEO_USD_TO_BRL}
+
+
+@router.get(
+    "/credits/summary",
+    summary="Get video credits summary",
+    response_model=VideoCreditsResponse,
+)
+async def credits_summary(
+    days: int = 30,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Return BRL cost summary for video generation with per-model breakdown.
+
+    Per CRED-03: total spent, per-model breakdown, failed count, daily budget in BRL.
+    """
+    from src.database.repositories.usage_repo import UsageRepository
+
+    repo = UsageRepository(session)
+    data = await repo.get_credits_summary(user_id=current_user.id, days=days)
+    return VideoCreditsResponse(**data)
 
 
 @router.post("/preview-prompt", summary="Preview video prompt without calling Kie.ai (free)")
@@ -318,18 +340,23 @@ async def _generate_video_task(
                     "generation_time_ms": gen_result.generation_time_ms,
                 }
 
-                # Track cost (per D-09)
+                # Track cost (per D-09, CRED-01/02: BRL from prices_brl, success-only)
+                from config import compute_video_cost_brl
+                model_id = model or VIDEO_MODEL
+                cost_brl = compute_video_cost_brl(model_id, duration)
                 repo = UsageRepository(session)
                 await repo.increment(
                     user_id=user_id,
                     service="kie_video",
-                    tier="standard",
+                    tier=model_id,
                     cost_usd=gen_result.cost_usd,
+                    cost_brl=cost_brl,
+                    model=model_id,
                 )
 
                 logger.info(
-                    "Video generated for package %d: task=%s cost=$%.3f",
-                    content_package_id, gen_result.task_id, gen_result.cost_usd,
+                    "Video generated for package %d: task=%s cost=$%.3f R$%.2f",
+                    content_package_id, gen_result.task_id, gen_result.cost_usd, cost_brl,
                 )
             else:
                 # Failure
