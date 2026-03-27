@@ -1206,10 +1206,17 @@ export interface VideoProgressResponse {
   content_package_id: number;
   state: string;
   progress: number;
+  step_label: string;
 }
 
 export const getVideoProgress = (contentPackageId: number) =>
   request<VideoProgressResponse>(`/generate/video/progress/${contentPackageId}`);
+
+export async function retryVideo(contentPackageId: number): Promise<VideoStatusResponse> {
+  return request<VideoStatusResponse>(`/generate/video/retry/${contentPackageId}`, {
+    method: "POST",
+  });
+}
 
 export const getVideoBudget = () =>
   request<VideoBudgetResponse>("/generate/video/budget");

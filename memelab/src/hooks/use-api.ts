@@ -187,13 +187,13 @@ export function useBillingStatus() {
 
 export function useVideoList() {
   const swr = useSWR("video-list", () => api.getVideoList(), {
-    refreshInterval: 10000,
+    refreshInterval: 30000,
     errorRetryCount: 1,
   });
   // Poll faster (3s) when videos are actively generating
   const hasGenerating = swr.data?.videos.some((v) => v.video_status === "generating");
   return useSWR("video-list", () => api.getVideoList(), {
-    refreshInterval: hasGenerating ? 3000 : 10000,
+    refreshInterval: hasGenerating ? 3000 : 30000,
     errorRetryCount: 1,
   });
 }
