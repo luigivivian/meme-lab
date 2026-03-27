@@ -162,14 +162,21 @@ export default function JobsPage() {
       </div>
 
       {/* Filter Tabs */}
-      {jobs.length > 0 && (
+      {jobs.length > 0 && (() => {
+        const counts = {
+          all: jobs.length,
+          running: jobs.filter((j) => j.status === "running" || j.status === "queued").length,
+          completed: jobs.filter((j) => j.status === "completed" && j.failed === 0).length,
+          with_failures: jobs.filter((j) => j.failed > 0).length,
+        };
+        return (
         <div className="flex items-center gap-1.5 rounded-xl bg-secondary/30 p-1 w-fit">
-          {[
-            { key: "all", label: "Todos", count: jobs.length },
-            { key: "running", label: "Executando", count: jobs.filter((j) => j.status === "running").length },
-            { key: "completed", label: "Concluidos", count: jobs.filter((j) => j.status === "completed").length },
-            { key: "failed", label: "Falhas", count: jobs.filter((j) => j.status === "failed" || j.failed > 0).length },
-          ].map(({ key, label, count }) => (
+          {([
+            { key: "all", label: "Todos", count: counts.all },
+            { key: "running", label: "Executando", count: counts.running },
+            { key: "completed", label: "Concluidos", count: counts.completed },
+            { key: "with_failures", label: "Com falhas", count: counts.with_failures },
+          ] as const).map(({ key, label, count }) => (
             <button
               key={key}
               onClick={() => setStatusFilter(key)}
@@ -184,7 +191,8 @@ export default function JobsPage() {
             </button>
           ))}
         </div>
-      )}
+        );
+      })()}
 
       {/* Jobs List */}
       {isLoading ? (
@@ -195,8 +203,10 @@ export default function JobsPage() {
         </div>
       ) : jobs.length > 0 ? (() => {
         const filtered = statusFilter === "all" ? jobs
-          : statusFilter === "failed" ? jobs.filter((j) => j.status === "failed" || j.failed > 0)
-          : jobs.filter((j) => j.status === statusFilter);
+          : statusFilter === "running" ? jobs.filter((j) => j.status === "running" || j.status === "queued")
+          : statusFilter === "completed" ? jobs.filter((j) => j.status === "completed" && j.failed === 0)
+          : statusFilter === "with_failures" ? jobs.filter((j) => j.failed > 0)
+          : jobs;
         return filtered.length > 0 ? (
         <Card>
           <CardHeader>
