@@ -22,6 +22,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 15: Publishing & Scheduling** - Schedule, publish, manage, and calendar-view Instagram posts (completed 2026-03-26)
 - [x] **Phase 16: Dashboard v2** - 30-day usage history, limit alerts, cost reports, and pipeline run history (completed 2026-03-26)
 - [x] **Phase 17: Billing & Stripe** - Subscription plans with Stripe Checkout, webhooks, portal, and plan enforcement (completed 2026-03-26)
+- [x] **Phase 999.1: Video Generation — Kie.ai Sora 2** - Image-to-video via Kie.ai API, GCS upload, motion prompts, budget cap (completed 2026-03-26)
+- [x] **Phase 999.2: Video Legends & Subtitles** - FFmpeg text overlays on videos, 3 animation modes, pipeline integration (completed 2026-03-27)
+- [x] **Phase 999.3: Sora 2 Prompt Engineering Research** - V2 motion templates, three-layer framework, version switching (completed 2026-03-27)
+- [ ] **Phase 18: Job Status Sync & Management** - Fix stale/failed jobs, status sync, improved jobs page UI with progress visualization
+- [ ] **Phase 19: Video Gallery & Management** - Dedicated videos page, inline player, download/approve/delete, filters, video tag on images
+- [ ] **Phase 20: Kie.ai Credits & Cost Tracking** - Credits system per model, only charge on success, BRL cost tracking
+- [ ] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density
 
 ## Phase Details
 
@@ -135,7 +142,73 @@ Phases execute in numeric order: 12 -> 12.1 -> 12.2 -> 13 -> ...
 | 16. Dashboard v2 | 0/? | Complete    | 2026-03-26 |
 | 17. Billing & Stripe | 1/2 | Complete    | 2026-03-26 |
 | 999.1. Video Generation — Kie.ai Sora 2 | 3/3 | Complete    | 2026-03-26 |
-| 999.2. Video Legends & Subtitles | 1/2 | Complete    | 2026-03-27 |
+| 999.2. Video Legends & Subtitles | 2/2 | Complete    | 2026-03-27 |
+| 999.3. Sora 2 Prompt Engineering | 2/2 | Complete    | 2026-03-27 |
+| 18. Job Status Sync & Management | 0/? | Not Started | - |
+| 19. Video Gallery & Management | 0/? | Not Started | - |
+| 20. Kie.ai Credits & Cost Tracking | 0/? | Not Started | - |
+| 21. Dashboard Business Metrics | 0/? | Not Started | - |
+
+### Phase 18: Job Status Sync & Management
+**Goal**: Kill stale/failed jobs still showing as running, fix job status synchronization (update to failed on request error or missing job ID), and improve the jobs page UI with better progress visualization and clear status states
+**Depends on**: Phase 999.1
+**Requirements**: JOB-01, JOB-02, JOB-03, JOB-04
+**Success Criteria** (what must be TRUE):
+  1. No stale jobs remain — any job that failed or whose Kie.ai task ID is not found is marked as failed in the database
+  2. Job status sync validates against Kie.ai API on each poll — request errors and missing IDs trigger automatic failed status
+  3. Jobs page shows clear visual distinction between running (spinner), completed (green check), and failed (red X) states
+  4. Jobs page has improved progress bars with real-time updates and accurate percentage display
+**Plans**: TBD
+
+Plans:
+- [ ] 18-01: TBD
+- [ ] 18-02: TBD
+
+### Phase 19: Video Gallery & Management
+**Goal**: Create a dedicated "Videos Gerados" page with its own sidebar menu entry, supporting inline video playback, download, approve/delete actions, filters, and newest-first ordering. Images with existing videos show a tag but keep all generation actions enabled.
+**Depends on**: Phase 18
+**Requirements**: VGAL-01, VGAL-02, VGAL-03, VGAL-04, VGAL-05, VGAL-06
+**Success Criteria** (what must be TRUE):
+  1. A new "Videos" entry exists in the sidebar navigation, leading to a dedicated video gallery page
+  2. Videos are displayed ordered from newest to oldest, with inline video player (play in browser without download)
+  3. Each video has separate action buttons: download, approve, delete — with confirmation dialog for delete
+  4. Filter tabs allow filtering by status (all/completed/failed), model used, and date range
+  5. In the image gallery, images that already have generated videos show a "Video Gerado" tag but all actions remain enabled for new video generations
+  6. Deleting a video removes the file and clears video columns from the content package
+**Plans**: TBD
+**UI hint**: yes
+
+Plans:
+- [ ] 19-01: TBD
+- [ ] 19-02: TBD
+
+### Phase 20: Kie.ai Credits & Cost Tracking
+**Goal**: Create a credits tracking system for Kie.ai API that correctly accounts costs per model using configured BRL prices, only deducting credits on successful video generation
+**Depends on**: Phase 18
+**Requirements**: CRED-01, CRED-02, CRED-03, CRED-04
+**Success Criteria** (what must be TRUE):
+  1. Credits are only deducted when a video generation succeeds — failed generations cost zero
+  2. Each model's cost is tracked using the prices_brl values from VIDEO_MODELS config
+  3. A credits summary is available via API showing total spent, per-model breakdown, and remaining budget
+  4. Dashboard displays accurate cumulative costs in BRL with per-model granularity
+**Plans**: TBD
+
+Plans:
+- [ ] 20-01: TBD
+
+### Phase 21: Dashboard Business Metrics
+**Goal**: Improve dashboard info cards with business-relevant metrics (videos gerados, custo medio por video, creditos restantes, trends coletados) and update all spending values to display in BRL
+**Depends on**: Phase 20
+**Requirements**: DASH-05, DASH-06, DASH-07
+**Success Criteria** (what must be TRUE):
+  1. All spending/cost values on the dashboard display in BRL (not USD)
+  2. Dashboard cards show: total videos generated, average cost per video, remaining Kie.ai budget, total trends collected, active content packages
+  3. Cards are visually improved with icons, trend indicators (up/down arrows), and comparative data (vs previous period)
+**Plans**: TBD
+**UI hint**: yes
+
+Plans:
+- [ ] 21-01: TBD
 
 ## Backlog
 
@@ -203,7 +276,7 @@ Plans:
 **Cost:** Zero (research + code changes only).
 **Depends on:** Phase 999.1 (uses VideoPromptBuilder)
 **Requirements:** D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 999.3-01-PLAN.md — v2 motion templates (17 themes, three-layer framework), config constant, version switching, test scaffold
