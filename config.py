@@ -379,3 +379,14 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "clipflow-video-uploads")
 
 # Signed URL expiry in seconds (1 hour — video gen takes 30-120s)
 GCS_SIGNED_URL_EXPIRY = int(os.getenv("GCS_SIGNED_URL_EXPIRY", "3600"))
+
+# ===== Video Legends (FFmpeg drawtext) — Phase 999.2 =====
+
+# Feature flag — legend rendering disabled by default (requires FFmpeg installed)
+VIDEO_LEGEND_ENABLED = os.getenv("VIDEO_LEGEND_ENABLED", "false").lower() == "true"
+
+# Default animation mode: "static" | "fade" | "typewriter" (per D-05, D-08)
+VIDEO_LEGEND_MODE = os.getenv("VIDEO_LEGEND_MODE", "static")
+
+# Font size for video text overlay (matches FONT_SIZE=48 by default)
+VIDEO_LEGEND_FONT_SIZE = int(os.getenv("VIDEO_LEGEND_FONT_SIZE", "48"))

@@ -346,6 +346,10 @@ class ContentPackage(Base):
     video_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     video_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
+    # Legend overlay (Phase 999.2)
+    legend_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    legend_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+
     # Approval workflow (Phase 12)
     approval_status: Mapped[str] = mapped_column(
         String(20), default="pending", server_default="pending", nullable=False
@@ -371,6 +375,7 @@ class ContentPackage(Base):
         Index("idx_pkg_created_at", "created_at"),
         Index("idx_pkg_is_published", "is_published"),
         Index("idx_pkg_video_status", "video_status"),
+        Index("idx_pkg_legend_status", "legend_status"),
     )
 
 
