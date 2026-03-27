@@ -1,7 +1,7 @@
 """add billing fields to users table
 
-Revision ID: 013
-Revises: 012
+Revision ID: 014
+Revises: 013
 Create Date: 2026-03-26
 
 Phase 17: Billing & Stripe
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "013"
-down_revision: Union[str, None] = "012"
+revision: str = "014"
+down_revision: Union[str, None] = "013"
 branch_labels: Union[str, None] = None
 depends_on: Union[str, None] = None
 

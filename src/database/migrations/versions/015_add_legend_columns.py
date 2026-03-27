@@ -1,7 +1,7 @@
 """add legend columns to content_packages
 
-Revision ID: 014
-Revises: 012
+Revision ID: 015
+Revises: 014
 Create Date: 2026-03-26
 
 Phase 999.2: Video Legends & Subtitles
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers
-revision: str = '014'
-down_revision: Union[str, None] = '012'
+revision: str = '015'
+down_revision: Union[str, None] = '014'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
