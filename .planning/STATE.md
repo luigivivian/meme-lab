@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: Ready to execute
-stopped_at: Completed 20-01-PLAN.md
-last_updated: "2026-03-27T18:50:24.212Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-03-27T18:54:55.743Z"
 progress:
   total_phases: 13
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -67,6 +67,7 @@ Plan: 2 of 2
 | Phase 19 P02 | 3min | 2 tasks | 2 files |
 | Phase 19 P02 | 4min | 2 tasks | 2 files |
 | Phase 20 P01 | 4min | 2 tasks | 7 files |
+| Phase 20 P02 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,9 @@ Recent decisions affecting current work:
 - [Phase 20]: tier=model_id approach: per-model rows via existing unique constraint, no schema change needed
 - [Phase 20]: Legacy api_usage rows (cost_brl=0, cost_usd>0) handled by USD*BRL fallback in summary query
 - [Phase 20]: compute_video_cost_brl in config.py: prices_brl lookup with closest-duration snap, USD fallback for unknown models
+- [Phase 20]: VideoCreditsCard placed below existing dashboard content, before Dialog (per Phase 16 pattern)
+- [Phase 20]: No existing cost_usd displays modified (deferred to Phase 21 per user decision)
+- [Phase 20]: formatBRL uses Intl.NumberFormat pt-BR for locale-aware BRL formatting
 
 ### Pending Todos
 
@@ -133,6 +137,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T18:50:24.209Z
-Stopped at: Completed 20-01-PLAN.md
+Last session: 2026-03-27T18:54:55.740Z
+Stopped at: Completed 20-02-PLAN.md
 Resume file: None
