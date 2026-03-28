@@ -21,7 +21,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import generation, jobs, themes, pipeline, content, agents, drive, characters, publishing, auth, video, billing, dashboard
+from src.api.routes import generation, jobs, themes, pipeline, content, agents, drive, characters, publishing, auth, video, billing, dashboard, reels
 from src.api.log_sanitizer import setup_log_sanitizer
 
 setup_log_sanitizer()
@@ -107,6 +107,7 @@ app.include_router(auth.router)
 app.include_router(video.router)
 app.include_router(billing.router)
 app.include_router(dashboard.router)
+app.include_router(reels.router)
 
 
 @app.get("/llm/status", tags=["System"], summary="Status do backend LLM")
