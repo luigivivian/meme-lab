@@ -43,6 +43,34 @@ class ReelsResult:
     cost_brl: float
 
 
+def _pick_scene_duration(cena: dict, target_duration: int) -> int:
+    """Pick 6s or 10s for a Hailuo clip based on scene complexity.
+
+    Uses scene narration length, script-defined duration, and overall
+    reel target to decide. Longer/complex scenes get 10s.
+    """
+    script_dur = cena.get("duracao_segundos", 5)
+    narracao = cena.get("narracao", "")
+    overlay = cena.get("legenda_overlay", "")
+
+    # Signals that a scene needs more time:
+    # - Script says >6s for this scene
+    # - Long narration (>60 chars = ~5s of speech)
+    # - Detailed visual description (>80 chars = complex scene)
+    # - Overall reel is long (>45s = probably needs richer scenes)
+    complexity_score = 0
+    if script_dur > 6:
+        complexity_score += 2
+    if len(narracao) > 60:
+        complexity_score += 1
+    if len(overlay) > 80:
+        complexity_score += 1
+    if target_duration > 45:
+        complexity_score += 1
+
+    return 10 if complexity_score >= 2 else 6
+
+
 def _build_scene_motion_prompt(overlay: str, narracao: str, scene_idx: int, total: int) -> str:
     """Build a Hailuo motion prompt directly from the scene description.
 
@@ -412,7 +440,7 @@ class ReelsPipeline:
         os.makedirs(clips_dir, exist_ok=True)
 
         hailuo_model = "hailuo/2-3-image-to-video-standard"
-        hailuo_duration = 6
+        target_duration = self.config.get("target_duration", 30)
         n = len(image_paths)
 
         # Phase 1: Upload images to GCS and build scene-aware motion prompts
@@ -422,41 +450,51 @@ class ReelsPipeline:
             gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{i}.jpg"
             public_url = gcs.upload_image(img_path, gcs_key)
 
-            # Build motion prompt directly from scene context — NOT from generic wizard templates
             narracao = cena.get("narracao", "")
             overlay = cena.get("legenda_overlay", "")
+            clip_duration = _pick_scene_duration(cena, target_duration)
             motion = _build_scene_motion_prompt(overlay, narracao, i, n)
 
-            tasks_info.append({"index": i, "url": public_url, "motion": motion, "img_path": img_path})
-            logger.info(f"Scene {i}: uploaded to GCS, motion prompt: {motion[:80]}...")
+            tasks_info.append({
+                "index": i, "url": public_url, "motion": motion,
+                "img_path": img_path, "duration": clip_duration,
+            })
+            logger.info(f"Scene {i}: {clip_duration}s clip, prompt: {motion[:60]}...")
 
-        # Phase 2: Create all Hailuo tasks
+        # Phase 2: Create all Hailuo tasks (per-scene duration: 6s or 10s)
         task_ids = []
         for info in tasks_info:
             try:
                 task_id = await kie.create_task(
                     image_url=info["url"],
                     prompt=info["motion"],
-                    duration=hailuo_duration,
+                    duration=info["duration"],
                     model=hailuo_model,
                 )
-                task_ids.append({"index": info["index"], "task_id": task_id, "img_path": info["img_path"]})
-                logger.info(f"Scene {info['index']}: Hailuo task created: {task_id}")
+                task_ids.append({
+                    "index": info["index"], "task_id": task_id,
+                    "img_path": info["img_path"], "duration": info["duration"],
+                })
+                logger.info(f"Scene {info['index']}: Hailuo {info['duration']}s task: {task_id}")
             except Exception as e:
                 logger.error(f"Scene {info['index']}: failed to create Hailuo task: {e}")
-                task_ids.append({"index": info["index"], "task_id": None, "img_path": info["img_path"]})
+                task_ids.append({
+                    "index": info["index"], "task_id": None,
+                    "img_path": info["img_path"], "duration": info["duration"],
+                })
 
         # Phase 3: Poll all tasks in parallel
         async def poll_and_download(entry):
             idx = entry["index"]
             tid = entry["task_id"]
             img_path = entry["img_path"]
+            clip_dur = entry["duration"]
             clip_path = os.path.join(clips_dir, f"clip_{idx:02d}.mp4")
 
             if tid is None:
-                logger.warning(f"Scene {idx}: no task, using static fallback")
+                logger.warning(f"Scene {idx}: no task, using {clip_dur}s static fallback")
                 subprocess.run([
-                    "ffmpeg", "-y", "-loop", "1", "-t", str(hailuo_duration),
+                    "ffmpeg", "-y", "-loop", "1", "-t", str(clip_dur),
                     "-i", img_path,
                     "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
