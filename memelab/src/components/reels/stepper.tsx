@@ -7,8 +7,8 @@ import type { StepState } from "@/lib/api";
 
 const STEPS = [
   { id: "prompt", label: "Prompt", icon: MessageSquare },
-  { id: "images", label: "Imagens", icon: Image },
   { id: "script", label: "Roteiro", icon: FileText },
+  { id: "images", label: "Imagens", icon: Image },
   { id: "tts", label: "Narracao", icon: Mic },
   { id: "srt", label: "Legendas", icon: Captions },
   { id: "video", label: "Video", icon: Film },
