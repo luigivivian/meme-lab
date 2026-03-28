@@ -706,6 +706,9 @@ class ReelsJob(TimestampMixin, Base):
     progress_pct: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Interactive step state (per-step persistence for step-by-step execution)
+    step_state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     # Artifacts
     image_paths: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     script_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
