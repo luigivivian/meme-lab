@@ -43,7 +43,7 @@ export function StepNarration({
     try {
       await onApprove("tts");
       mutate();
-    } finally {
+    } catch {
       setLoading(false);
     }
   }

@@ -81,7 +81,7 @@ export function StepSubtitles({
       }
       await onApprove("srt");
       mutate();
-    } finally {
+    } catch {
       setLoading(false);
     }
   }

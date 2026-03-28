@@ -635,6 +635,15 @@ async def approve_step(
 
     step_idx = STEP_ORDER.index(step_name)
     step_data = step_state.get(step_name, {})
+
+    # Idempotent: if already approved, return without re-triggering next step
+    if step_data.get("approved"):
+        return StepApproveResponse(
+            step=step_name,
+            approved=True,
+            current_step=step_state.get("current_step", 0),
+        )
+
     step_data["approved"] = True
     step_state[step_name] = step_data
 

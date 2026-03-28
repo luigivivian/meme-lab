@@ -81,7 +81,7 @@ export function StepScript({ jobId, stepState }: { jobId: string; stepState: Ste
         setDirty(false);
       }
       await approveStep(jobId, "script");
-    } finally {
+    } catch {
       setLoading(false);
     }
   }

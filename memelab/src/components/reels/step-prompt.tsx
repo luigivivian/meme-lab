@@ -17,8 +17,8 @@ export function StepPrompt({ jobId, stepState }: { jobId: string; stepState: Ste
     setLoading(true);
     try {
       await approveStep(jobId, "prompt");
-      // Backend auto-triggers next step on approve — no separate executeStep needed
-    } finally {
+      // Keep loading=true — SWR will switch to next step component
+    } catch {
       setLoading(false);
     }
   }
