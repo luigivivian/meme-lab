@@ -671,6 +671,7 @@ async def approve_step(
                     "niche": cfg.niche,
                     "cta_default": cfg.cta_default,
                 }
+        from src.database.session import get_session_factory
         session_factory = get_session_factory()
         background_tasks.add_task(
             _execute_step_task, job.job_id, next_step_name, config_override, session_factory
