@@ -4,15 +4,19 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useStepState } from "@/hooks/use-reels";
+import { approveStep, regenerateStep } from "@/lib/api";
 import { StepperHeader, StepContent } from "@/components/reels/stepper";
 import { StepPrompt } from "@/components/reels/step-prompt";
 import { StepImages } from "@/components/reels/step-images";
 import { StepScript } from "@/components/reels/step-script";
+import { StepNarration } from "@/components/reels/step-narration";
+import { StepSubtitles } from "@/components/reels/step-subtitles";
+import { StepVideo } from "@/components/reels/step-video";
 
 export default function ReelJobPage() {
   const params = useParams<{ jobId: string }>();
   const jobId = params.jobId;
-  const { data: stepState, error, isLoading } = useStepState(jobId);
+  const { data: stepState, error, isLoading, mutate } = useStepState(jobId);
 
   if (isLoading || !stepState) {
     return (
@@ -39,6 +43,16 @@ export default function ReelJobPage() {
   const currentStep = stepState.current_step;
   const state = stepState!;
 
+  async function handleApprove(step: string) {
+    await approveStep(jobId, step);
+    mutate();
+  }
+
+  async function handleRegenerate(step: string) {
+    await regenerateStep(jobId, step);
+    mutate();
+  }
+
   function renderStepContent() {
     switch (currentStep) {
       case 0:
@@ -47,11 +61,38 @@ export default function ReelJobPage() {
         return <StepImages jobId={jobId} stepState={state} />;
       case 2:
         return <StepScript jobId={jobId} stepState={state} />;
+      case 3:
+        return (
+          <StepNarration
+            jobId={jobId}
+            stepData={state.tts}
+            onApprove={handleApprove}
+            onRegenerate={handleRegenerate}
+            mutate={() => mutate()}
+          />
+        );
+      case 4:
+        return (
+          <StepSubtitles
+            jobId={jobId}
+            stepData={state.srt}
+            onApprove={handleApprove}
+            onRegenerate={handleRegenerate}
+            mutate={() => mutate()}
+          />
+        );
+      case 5:
+        return (
+          <StepVideo
+            jobId={jobId}
+            stepData={state.video}
+            mutate={() => mutate()}
+          />
+        );
       default:
         return (
           <div className="rounded-lg border p-8 text-center">
-            <p className="text-muted-foreground">Em breve...</p>
-            <p className="text-xs text-muted-foreground mt-1">Passo {currentStep + 1} de 6</p>
+            <p className="text-muted-foreground">Passo desconhecido.</p>
           </div>
         );
     }
