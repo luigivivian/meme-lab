@@ -1,4 +1,4 @@
-"""ORM models — 14 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+"""ORM models — 16 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
 
 from datetime import datetime
 from typing import Optional
@@ -614,4 +614,118 @@ class ApiUsage(TimestampMixin, Base):
         Index("idx_api_usage_user_id", "user_id"),
         Index("idx_api_usage_date", "date"),
         Index("idx_api_usage_service", "service"),
+    )
+
+
+# ============================================================
+# 15. reels_config
+# ============================================================
+
+class ReelsConfig(TimestampMixin, Base):
+    __tablename__ = "reels_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False, default="default", server_default="default")
+
+    # Images
+    image_count: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
+    image_style: Mapped[str] = mapped_column(String(50), default="photographic", server_default="photographic")
+
+    # Script
+    tone: Mapped[str] = mapped_column(String(30), default="inspiracional", server_default="inspiracional")
+    target_duration: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
+    niche: Mapped[str] = mapped_column(String(100), default="lifestyle", server_default="lifestyle")
+    cta_default: Mapped[str] = mapped_column(String(200), default="salve esse post", server_default="salve esse post")
+    keywords: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    script_language: Mapped[str] = mapped_column(String(10), default="pt-BR", server_default="pt-BR")
+    script_system_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # TTS
+    tts_provider: Mapped[str] = mapped_column(String(20), default="gemini", server_default="gemini")
+    tts_voice: Mapped[str] = mapped_column(String(50), default="Puck", server_default="Puck")
+    tts_speed: Mapped[float] = mapped_column(Float, default=1.1, server_default="1.1")
+
+    # Transcription
+    transcription_provider: Mapped[str] = mapped_column(String(20), default="gemini", server_default="gemini")
+
+    # Video assembly
+    image_duration: Mapped[float] = mapped_column(Float, default=4.0, server_default="4.0")
+    transition_type: Mapped[str] = mapped_column(String(20), default="fade", server_default="fade")
+    transition_duration: Mapped[float] = mapped_column(Float, default=0.5, server_default="0.5")
+    bg_music_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    bg_music_volume: Mapped[float] = mapped_column(Float, default=0.15, server_default="0.15")
+
+    # Subtitles
+    subtitle_position: Mapped[str] = mapped_column(String(20), default="bottom", server_default="bottom")
+    subtitle_font_size: Mapped[int] = mapped_column(Integer, default=52, server_default="52")
+    subtitle_color: Mapped[str] = mapped_column(String(10), default="#FFFFFF", server_default="#FFFFFF")
+
+    # Branding
+    logo_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
+    # Preset
+    preset: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "character_id", "name", name="uq_reels_config_user_char_name"),
+        Index("idx_reels_config_user_id", "user_id"),
+    )
+
+
+# ============================================================
+# 16. reels_jobs
+# ============================================================
+
+class ReelsJob(TimestampMixin, Base):
+    __tablename__ = "reels_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
+    )
+    config_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("reels_config.id"), nullable=True
+    )
+
+    # Input
+    tema: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    # Status tracking
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default="queued")
+    current_step: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    progress_pct: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Artifacts
+    image_paths: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    script_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    audio_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    srt_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    video_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    video_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+
+    # Publishing
+    instagram_media_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    instagram_permalink: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    caption: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    hashtags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
+    # Cost tracking
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
+    cost_brl: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
+
+    __table_args__ = (
+        Index("idx_reels_jobs_user_id", "user_id"),
+        Index("idx_reels_jobs_status", "status"),
+        Index("idx_reels_jobs_job_id", "job_id"),
     )
