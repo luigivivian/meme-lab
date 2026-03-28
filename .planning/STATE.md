@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: v2.0 milestone complete
-stopped_at: Completed 999.4-04-PLAN.md
-last_updated: "2026-03-28T18:19:25.439Z"
+stopped_at: "Completed 999.4-05-PLAN.md (checkpoint: human-verify pending)"
+last_updated: "2026-03-28T18:24:45.742Z"
 progress:
   total_phases: 14
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
 ---
 
 # Project State
@@ -74,6 +74,7 @@ Plan: Not started
 | Phase 999.4 P02 | 3min | 2 tasks | 4 files |
 | Phase 999.4 P03 | 2min | 2 tasks | 2 files |
 | Phase 999.4 P04 | 2min | 2 tasks | 2 files |
+| Phase 999.4 P05 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -140,6 +141,7 @@ Recent decisions affecting current work:
 - [Phase 999.4]: Direct Gemini API for image gen (no wrapper), response_schema for script JSON, PCM-to-WAV for TTS
 - [Phase 999.4]: xfade filter for crossfade transitions (not concat demuxer); lazy imports in pipeline orchestrator
 - [Phase 999.4]: Models imported from src/reels_pipeline/models.py (no duplication in api/models.py)
+- [Phase 999.4]: Native HTML range inputs for config sliders (no Slider component in project)
 
 ### Pending Todos
 
@@ -153,6 +155,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T18:19:25.436Z
-Stopped at: Completed 999.4-04-PLAN.md
+Last session: 2026-03-28T18:24:45.738Z
+Stopped at: Completed 999.4-05-PLAN.md (checkpoint: human-verify pending)
 Resume file: None

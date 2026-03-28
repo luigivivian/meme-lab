@@ -29,7 +29,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 19: Video Gallery & Management** - Dedicated videos page, inline player, download/approve/delete, filters, video tag on images (completed 2026-03-27)
 - [x] **Phase 20: Kie.ai Credits & Cost Tracking** - Credits system per model, only charge on success, BRL cost tracking (completed 2026-03-27)
 - [x] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density (completed 2026-03-27)
-- [ ] **Phase 999.4: Instagram Reels Pipeline** - Geracao automatizada de Reels: imagens → roteiro Claude → TTS → legendas → FFmpeg → MP4 (BACKLOG)
+- [x] **Phase 999.4: Instagram Reels Pipeline** - Geracao automatizada de Reels: imagens → roteiro Claude → TTS → legendas → FFmpeg → MP4 (BACKLOG) (completed 2026-03-28)
 
 ## Phase Details
 
@@ -304,4 +304,4 @@ Plans:
 - [x] 999.4-02-PLAN.md — Pipeline modules: image_gen, script_gen, tts, transcriber
 - [x] 999.4-03-PLAN.md — Video builder (FFmpeg xfade) + pipeline orchestrator (main.py)
 - [x] 999.4-04-PLAN.md — API routes (/reels/*) + app wiring
-- [ ] 999.4-05-PLAN.md — Frontend: reels page, config panel, API client, SWR hooks, sidebar nav
+- [x] 999.4-05-PLAN.md — Frontend: reels page, config panel, API client, SWR hooks, sidebar nav
