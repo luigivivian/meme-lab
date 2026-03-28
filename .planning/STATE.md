@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: v2.0 milestone complete
-stopped_at: Completed 21-02-PLAN.md
-last_updated: "2026-03-27T22:13:02.705Z"
+stopped_at: Phase 999.4 context gathered
+last_updated: "2026-03-28T17:32:25.600Z"
 progress:
-  total_phases: 13
+  total_phases: 14
   completed_phases: 4
   total_plans: 8
   completed_plans: 8
@@ -145,6 +145,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T21:54:09.384Z
-Stopped at: Completed 21-02-PLAN.md
-Resume file: None
+Last session: 2026-03-28T17:32:25.586Z
+Stopped at: Phase 999.4 context gathered
+Resume file: .planning/phases/999.4-instagram-reels-pipeline/999.4-CONTEXT.md
