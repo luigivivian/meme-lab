@@ -193,7 +193,7 @@ async def _execute_step_task(
                 audio_path = step_state.get("tts", {}).get("path", "")
                 srt_path = step_state.get("srt", {}).get("path", "")
                 script_json = step_state.get("script", {}).get("json", {})
-                video_path = await pipeline.run_step_video(
+                video_path = await pipeline.run_step_video_hailuo(
                     image_paths=image_paths,
                     audio_path=audio_path,
                     srt_path=srt_path,

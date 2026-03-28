@@ -291,6 +291,136 @@ class ReelsPipeline:
 
         return video_path
 
+    async def run_step_video_hailuo(
+        self,
+        image_paths: list[str],
+        audio_path: str,
+        srt_path: str,
+        job_dir: str,
+        script: dict | None = None,
+    ) -> str:
+        """Step 6 v2: Generate per-scene Hailuo video clips, concatenate with audio + subtitles.
+
+        Per REELV2-03: Uses Kie.ai Hailuo 2.3 Standard for image-to-video per scene.
+        Polls all tasks in parallel. Falls back to static image clip on failure.
+        Final assembly via FFmpeg xfade + audio + SRT subtitles.
+
+        Args:
+            image_paths: Paths to per-scene images (1 per cena).
+            audio_path: Path to TTS narration audio.
+            srt_path: Path to SRT subtitles.
+            job_dir: Job working directory.
+            script: Script dict with cenas (for motion prompt context).
+
+        Returns:
+            Path to final video file.
+        """
+        import asyncio as aio
+        import subprocess
+
+        from src.video_gen.kie_client import KieSora2Client
+        from src.video_gen.gcs_uploader import GCSUploader
+        from src.video_gen.video_prompt_builder import VideoPromptBuilder
+        from src.reels_pipeline.video_builder import concat_clips_with_audio
+
+        kie = KieSora2Client()
+        gcs = GCSUploader()
+        builder = VideoPromptBuilder()
+        cenas = (script or {}).get("cenas", [])
+        clips_dir = os.path.join(job_dir, "clips")
+        os.makedirs(clips_dir, exist_ok=True)
+
+        hailuo_model = "hailuo/2-3-image-to-video-standard"
+        hailuo_duration = 6
+
+        # Phase 1: Upload images to GCS and build motion prompts
+        tasks_info = []
+        for i, img_path in enumerate(image_paths):
+            cena = cenas[i] if i < len(cenas) else {}
+            gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{i}.jpg"
+            public_url = gcs.upload_image(img_path, gcs_key)
+
+            motion = builder.build_motion_prompt(
+                theme_key="generico",
+                phrase_context=cena.get("narracao", ""),
+                scene=cena.get("legenda_overlay", ""),
+            )
+            tasks_info.append({"index": i, "url": public_url, "motion": motion, "img_path": img_path})
+            logger.info(f"Scene {i}: uploaded to GCS, motion prompt built")
+
+        # Phase 2: Create all Hailuo tasks
+        task_ids = []
+        for info in tasks_info:
+            try:
+                task_id = await kie.create_task(
+                    image_url=info["url"],
+                    prompt=info["motion"],
+                    duration=hailuo_duration,
+                    model=hailuo_model,
+                )
+                task_ids.append({"index": info["index"], "task_id": task_id, "img_path": info["img_path"]})
+                logger.info(f"Scene {info['index']}: Hailuo task created: {task_id}")
+            except Exception as e:
+                logger.error(f"Scene {info['index']}: failed to create Hailuo task: {e}")
+                task_ids.append({"index": info["index"], "task_id": None, "img_path": info["img_path"]})
+
+        # Phase 3: Poll all tasks in parallel
+        async def poll_and_download(entry):
+            idx = entry["index"]
+            tid = entry["task_id"]
+            img_path = entry["img_path"]
+            clip_path = os.path.join(clips_dir, f"clip_{idx:02d}.mp4")
+
+            if tid is None:
+                logger.warning(f"Scene {idx}: no task, using static fallback")
+                subprocess.run([
+                    "ffmpeg", "-y", "-loop", "1", "-t", str(hailuo_duration),
+                    "-i", img_path,
+                    "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+                    clip_path,
+                ], capture_output=True, timeout=60)
+                return clip_path
+
+            try:
+                result = await kie.poll_until_complete(tid)
+                if result and result.video_url:
+                    await kie.download_video(result.video_url, clip_path)
+                    logger.info(f"Scene {idx}: Hailuo clip downloaded")
+                    return clip_path
+            except Exception as e:
+                logger.error(f"Scene {idx}: Hailuo poll/download failed: {e}")
+
+            # Fallback: static image for 6s
+            logger.warning(f"Scene {idx}: Hailuo failed, using static fallback")
+            subprocess.run([
+                "ffmpeg", "-y", "-loop", "1", "-t", str(hailuo_duration),
+                "-i", img_path,
+                "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+                clip_path,
+            ], capture_output=True, timeout=60)
+            return clip_path
+
+        clip_paths_raw = await aio.gather(*[poll_and_download(e) for e in task_ids])
+        clip_paths = [p for p in clip_paths_raw if p and os.path.isfile(p)]
+
+        if not clip_paths:
+            raise RuntimeError("No video clips generated (all Hailuo tasks failed)")
+
+        # Phase 4: Concat clips with audio + subtitles
+        video_path = os.path.join(job_dir, "final.mp4")
+        concat_clips_with_audio(
+            clip_paths=clip_paths,
+            audio_path=audio_path,
+            srt_path=srt_path,
+            output_path=video_path,
+            transition_duration=0.3,
+        )
+
+        logger.info(f"Hailuo reel assembled: {video_path} from {len(clip_paths)} clips")
+        return video_path
+
     # ------------------------------------------------------------------
     # Full pipeline (backward compatible)
     # ------------------------------------------------------------------

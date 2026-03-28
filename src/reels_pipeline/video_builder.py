@@ -125,8 +125,9 @@ def build_reel_video(
     # Use the filename option with single-quote wrapping to avoid path parsing issues
     subtitle_filter = (
         f"[vout]subtitles=filename='{abs_srt}'"
-        f":force_style='FontSize=52,PrimaryColour=&HFFFFFF&,"
-        f"OutlineColour=&H000000&,Outline=2,Alignment=2,MarginV=200'[final]"
+        f":force_style='FontSize=28,PrimaryColour=&HFFFFFF&,"
+        f"OutlineColour=&H000000&,Outline=3,Alignment=2,MarginV=80,"
+        f"Bold=1'[final]"
     )
 
     filter_complex = ";".join(scale_filters + xfade_filters + [subtitle_filter])
@@ -453,4 +454,106 @@ def concat_segments(
         )
 
     logger.info(f"Segments concatenated: {output_path}")
+    return output_path
+
+
+def concat_clips_with_audio(
+    clip_paths: list[str],
+    audio_path: str,
+    srt_path: str,
+    output_path: str,
+    transition_duration: float = 0.3,
+) -> str:
+    """Concatenate Hailuo video clips, overlay audio and subtitles.
+
+    Uses xfade for clip transitions, adds TTS audio and SRT subtitle overlay.
+    Per REELV2-03: final assembly of Hailuo-generated scene clips.
+
+    Args:
+        clip_paths: Paths to scene video clips (MP4).
+        audio_path: Path to TTS narration audio.
+        srt_path: Path to SRT subtitle file.
+        output_path: Path for final output MP4.
+        transition_duration: Duration of xfade between clips.
+
+    Returns:
+        output_path on success.
+    """
+    if not clip_paths:
+        raise ValueError("No clip paths to concatenate")
+
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+
+    if len(clip_paths) == 1:
+        abs_srt = os.path.abspath(srt_path)
+        subtitle_filter = (
+            f"[0:v]subtitles=filename='{abs_srt}'"
+            f":force_style='FontSize=28,PrimaryColour=&HFFFFFF&,"
+            f"OutlineColour=&H000000&,Outline=3,Alignment=2,MarginV=80,"
+            f"Bold=1'[final]"
+        )
+        cmd = [
+            "ffmpeg", "-y", "-i", clip_paths[0], "-i", audio_path,
+            "-filter_complex", subtitle_filter,
+            "-map", "[final]", "-map", "1:a",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k",
+            "-shortest", "-movflags", "+faststart",
+            output_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg single clip failed: {result.stderr[:500]}")
+        return output_path
+
+    # Multiple clips: xfade concat + audio + subtitles
+    durations = [get_video_duration(p) for p in clip_paths]
+
+    cmd = ["ffmpeg", "-y"]
+    for p in clip_paths:
+        cmd += ["-i", p]
+    audio_idx = len(clip_paths)
+    cmd += ["-i", audio_path]
+
+    # xfade chain
+    n = len(clip_paths)
+    xfade_filters = []
+    prev = "0:v"
+    for i in range(1, n):
+        offset = sum(durations[:i]) - i * transition_duration
+        offset = max(offset, 0)
+        out = f"v{i}" if i < n - 1 else "vconcat"
+        xfade_filters.append(
+            f"[{prev}][{i}:v]xfade=transition=fade:duration={transition_duration}:offset={offset}[{out}]"
+        )
+        prev = out
+
+    # Subtitle overlay on concatenated video
+    abs_srt = os.path.abspath(srt_path)
+    sub_filter = (
+        f"[vconcat]subtitles=filename='{abs_srt}'"
+        f":force_style='FontSize=28,PrimaryColour=&HFFFFFF&,"
+        f"OutlineColour=&H000000&,Outline=3,Alignment=2,MarginV=80,"
+        f"Bold=1'[final]"
+    )
+    xfade_filters.append(sub_filter)
+
+    filter_complex = ";".join(xfade_filters)
+
+    cmd += [
+        "-filter_complex", filter_complex,
+        "-map", "[final]",
+        "-map", f"{audio_idx}:a",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+        "-c:a", "aac", "-b:a", "192k",
+        "-shortest", "-movflags", "+faststart",
+        output_path,
+    ]
+
+    logger.info(f"Concat {n} Hailuo clips with audio + subtitles")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if result.returncode != 0:
+        raise RuntimeError(f"Clip concat failed: {result.stderr[:1000]}")
+
+    logger.info(f"Final video assembled: {output_path}")
     return output_path
