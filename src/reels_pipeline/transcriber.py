@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import re
 from pathlib import Path
 
 from google.genai import types
@@ -74,11 +75,49 @@ async def transcribe_to_srt(
             lines = lines[:-1]
         srt_text = "\n".join(lines)
 
+    srt_text = _normalize_srt_timestamps(srt_text)
+
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(srt_text)
 
     logger.info(f"SRT saved: {output_path} ({len(srt_text)} chars)")
     return output_path
+
+
+def _normalize_srt_timestamps(srt_text: str) -> str:
+    """Fix malformed SRT timestamps from Gemini.
+
+    Gemini sometimes returns timestamps like '00:00:270' (MM:SS:mmm)
+    instead of the correct SRT format '00:00:00,270' (HH:MM:SS,mmm).
+    Also handles '00:00:270' -> '00:00:00,270' and variants.
+    """
+    def fix_timestamp(match: re.Match) -> str:
+        ts = match.group(0)
+        # Already correct format: HH:MM:SS,mmm
+        if re.match(r"\d{2}:\d{2}:\d{2},\d{3}$", ts):
+            return ts
+        # Format: MM:SS:mmm (Gemini's common mistake) -> HH:MM:SS,mmm
+        m = re.match(r"(\d{2}):(\d{2}):(\d{2,3})$", ts)
+        if m:
+            a, b, c = m.groups()
+            if len(c) == 3:
+                # a:b:ccc -> 00:a:b,ccc (treat as MM:SS,mmm)
+                return f"00:{a}:{b},{c}"
+            else:
+                # a:b:cc -> 00:a:b,cc0 (treat as MM:SS,cs)
+                return f"00:{a}:{b},{c}0"
+        # Format: HH:MM:SS.mmm (dot instead of comma)
+        m = re.match(r"(\d{2}:\d{2}:\d{2})\.(\d{3})$", ts)
+        if m:
+            return f"{m.group(1)},{m.group(2)}"
+        return ts
+
+    # Match timestamp patterns in arrow lines: "TS --> TS"
+    return re.sub(
+        r"\d{2}:\d{2}:\d{2}[,:\.]\d{2,3}|\d{2}:\d{2}:\d{2,3}",
+        fix_timestamp,
+        srt_text,
+    )
 
 
 def estimate_transcription_cost(audio_duration_seconds: float) -> float:

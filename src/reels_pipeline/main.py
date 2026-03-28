@@ -63,10 +63,34 @@ class ReelsPipeline:
         self.config = config_override or {}
 
     def _make_job_dir(self, tema: str) -> tuple[str, str]:
-        """Create and return (job_dir, images_dir) for a tema."""
+        """Create and return (job_dir, images_dir) for a tema.
+
+        Uses sequential numbering: reel_001, reel_002, etc.
+        """
+        existing = [
+            d for d in os.listdir(REELS_OUTPUT_DIR)
+            if os.path.isdir(os.path.join(REELS_OUTPUT_DIR, d)) and d.startswith("reel_")
+        ] if os.path.exists(REELS_OUTPUT_DIR) else []
+        next_num = 1
+        if existing:
+            nums = []
+            for d in existing:
+                parts = d.split("_", 1)
+                if len(parts) >= 2 and parts[1][:3].isdigit():
+                    try:
+                        nums.append(int(parts[0].replace("reel", "") or d.split("_")[1][:3]))
+                    except ValueError:
+                        pass
+            # Extract numbers from reel_NNN pattern
+            nums = []
+            for d in existing:
+                try:
+                    nums.append(int(d.split("_")[1]))
+                except (IndexError, ValueError):
+                    pass
+            next_num = max(nums, default=0) + 1
         tema_slug = re.sub(r"[^a-z0-9]+", "_", tema.lower().strip())[:40]
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        job_dir = os.path.join(REELS_OUTPUT_DIR, f"{timestamp}_{tema_slug}")
+        job_dir = os.path.join(REELS_OUTPUT_DIR, f"reel_{next_num:03d}_{tema_slug}")
         images_dir = os.path.join(job_dir, "images")
         os.makedirs(images_dir, exist_ok=True)
         return job_dir, images_dir

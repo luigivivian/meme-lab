@@ -476,6 +476,16 @@ async def create_interactive_reel(
 
     step_state = _init_step_state(req.tema)
 
+    # Create job_dir immediately so all subsequent steps can use it
+    from src.reels_pipeline.main import ReelsPipeline
+    pipeline = ReelsPipeline()
+    prompt_result = await pipeline.run_step_prompt(
+        tema=req.tema,
+        character_id=character_id,
+    )
+    step_state["prompt"]["job_dir"] = prompt_result.get("job_dir", "")
+    step_state["prompt"]["status"] = "complete"
+
     job = ReelsJob(
         job_id=job_id,
         user_id=current_user.id,
