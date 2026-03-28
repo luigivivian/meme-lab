@@ -335,4 +335,9 @@ Plans:
   2. Images are generated per-scene following the script roteiro — each cena gets its own contextual image matching the story
   3. Video is generated using Hailuo 2.3 Fast via Kie.ai API (image-to-video per scene), not FFmpeg slideshow
   4. Subtitles are sized and styled for mobile 9:16 format, matching the meme visual style
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 999.6-01-PLAN.md — Backend: reorder steps, text-only script gen, per-cena image gen
+- [ ] 999.6-02-PLAN.md — Backend: Hailuo video step (Kie.ai per scene), mobile subtitle fix
+- [ ] 999.6-03-PLAN.md — Frontend: reorder stepper, fix step wiring, visual checkpoint
