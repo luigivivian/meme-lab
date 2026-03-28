@@ -346,6 +346,9 @@ INSTAGRAM_BEST_TIMES_BR = {
 # Feature flag — video generation disabled by default (per D-05: opt-in only)
 VIDEO_ENABLED = os.getenv("VIDEO_ENABLED", "false").lower() == "true"
 
+# Feature flag — Reels pipeline disabled by default (Phase 999.4)
+REELS_ENABLED = os.getenv("REELS_ENABLED", "false").lower() == "true"
+
 # Kie.ai API key (get from https://kie.ai/api-key)
 KIE_API_KEY = os.getenv("KIE_API_KEY", "")
 
