@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Loader2, Play, Pause, RefreshCw, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { approveStep, regenerateStep, executeStep, reelFileUrl, type StepState } from "@/lib/api";
+import { approveStep, regenerateStep, reelFileUrl, type StepState } from "@/lib/api";
 
 export function StepNarration({
   jobId,
@@ -42,7 +42,6 @@ export function StepNarration({
     setLoading(true);
     try {
       await onApprove("tts");
-      await executeStep(jobId, "srt");
       mutate();
     } finally {
       setLoading(false);

@@ -5,7 +5,7 @@ import { Loader2, Pencil, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { approveStep, editStep, executeStep, type StepState } from "@/lib/api";
+import { approveStep, editStep, type StepState } from "@/lib/api";
 
 export function StepPrompt({ jobId, stepState }: { jobId: string; stepState: StepState }) {
   const prompt = stepState.prompt;
@@ -17,7 +17,7 @@ export function StepPrompt({ jobId, stepState }: { jobId: string; stepState: Ste
     setLoading(true);
     try {
       await approveStep(jobId, "prompt");
-      await executeStep(jobId, "script");
+      // Backend auto-triggers next step on approve — no separate executeStep needed
     } finally {
       setLoading(false);
     }

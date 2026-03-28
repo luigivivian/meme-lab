@@ -619,6 +619,7 @@ async def execute_step(
 async def approve_step(
     job_id: str,
     step_name: str,
+    background_tasks: BackgroundTasks,
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(db_session),
 ):
@@ -650,6 +651,30 @@ async def approve_step(
         job.status = "complete"
 
     await db.commit()
+
+    # Auto-trigger next step execution (eliminates frontend race condition)
+    if next_step < len(STEP_ORDER):
+        next_step_name = STEP_ORDER[next_step]
+        config_override = {}
+        if job.config_id:
+            cfg_result = await db.execute(
+                select(ReelsConfig).where(
+                    ReelsConfig.id == job.config_id,
+                    ReelsConfig.user_id == current_user.id,
+                )
+            )
+            cfg = cfg_result.scalar_one_or_none()
+            if cfg:
+                config_override = {
+                    "target_duration": cfg.target_duration,
+                    "tone": cfg.tone,
+                    "niche": cfg.niche,
+                    "cta_default": cfg.cta_default,
+                }
+        session_factory = get_session_factory()
+        background_tasks.add_task(
+            _execute_step_task, job.job_id, next_step_name, config_override, session_factory
+        )
 
     return StepApproveResponse(
         step=step_name,
@@ -792,15 +817,19 @@ async def edit_step(
 async def serve_artifact_file(
     job_id: str,
     filename: str,
-    current_user=Depends(get_current_user),
     db: AsyncSession = Depends(db_session),
 ):
     """Serve artifact files (images, audio, video) via FileResponse.
 
-    Per Research Pitfall 3: enables frontend previews.
-    Accepts both relative-to-job_dir and absolute paths stored in step_state.
+    No auth required — <img> tags can't send Authorization headers.
+    Security: job_id is opaque UUID + path restricted to output/reels.
     """
-    job = await _get_user_job(job_id, current_user.id, db)
+    result = await db.execute(
+        select(ReelsJob).where(ReelsJob.job_id == job_id)
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
     step_state = job.step_state or {}
 
     job_dir = step_state.get("prompt", {}).get("job_dir", "")

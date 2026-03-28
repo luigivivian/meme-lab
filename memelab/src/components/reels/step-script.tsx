@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { approveStep, regenerateStep, editStep, executeStep, type StepState } from "@/lib/api";
+import { approveStep, regenerateStep, editStep, type StepState } from "@/lib/api";
 
 interface Cena {
   narracao: string;
@@ -81,7 +81,6 @@ export function StepScript({ jobId, stepState }: { jobId: string; stepState: Ste
         setDirty(false);
       }
       await approveStep(jobId, "script");
-      await executeStep(jobId, "images");
     } finally {
       setLoading(false);
     }

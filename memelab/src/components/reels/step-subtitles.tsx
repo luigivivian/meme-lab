@@ -5,7 +5,7 @@ import { Loader2, RefreshCw, Save, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SrtEditor, type SrtEntry } from "@/components/reels/srt-editor";
-import { approveStep, editStep, executeStep, regenerateStep, reelFileUrl, type StepState } from "@/lib/api";
+import { approveStep, editStep, regenerateStep, reelFileUrl, type StepState } from "@/lib/api";
 
 function parseSrt(text: string): SrtEntry[] {
   return text
@@ -80,7 +80,6 @@ export function StepSubtitles({
         await editStep(jobId, "srt", { srt_entries: entries });
       }
       await onApprove("srt");
-      await executeStep(jobId, "video");
       mutate();
     } finally {
       setLoading(false);

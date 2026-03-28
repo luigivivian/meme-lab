@@ -5,7 +5,7 @@ import { Loader2, RefreshCw, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { approveStep, regenerateStep, executeStep, reelFileUrl, type StepState } from "@/lib/api";
+import { approveStep, regenerateStep, reelFileUrl, type StepState } from "@/lib/api";
 
 export function StepImages({ jobId, stepState }: { jobId: string; stepState: StepState }) {
   const images = stepState.images;
@@ -17,7 +17,6 @@ export function StepImages({ jobId, stepState }: { jobId: string; stepState: Ste
     setLoading(true);
     try {
       await approveStep(jobId, "images");
-      await executeStep(jobId, "tts");
     } finally {
       setLoading(false);
     }
