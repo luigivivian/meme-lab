@@ -68,15 +68,19 @@ Voce recebera {n_imagens} imagens que serao usadas no Reel. Crie um roteiro que:
 
 
 async def generate_script(
-    image_paths: list[str],
-    tema: str,
+    image_paths: list[str] | None = None,
+    tema: str = "",
     config_override: dict | None = None,
     character_context: dict | None = None,
 ) -> dict:
-    """Generate a structured roteiro (script) from images via Gemini multimodal.
+    """Generate a structured roteiro (script) via Gemini.
+
+    Supports two modes:
+    - Multimodal (image_paths provided): sends images + text to Gemini
+    - Text-only (image_paths=None): generates script from tema text only (v2 interactive)
 
     Args:
-        image_paths: Paths to the generated reel images.
+        image_paths: Optional paths to reel images. None for text-only mode.
         tema: Theme/topic for the script.
         config_override: Optional DB config values to merge with defaults.
         character_context: Optional dict with character persona (name, system_prompt, humor_style, tone).
@@ -109,28 +113,37 @@ async def generate_script(
             )
             tom = char_tone or tom
 
+    n_imagens = len(image_paths) if image_paths else 5
     system_prompt = _SYSTEM_PROMPT.format(
         tom=tom,
         duracao=duracao,
         nicho=nicho,
         keywords=keywords or "nenhuma",
         cta=cta,
-        n_imagens=len(image_paths),
-        max_index=len(image_paths) - 1,
+        n_imagens=n_imagens,
+        max_index=n_imagens - 1,
     ) + character_section
 
-    # Build multimodal content: images + text prompt
+    # Build content parts
     parts = []
-    for img_path in image_paths:
-        img_bytes = Path(img_path).read_bytes()
-        mime = "image/jpeg" if img_path.lower().endswith((".jpg", ".jpeg")) else "image/png"
-        parts.append(types.Part.from_bytes(data=img_bytes, mime_type=mime))
-
-    user_prompt = (
-        f"Tema do Reel: {tema}\n"
-        f"Idioma: {language}\n"
-        f"Crie o roteiro completo para este Reel usando as {len(image_paths)} imagens acima."
-    )
+    if image_paths:
+        for img_path in image_paths:
+            img_bytes = Path(img_path).read_bytes()
+            mime = "image/jpeg" if img_path.lower().endswith((".jpg", ".jpeg")) else "image/png"
+            parts.append(types.Part.from_bytes(data=img_bytes, mime_type=mime))
+        user_prompt = (
+            f"Tema do Reel: {tema}\n"
+            f"Idioma: {language}\n"
+            f"Crie o roteiro completo para este Reel usando as {len(image_paths)} imagens acima."
+        )
+    else:
+        # v2 text-only: script generates from tema text before images exist
+        user_prompt = (
+            f"Tema do Reel: {tema}\n"
+            f"Idioma: {language}\n"
+            f"Crie o roteiro completo para este Reel. Descreva em cada cena "
+            f"o visual que deve aparecer (legenda_overlay) para guiar a geracao de imagens."
+        )
     parts.append(user_prompt)
 
     client = _get_client()

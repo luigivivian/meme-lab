@@ -76,7 +76,7 @@ PRESETS = {
 
 # ── Step order for interactive pipeline ────────────────────────────────────
 
-STEP_ORDER = ["prompt", "images", "script", "tts", "srt", "video"]
+STEP_ORDER = ["prompt", "script", "images", "tts", "srt", "video"]
 
 
 def _init_step_state(tema: str) -> dict:
@@ -144,19 +144,29 @@ async def _execute_step_task(
             job_dir = step_state.get("prompt", {}).get("job_dir", "")
 
             if step_name == "images":
-                paths = await pipeline.run_step_images(
-                    tema=job.tema,
-                    character_id=job.character_id,
-                    job_dir=job_dir,
-                    images_dir=os.path.join(job_dir, "images") if job_dir else "",
-                )
+                script_json = step_state.get("script", {}).get("json", {})
+                if script_json and script_json.get("cenas"):
+                    # v2: per-cena image generation using script context
+                    paths = await pipeline.run_step_images_per_cena(
+                        script=script_json,
+                        character_id=job.character_id,
+                        job_dir=job_dir,
+                        images_dir=os.path.join(job_dir, "images") if job_dir else "",
+                    )
+                else:
+                    # Fallback: generic image generation (no script available)
+                    paths = await pipeline.run_step_images(
+                        tema=job.tema,
+                        character_id=job.character_id,
+                        job_dir=job_dir,
+                        images_dir=os.path.join(job_dir, "images") if job_dir else "",
+                    )
                 step_data["paths"] = paths
                 step_data["status"] = "complete"
 
             elif step_name == "script":
-                image_paths = step_state.get("images", {}).get("paths", [])
                 script_result = await pipeline.run_step_script(
-                    image_paths=image_paths,
+                    image_paths=None,  # v2: text-only script gen (before images)
                     tema=job.tema,
                     job_dir=job_dir,
                     character_id=job.character_id,
