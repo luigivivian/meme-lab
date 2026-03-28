@@ -125,15 +125,19 @@ class ReelsPipeline:
 
     async def run_step_script(
         self,
-        image_paths: list[str],
-        tema: str,
-        job_dir: str,
+        image_paths: list[str] | None = None,
+        tema: str = "",
+        job_dir: str = "",
         character_id: int | None = None,
     ) -> dict:
-        """Step 3: Generate structured roteiro (script) from images.
+        """Step 2 (v2): Generate structured roteiro (script).
+
+        Supports text-only mode (image_paths=None) for interactive pipeline
+        where script generates before images, and multimodal mode when images
+        are available (sequential pipeline).
 
         Args:
-            image_paths: Paths to reel images.
+            image_paths: Optional paths to reel images. None for text-only.
             tema: Theme/topic text.
             job_dir: Job working directory (roteiro.json saved here).
             character_id: Optional character for persona-aware script.
