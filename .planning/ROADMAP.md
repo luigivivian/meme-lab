@@ -29,7 +29,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 19: Video Gallery & Management** - Dedicated videos page, inline player, download/approve/delete, filters, video tag on images (completed 2026-03-27)
 - [x] **Phase 20: Kie.ai Credits & Cost Tracking** - Credits system per model, only charge on success, BRL cost tracking (completed 2026-03-27)
 - [x] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density (completed 2026-03-27)
-- [x] **Phase 999.4: Instagram Reels Pipeline** - Geracao automatizada de Reels: imagens → roteiro Claude → TTS → legendas → FFmpeg → MP4 (BACKLOG) (completed 2026-03-28)
+- [x] **Phase 999.4: Instagram Reels Pipeline** - Geracao automatizada de Reels: imagens → roteiro Claude → TTS → legendas → FFmpeg → MP4 (completed 2026-03-28)
+- [ ] **Phase 999.5: Interactive Reels Pipeline** - Stepper UI com aprovacao por etapa, regeneracao individual, videos longos via segmentacao (BACKLOG)
 
 ## Phase Details
 
@@ -305,3 +306,18 @@ Plans:
 - [x] 999.4-03-PLAN.md — Video builder (FFmpeg xfade) + pipeline orchestrator (main.py)
 - [x] 999.4-04-PLAN.md — API routes (/reels/*) + app wiring
 - [x] 999.4-05-PLAN.md — Frontend: reels page, config panel, API client, SWR hooks, sidebar nav
+
+### Phase 999.5: Interactive Reels Pipeline (BACKLOG)
+**Goal**: Transformar pipeline de Reels em fluxo interativo com stepper UI: cada etapa (prompt → imagens → roteiro → narracao → legendas → video) requer aprovacao do usuario com opcao de regenerar/editar. Videos longos (>30s) segmentados em blocos consistentes e concatenados.
+**Depends on**: Phase 999.4 (existing pipeline modules)
+**Requirements**: IREEL-01, IREEL-02, IREEL-03, IREEL-04, IREEL-05
+**Success Criteria** (what must be TRUE):
+  1. User navigates a visual stepper with 6 steps, each showing preview and approve/regenerate controls
+  2. Each step can be regenerated individually without restarting the whole pipeline
+  3. User can edit generated text (prompt, roteiro, legendas) inline before approving
+  4. Videos >30s are automatically segmented into consistent blocks and concatenated
+  5. Final video preview plays in-browser before download
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD
