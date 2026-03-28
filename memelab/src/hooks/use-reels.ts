@@ -24,3 +24,11 @@ export function useReelsConfig() {
 export function useReelsPresets() {
   return useSWR("reels-presets", () => api.getReelsPresets());
 }
+
+export function useStepState(jobId: string | null) {
+  return useSWR(
+    jobId ? `reel-step-state-${jobId}` : null,
+    () => api.getStepState(jobId!),
+    { refreshInterval: 2000, errorRetryCount: 1 }
+  );
+}
