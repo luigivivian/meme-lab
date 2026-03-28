@@ -26,9 +26,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 999.2: Video Legends & Subtitles** - FFmpeg text overlays on videos, 3 animation modes, pipeline integration (completed 2026-03-27)
 - [x] **Phase 999.3: Sora 2 Prompt Engineering Research** - V2 motion templates, three-layer framework, version switching (completed 2026-03-27)
 - [x] **Phase 18: Job Status Sync & Management** - Fix stale/failed jobs, status sync, improved jobs page UI with progress visualization (completed 2026-03-27)
-- [x] **Phase 19: Video Gallery & Management** - Dedicated videos page, inline player, download/approve/delete, filters, video tag on images (completed 2026-03-27)
+- [x] **Phase 19: Video Gallery & Management** - Dedicated videos page, inline player, download/approve/delete, filters, video tag on images (completed 2026-03-27)
 - [x] **Phase 20: Kie.ai Credits & Cost Tracking** - Credits system per model, only charge on success, BRL cost tracking (completed 2026-03-27)
 - [x] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density (completed 2026-03-27)
+- [ ] **Phase 999.4: Instagram Reels Pipeline** - Geracao automatizada de Reels: imagens → roteiro Claude → TTS → legendas → FFmpeg → MP4 (BACKLOG)
 
 ## Phase Details
 
@@ -284,3 +285,23 @@ Plans:
 Plans:
 - [x] 999.3-01-PLAN.md — v2 motion templates (17 themes, three-layer framework), config constant, version switching, test scaffold
 - [ ] 999.3-02-PLAN.md — v2 system prompts (structured CAMERA/SUBJECT/PHYSICS/ATMOSPHERE sections), LLM wiring, additional tests
+
+### Phase 999.4: Instagram Reels Pipeline (BACKLOG)
+**Goal**: Pipeline standalone em src/reels_pipeline/ para geracao automatizada de Instagram Reels: imagens Gemini 9:16 → roteiro Gemini multimodal (JSON estruturado) → narracao OpenAI TTS-HD → legendas Whisper SRT → montagem FFmpeg xfade → MP4 pronto para publicar. Config no banco com painel de ajustes e presets.
+**Depends on**: Nothing (reuses existing modules: GeminiImageClient, LegendRenderer, GCSUploader, InstagramClient)
+**Requirements**: REEL-01, REEL-02, REEL-03, REEL-04, REEL-05, REEL-06, REEL-07, REEL-08, REEL-09
+**Success Criteria** (what must be TRUE):
+  1. User can trigger reel generation from /reels page with a tema and see real-time progress
+  2. Pipeline generates 5 images at 9:16, creates structured roteiro via Gemini, narrates via TTS, transcribes to SRT, assembles MP4 via FFmpeg
+  3. User can view job history with status badges and cost tracking in BRL
+  4. User can configure pipeline settings (TTS voice, duration, presets) via config panel
+  5. All /reels/* API endpoints respond correctly with tenant isolation
+**Plans**: 5 plans
+**UI hint**: yes
+
+Plans:
+- [ ] 999.4-01-PLAN.md — Foundation: DB migration (reels_config + reels_jobs), config constants, Pydantic models
+- [ ] 999.4-02-PLAN.md — Pipeline modules: image_gen, script_gen, tts, transcriber
+- [ ] 999.4-03-PLAN.md — Video builder (FFmpeg xfade) + pipeline orchestrator (main.py)
+- [ ] 999.4-04-PLAN.md — API routes (/reels/*) + app wiring
+- [ ] 999.4-05-PLAN.md — Frontend: reels page, config panel, API client, SWR hooks, sidebar nav
