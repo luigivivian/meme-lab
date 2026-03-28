@@ -1176,6 +1176,20 @@ export const generateVideo = (params: VideoGenerateRequest) =>
     body: JSON.stringify(params),
   });
 
+export interface VideoFromImageRequest {
+  filename: string;
+  duration: number;
+  character_ids?: string[];
+  custom_prompt?: string;
+  model?: string;
+}
+
+export const generateVideoFromImage = (params: VideoFromImageRequest) =>
+  request<VideoStatusResponse>("/generate/video/from-image", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+
 export const generateVideoBatch = (params: {
   content_package_ids: number[];
   duration?: number;
@@ -1424,6 +1438,84 @@ export interface VideoCreditsResponse {
 
 export async function getVideoCredits(days = 30): Promise<VideoCreditsResponse> {
   return request<VideoCreditsResponse>(`/generate/video/credits/summary?days=${days}`);
+}
+
+// --- Reels Pipeline (Phase 999.4) ---
+
+export interface ReelGenerateRequest {
+  tema: string;
+  character_id?: number;
+  config_id?: number;
+  tone?: string;
+  target_duration?: number;
+  niche?: string;
+  keywords?: string[];
+}
+
+export interface ReelJob {
+  job_id: string;
+  status: string;
+  tema: string;
+  current_step?: string;
+  progress_pct: number;
+  video_url?: string;
+  caption?: string;
+  hashtags?: string[];
+  cost_brl: number;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface ReelsConfig {
+  id: number;
+  name: string;
+  image_count: number;
+  tone: string;
+  target_duration: number;
+  niche: string;
+  tts_provider: string;
+  tts_voice: string;
+  tts_speed: number;
+  image_duration: number;
+  transition_type: string;
+  transition_duration: number;
+  subtitle_font_size: number;
+  preset?: string;
+}
+
+export interface ReelsPresets {
+  presets: Record<string, Partial<ReelsConfig>>;
+}
+
+export async function generateReel(req: ReelGenerateRequest) {
+  return request<{ job_id: string; status: string }>("/reels/generate", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export async function getReelStatus(jobId: string) {
+  return request<ReelJob>(`/reels/status/${jobId}`);
+}
+
+export async function getReelJobs(status?: string) {
+  const params = status ? `?status=${status}` : "";
+  return request<ReelJob[]>(`/reels/jobs${params}`);
+}
+
+export async function getReelsConfig() {
+  return request<ReelsConfig[]>("/reels/config");
+}
+
+export async function saveReelsConfig(config: Partial<ReelsConfig>) {
+  return request<ReelsConfig>("/reels/config", {
+    method: "POST",
+    body: JSON.stringify(config),
+  });
+}
+
+export async function getReelsPresets() {
+  return request<ReelsPresets>("/reels/config/presets");
 }
 
 // --- Content Export ---
