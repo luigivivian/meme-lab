@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: v2.0 milestone complete
-stopped_at: Completed 999.4-01-PLAN.md
-last_updated: "2026-03-28T18:07:23.521Z"
+stopped_at: Completed 999.4-02-PLAN.md
+last_updated: "2026-03-28T18:12:04.072Z"
 progress:
   total_phases: 14
   completed_phases: 4
   total_plans: 13
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -71,6 +71,7 @@ Plan: Not started
 | Phase 21 P01 | 2min | 1 tasks | 3 files |
 | Phase 21 P02 | 3min | 2 tasks | 4 files |
 | Phase 999.4 P01 | 3min | 2 tasks | 6 files |
+| Phase 999.4 P02 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,7 @@ Recent decisions affecting current work:
 - [Phase 21]: Arrow icons (TrendingUp/TrendingDown/Minus) rendered inside StatsCard component for reusability, not in dashboard page
 - [Phase 21]: Active packages count shown as description subtitle on Videos Gerados card (clean 4-card grid)
 - [Phase 999.4]: TTS/transcription defaults to gemini (not openai) — zero new dependencies for reels pipeline
+- [Phase 999.4]: Direct Gemini API for image gen (no wrapper), response_schema for script JSON, PCM-to-WAV for TTS
 
 ### Pending Todos
 
@@ -147,6 +149,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T18:07:23.518Z
-Stopped at: Completed 999.4-01-PLAN.md
+Last session: 2026-03-28T18:12:04.069Z
+Stopped at: Completed 999.4-02-PLAN.md
 Resume file: None

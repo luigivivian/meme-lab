@@ -301,7 +301,7 @@ Plans:
 
 Plans:
 - [x] 999.4-01-PLAN.md — Foundation: DB migration (reels_config + reels_jobs), config constants, Pydantic models
-- [ ] 999.4-02-PLAN.md — Pipeline modules: image_gen, script_gen, tts, transcriber
+- [x] 999.4-02-PLAN.md — Pipeline modules: image_gen, script_gen, tts, transcriber
 - [ ] 999.4-03-PLAN.md — Video builder (FFmpeg xfade) + pipeline orchestrator (main.py)
 - [ ] 999.4-04-PLAN.md — API routes (/reels/*) + app wiring
 - [ ] 999.4-05-PLAN.md — Frontend: reels page, config panel, API client, SWR hooks, sidebar nav
