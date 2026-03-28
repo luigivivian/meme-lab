@@ -119,11 +119,14 @@ async def generate_script(
         image_instruction = f"Voce recebera {n_imagens} imagens que serao usadas no Reel."
         cena_instruction = f"Use cada imagem em ordem (imagem_index 0 a {n_imagens - 1})"
     else:
+        # Dynamic: duration drives scene count (~1 cena per 4-6s of content)
+        min_cenas = max(3, duracao // 6)
+        max_cenas = max(5, duracao // 4)
         image_instruction = (
-            "Crie quantas cenas forem necessarias para cobrir o tema completo "
-            "(minimo 3, sem limite maximo). Cada cena gerara uma imagem propria."
+            f"Cada cena gerara uma imagem. Crie entre {min_cenas} e {max_cenas} cenas "
+            f"para cobrir o tema em ~{duracao}s."
         )
-        cena_instruction = "Crie uma cena para cada momento/topico do roteiro (numere imagem_index sequencialmente a partir de 0)"
+        cena_instruction = "Uma cena por momento-chave do roteiro (imagem_index sequencial a partir de 0)"
 
     system_prompt = _SYSTEM_PROMPT.format(
         tom=tom,
