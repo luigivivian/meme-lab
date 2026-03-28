@@ -64,6 +64,42 @@ class ReelJobResponse(BaseModel):
     created_at: datetime
 
 
+class StepStateResponse(BaseModel):
+    """Full step_state for an interactive reel job."""
+    job_id: str
+    current_step: int
+    prompt: Optional[dict] = None
+    images: Optional[dict] = None
+    script: Optional[dict] = None
+    tts: Optional[dict] = None
+    srt: Optional[dict] = None
+    video: Optional[dict] = None
+
+
+class StepApproveResponse(BaseModel):
+    """Response after approving a step."""
+    step: str
+    approved: bool
+    current_step: int
+
+
+class StepEditRequest(BaseModel):
+    """Request to edit an editable step's artifacts inline."""
+    text: Optional[str] = None
+    script_json: Optional[dict] = None
+    srt_entries: Optional[list[dict]] = None
+
+
+class ReelCreateInteractiveRequest(BaseModel):
+    """Request to create an interactive (step-by-step) reel job."""
+    tema: str
+    character_id: Optional[int] = None
+    character_slug: Optional[str] = None
+    no_character: bool = False
+    config_id: Optional[int] = None
+    target_duration: int = 30
+
+
 class ReelsConfigRequest(BaseModel):
     """Request to create/update a reels config."""
     name: Optional[str] = "default"

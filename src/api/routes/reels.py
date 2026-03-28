@@ -1,19 +1,23 @@
-"""Reels pipeline API routes — generate, status polling, job listing, config CRUD.
+"""Reels pipeline API routes — generate, status polling, job listing, config CRUD, interactive step API.
 
 Per D-01: Expose reels pipeline via /reels/* routes.
+Per D-02/D-03: Step-based endpoints for interactive pipeline execution.
 Per Phase 999.1 pattern: background tasks use get_session_factory() for independent DB sessions.
 
-Phase 999.4 — Instagram Reels Pipeline
+Phase 999.4/999.5 — Instagram Reels Pipeline
 """
 
 import json
 import logging
+import os
 import traceback
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from src.api.deps import get_current_user, db_session
 from src.database.models import ReelsConfig, ReelsJob
@@ -23,6 +27,10 @@ from src.reels_pipeline.models import (
     ReelJobResponse,
     ReelsConfigRequest,
     ReelsConfigResponse,
+    StepStateResponse,
+    StepApproveResponse,
+    StepEditRequest,
+    ReelCreateInteractiveRequest,
 )
 
 logger = logging.getLogger("clip-flow.api.reels")
@@ -66,7 +74,160 @@ PRESETS = {
 }
 
 
-# ── Background task ─────────────────────────────────────────────────────────
+# ── Step order for interactive pipeline ────────────────────────────────────
+
+STEP_ORDER = ["prompt", "images", "script", "tts", "srt", "video"]
+
+
+def _init_step_state(tema: str) -> dict:
+    """Create initial step_state for an interactive job."""
+    return {
+        "current_step": 0,
+        "prompt": {"text": tema, "approved": False},
+        "images": {"paths": [], "approved": False},
+        "script": {"json": {}, "approved": False},
+        "tts": {"path": "", "approved": False},
+        "srt": {"path": "", "approved": False},
+        "video": {"path": "", "approved": False},
+    }
+
+
+async def _get_user_job(
+    job_id: str, user_id: int, db: AsyncSession
+) -> ReelsJob:
+    """Fetch a ReelsJob owned by user_id, or raise 404."""
+    result = await db.execute(
+        select(ReelsJob).where(
+            ReelsJob.job_id == job_id,
+            ReelsJob.user_id == user_id,
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+# ── Background task for step execution ─────────────────────────────────────
+
+async def _execute_step_task(
+    job_id: str,
+    step_name: str,
+    config_override: dict,
+    session_factory,
+):
+    """Background task: execute a single pipeline step for an interactive job.
+
+    Uses get_session_factory() pattern for independent DB session.
+    """
+    from src.reels_pipeline.main import ReelsPipeline
+
+    async with session_factory() as session:
+        try:
+            result = await session.execute(
+                select(ReelsJob).where(ReelsJob.job_id == job_id)
+            )
+            job = result.scalar_one_or_none()
+            if not job:
+                logger.error("Step task: job %s not found", job_id)
+                return
+
+            step_state = dict(job.step_state or {})
+            step_data = step_state.get(step_name, {})
+            step_data["status"] = "generating"
+            step_state[step_name] = step_data
+            job.step_state = step_state
+            flag_modified(job, "step_state")
+            await session.commit()
+
+            pipeline = ReelsPipeline(config_override=config_override)
+            job_dir = step_state.get("prompt", {}).get("job_dir", "")
+
+            if step_name == "images":
+                paths = await pipeline.run_step_images(
+                    tema=job.tema,
+                    character_id=job.character_id,
+                    job_dir=job_dir,
+                    images_dir=os.path.join(job_dir, "images") if job_dir else "",
+                )
+                step_data["paths"] = paths
+                step_data["status"] = "complete"
+
+            elif step_name == "script":
+                image_paths = step_state.get("images", {}).get("paths", [])
+                script_result = await pipeline.run_step_script(
+                    image_paths=image_paths,
+                    tema=job.tema,
+                    job_dir=job_dir,
+                    character_id=job.character_id,
+                )
+                step_data["json"] = script_result
+                step_data["status"] = "complete"
+                job.script_json = script_result
+
+            elif step_name == "tts":
+                script_json = step_state.get("script", {}).get("json", {})
+                narration = script_json.get("narracao_completa", "")
+                audio_path, duration = await pipeline.run_step_tts(
+                    narration_text=narration,
+                    job_dir=job_dir,
+                )
+                step_data["path"] = audio_path
+                step_data["duration"] = duration
+                step_data["status"] = "complete"
+                job.audio_path = audio_path
+
+            elif step_name == "srt":
+                audio_path = step_state.get("tts", {}).get("path", "")
+                srt_path, duration = await pipeline.run_step_srt(
+                    audio_path=audio_path,
+                    job_dir=job_dir,
+                )
+                step_data["path"] = srt_path
+                step_data["duration"] = duration
+                step_data["status"] = "complete"
+                job.srt_path = srt_path
+
+            elif step_name == "video":
+                image_paths = step_state.get("images", {}).get("paths", [])
+                audio_path = step_state.get("tts", {}).get("path", "")
+                srt_path = step_state.get("srt", {}).get("path", "")
+                script_json = step_state.get("script", {}).get("json", {})
+                video_path = await pipeline.run_step_video(
+                    image_paths=image_paths,
+                    audio_path=audio_path,
+                    srt_path=srt_path,
+                    job_dir=job_dir,
+                    script=script_json,
+                )
+                step_data["path"] = video_path
+                step_data["status"] = "complete"
+                job.video_path = video_path
+
+            step_state[step_name] = step_data
+            job.step_state = step_state
+            flag_modified(job, "step_state")
+            await session.commit()
+
+            logger.info("Step %s complete for job %s", step_name, job_id)
+
+        except Exception as e:
+            logger.error("Step %s failed for job %s: %s", step_name, job_id, str(e))
+            logger.error(traceback.format_exc())
+            try:
+                step_state = dict(job.step_state or {})
+                step_data = step_state.get(step_name, {})
+                step_data["status"] = "error"
+                step_data["error"] = str(e)[:500]
+                step_state[step_name] = step_data
+                job.step_state = step_state
+                flag_modified(job, "step_state")
+                await session.commit()
+            except Exception:
+                pass
+
+
+# ── Background task (full pipeline) ────────────────────────────────────────
 
 async def _generate_reel_task(
     job_id: str,
@@ -261,6 +422,382 @@ async def generate_reel(
 
     return {"job_id": job_id, "status": "queued"}
 
+
+# ── Interactive step endpoints ─────────────────────────────────────────────
+
+@router.post("/interactive", summary="Create interactive reel job (step-by-step)")
+async def create_interactive_reel(
+    req: ReelCreateInteractiveRequest,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Create an interactive reel job with step_state initialized.
+
+    Returns job_id and step_state for frontend to drive step-by-step.
+    """
+    from src.database.models import Character
+
+    job_id = uuid.uuid4().hex[:16]
+
+    # Resolve character_id: explicit id > slug > auto-detect > none
+    character_id = req.character_id
+    if not character_id and req.character_slug:
+        slug_result = await db.execute(
+            select(Character).where(
+                Character.slug == req.character_slug,
+                Character.user_id == current_user.id,
+            )
+        )
+        slug_char = slug_result.scalar_one_or_none()
+        if slug_char:
+            character_id = slug_char.id
+    if not req.no_character and character_id is None:
+        char_result = await db.execute(
+            select(Character).where(
+                Character.user_id == current_user.id,
+                Character.is_deleted == False,
+            ).limit(1)
+        )
+        default_char = char_result.scalar_one_or_none()
+        if default_char:
+            character_id = default_char.id
+    elif req.no_character:
+        character_id = None
+
+    step_state = _init_step_state(req.tema)
+
+    job = ReelsJob(
+        job_id=job_id,
+        user_id=current_user.id,
+        character_id=character_id,
+        config_id=req.config_id,
+        tema=req.tema,
+        status="interactive",
+        step_state=step_state,
+    )
+    db.add(job)
+    await db.commit()
+
+    return {"job_id": job_id, "step_state": step_state}
+
+
+@router.get("/{job_id}/step-state", summary="Get interactive job step state")
+async def get_step_state(
+    job_id: str,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Return full step_state JSON for an interactive job. Tenant-isolated."""
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = job.step_state or {}
+    return StepStateResponse(
+        job_id=job.job_id,
+        current_step=step_state.get("current_step", 0),
+        prompt=step_state.get("prompt"),
+        images=step_state.get("images"),
+        script=step_state.get("script"),
+        tts=step_state.get("tts"),
+        srt=step_state.get("srt"),
+        video=step_state.get("video"),
+    )
+
+
+@router.post("/{job_id}/step/{step_name}", summary="Execute a pipeline step")
+async def execute_step(
+    job_id: str,
+    step_name: str,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Execute a specific pipeline step. Runs in background for heavy steps."""
+    from src.database.session import get_session_factory
+    from src.reels_pipeline.main import ReelsPipeline
+
+    if step_name not in STEP_ORDER:
+        raise HTTPException(status_code=400, detail=f"Invalid step: {step_name}")
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or _init_step_state(job.tema))
+
+    if step_name == "prompt":
+        # Prompt step: lightweight, no background task needed
+        # Run step_prompt to set up job directory
+        config_override = {}
+        if job.config_id:
+            cfg_result = await db.execute(
+                select(ReelsConfig).where(
+                    ReelsConfig.id == job.config_id,
+                    ReelsConfig.user_id == current_user.id,
+                )
+            )
+            cfg = cfg_result.scalar_one_or_none()
+            if cfg:
+                config_override = {"target_duration": cfg.target_duration}
+
+        pipeline = ReelsPipeline(config_override=config_override)
+        prompt_result = await pipeline.run_step_prompt(
+            tema=job.tema,
+            character_id=job.character_id,
+        )
+        step_state["prompt"]["job_dir"] = prompt_result.get("job_dir", "")
+        step_state["prompt"]["text"] = job.tema
+        step_state["prompt"]["status"] = "complete"
+        job.step_state = step_state
+        flag_modified(job, "step_state")
+        await db.commit()
+        return {"step": "prompt", "status": "complete", "step_state": step_state}
+
+    # Heavy steps: run in background
+    config_override = {}
+    if job.config_id:
+        cfg_result = await db.execute(
+            select(ReelsConfig).where(
+                ReelsConfig.id == job.config_id,
+                ReelsConfig.user_id == current_user.id,
+            )
+        )
+        cfg = cfg_result.scalar_one_or_none()
+        if cfg:
+            config_override = {
+                "image_count": cfg.image_count,
+                "image_style": cfg.image_style,
+                "tone": cfg.tone,
+                "target_duration": cfg.target_duration,
+                "tts_provider": cfg.tts_provider,
+                "tts_voice": cfg.tts_voice,
+                "tts_speed": cfg.tts_speed,
+                "transcription_provider": cfg.transcription_provider,
+                "image_duration": cfg.image_duration,
+                "transition_type": cfg.transition_type,
+                "transition_duration": cfg.transition_duration,
+                "subtitle_font_size": cfg.subtitle_font_size,
+                "subtitle_color": cfg.subtitle_color,
+            }
+
+    # Mark step as generating
+    step_data = step_state.get(step_name, {})
+    step_data["status"] = "generating"
+    step_state[step_name] = step_data
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
+    session_factory = get_session_factory()
+    background_tasks.add_task(
+        _execute_step_task, job_id, step_name, config_override, session_factory
+    )
+
+    return {"step": step_name, "status": "generating"}
+
+
+@router.post("/{job_id}/approve/{step_name}", summary="Approve a step and advance")
+async def approve_step(
+    job_id: str,
+    step_name: str,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Mark a step as approved and advance current_step to the next index.
+
+    Per D-02: only advances forward.
+    """
+    if step_name not in STEP_ORDER:
+        raise HTTPException(status_code=400, detail=f"Invalid step: {step_name}")
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+
+    step_idx = STEP_ORDER.index(step_name)
+    step_data = step_state.get(step_name, {})
+    step_data["approved"] = True
+    step_state[step_name] = step_data
+
+    # Advance current_step to next (only forward)
+    next_step = step_idx + 1
+    if next_step > step_state.get("current_step", 0):
+        step_state["current_step"] = next_step
+
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+
+    # If all steps approved, mark job complete
+    if next_step >= len(STEP_ORDER):
+        job.status = "complete"
+
+    await db.commit()
+
+    return StepApproveResponse(
+        step=step_name,
+        approved=True,
+        current_step=step_state["current_step"],
+    )
+
+
+@router.post("/{job_id}/regenerate/{step_name}", summary="Regenerate a step and clear downstream")
+async def regenerate_step(
+    job_id: str,
+    step_name: str,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Re-run a step and clear all downstream step artifacts.
+
+    Per D-02 / Research Pitfall 4: marks downstream steps as unapproved and clears artifacts.
+    """
+    from src.database.session import get_session_factory
+
+    if step_name not in STEP_ORDER:
+        raise HTTPException(status_code=400, detail=f"Invalid step: {step_name}")
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+
+    step_idx = STEP_ORDER.index(step_name)
+
+    # Clear downstream steps (step_name+1 through video)
+    for downstream_name in STEP_ORDER[step_idx + 1:]:
+        ds = step_state.get(downstream_name, {})
+        ds["approved"] = False
+        # Clear artifact fields
+        for key in ["paths", "path", "json", "duration", "status", "error"]:
+            ds.pop(key, None)
+        step_state[downstream_name] = ds
+
+    # Reset current_step to this step's index
+    step_state["current_step"] = step_idx
+
+    # Clear current step approval
+    current_data = step_state.get(step_name, {})
+    current_data["approved"] = False
+    step_state[step_name] = current_data
+
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
+    # Trigger step execution (same as POST /step/{step_name})
+    config_override = {}
+    if job.config_id:
+        cfg_result = await db.execute(
+            select(ReelsConfig).where(
+                ReelsConfig.id == job.config_id,
+                ReelsConfig.user_id == current_user.id,
+            )
+        )
+        cfg = cfg_result.scalar_one_or_none()
+        if cfg:
+            config_override = {
+                "image_count": cfg.image_count,
+                "image_style": cfg.image_style,
+                "tone": cfg.tone,
+                "target_duration": cfg.target_duration,
+                "tts_provider": cfg.tts_provider,
+                "tts_voice": cfg.tts_voice,
+                "tts_speed": cfg.tts_speed,
+                "transcription_provider": cfg.transcription_provider,
+            }
+
+    session_factory = get_session_factory()
+    background_tasks.add_task(
+        _execute_step_task, job_id, step_name, config_override, session_factory
+    )
+
+    return {"step": step_name, "status": "regenerating", "cleared_downstream": STEP_ORDER[step_idx + 1:]}
+
+
+@router.put("/{job_id}/edit/{step_name}", summary="Edit step artifacts inline")
+async def edit_step(
+    job_id: str,
+    step_name: str,
+    req: StepEditRequest,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Update editable step artifacts inline.
+
+    Per D-03: prompt, script, and srt are editable. Other steps return 400.
+    """
+    editable_steps = {"prompt", "script", "srt"}
+    if step_name not in editable_steps:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Step '{step_name}' is not editable. Editable steps: {', '.join(editable_steps)}",
+        )
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+
+    if step_name == "prompt":
+        if req.text is None:
+            raise HTTPException(status_code=400, detail="'text' field required for prompt edit")
+        step_state["prompt"]["text"] = req.text
+
+    elif step_name == "script":
+        if req.script_json is None:
+            raise HTTPException(status_code=400, detail="'script_json' field required for script edit")
+        step_state["script"]["json"] = req.script_json
+        job.script_json = req.script_json
+
+    elif step_name == "srt":
+        if req.srt_entries is None:
+            raise HTTPException(status_code=400, detail="'srt_entries' field required for srt edit")
+        # Reconstruct SRT file from entries
+        srt_path = step_state.get("srt", {}).get("path", "")
+        if srt_path:
+            srt_content = ""
+            for entry in req.srt_entries:
+                idx = entry.get("index", 0)
+                start = entry.get("start", "00:00:00,000")
+                end = entry.get("end", "00:00:00,000")
+                text = entry.get("text", "")
+                srt_content += f"{idx}\n{start} --> {end}\n{text}\n\n"
+            with open(srt_path, "w", encoding="utf-8") as f:
+                f.write(srt_content.strip())
+            step_state["srt"]["entries"] = req.srt_entries
+
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
+    return {"step": step_name, "status": "edited", "step_state": step_state}
+
+
+@router.get("/{job_id}/file/{filename:path}", summary="Serve artifact files for preview")
+async def serve_artifact_file(
+    job_id: str,
+    filename: str,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Serve artifact files (images, audio, video) via FileResponse.
+
+    Per Research Pitfall 3: enables frontend previews.
+    Resolves filename relative to job's job_dir.
+    """
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = job.step_state or {}
+
+    # Get job_dir from step_state
+    job_dir = step_state.get("prompt", {}).get("job_dir", "")
+    if not job_dir:
+        raise HTTPException(status_code=400, detail="Job directory not initialized")
+
+    file_path = os.path.join(job_dir, filename)
+
+    # Security: ensure the resolved path is under job_dir
+    resolved = os.path.realpath(file_path)
+    if not resolved.startswith(os.path.realpath(job_dir)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not os.path.isfile(resolved):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(resolved)
+
+
+# ── Existing endpoints ─────────────────────────────────────────────────────
 
 @router.get("/status/{job_id}", summary="Poll reel generation status", response_model=ReelStatusResponse)
 async def get_reel_status(
