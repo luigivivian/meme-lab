@@ -43,6 +43,31 @@ class ReelsResult:
     cost_brl: float
 
 
+def _build_scene_motion_prompt(overlay: str, narracao: str, scene_idx: int, total: int) -> str:
+    """Build a Hailuo motion prompt directly from the scene description.
+
+    Unlike VideoPromptBuilder (designed for single-image meme videos with
+    generic wizard themes), this creates scene-specific animation prompts
+    that match the actual visual content of each reel scene.
+    """
+    # Camera movement varies by scene position for visual rhythm
+    if scene_idx == 0:
+        camera = "Slow push-in from medium shot"
+    elif scene_idx == total - 1:
+        camera = "Gentle pull-back to wide shot"
+    elif scene_idx % 2 == 0:
+        camera = "Subtle dolly sideways"
+    else:
+        camera = "Slow push-in with slight tilt"
+
+    return (
+        f"{camera}. "
+        f"{overlay}. "
+        f"The scene conveys: {narracao} "
+        f"Smooth natural motion, cinematic lighting, 6 seconds."
+    )
+
+
 class ReelsPipeline:
     """Sequential orchestrator for the 5-step Reels pipeline.
 
@@ -378,33 +403,32 @@ class ReelsPipeline:
 
         from src.video_gen.kie_client import KieSora2Client
         from src.video_gen.gcs_uploader import GCSUploader
-        from src.video_gen.video_prompt_builder import VideoPromptBuilder
         from src.reels_pipeline.video_builder import concat_clips_with_audio
 
         kie = KieSora2Client()
         gcs = GCSUploader()
-        builder = VideoPromptBuilder()
         cenas = (script or {}).get("cenas", [])
         clips_dir = os.path.join(job_dir, "clips")
         os.makedirs(clips_dir, exist_ok=True)
 
         hailuo_model = "hailuo/2-3-image-to-video-standard"
         hailuo_duration = 6
+        n = len(image_paths)
 
-        # Phase 1: Upload images to GCS and build motion prompts
+        # Phase 1: Upload images to GCS and build scene-aware motion prompts
         tasks_info = []
         for i, img_path in enumerate(image_paths):
             cena = cenas[i] if i < len(cenas) else {}
             gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{i}.jpg"
             public_url = gcs.upload_image(img_path, gcs_key)
 
-            motion = builder.build_motion_prompt(
-                theme_key="generico",
-                phrase_context=cena.get("narracao", ""),
-                scene=cena.get("legenda_overlay", ""),
-            )
+            # Build motion prompt directly from scene context — NOT from generic wizard templates
+            narracao = cena.get("narracao", "")
+            overlay = cena.get("legenda_overlay", "")
+            motion = _build_scene_motion_prompt(overlay, narracao, i, n)
+
             tasks_info.append({"index": i, "url": public_url, "motion": motion, "img_path": img_path})
-            logger.info(f"Scene {i}: uploaded to GCS, motion prompt built")
+            logger.info(f"Scene {i}: uploaded to GCS, motion prompt: {motion[:80]}...")
 
         # Phase 2: Create all Hailuo tasks
         task_ids = []
