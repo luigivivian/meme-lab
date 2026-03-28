@@ -19,12 +19,37 @@ from src.reels_pipeline.config import (
     REELS_FPS,
     REELS_IMAGE_DURATION,
     REELS_SEGMENT_MAX_DURATION,
+    REELS_SUB_COLOR,
+    REELS_SUB_FONT,
+    REELS_SUB_FONTSIZE,
+    REELS_SUB_MARGIN_H,
+    REELS_SUB_MARGIN_V,
+    REELS_SUB_OUTLINE,
+    REELS_SUB_OUTLINE_COLOR,
     REELS_TRANSITION_DURATION,
     REELS_TRANSITION_TYPE,
     REELS_VIDEO_CRF,
 )
 
 logger = logging.getLogger("clip-flow.reels.video_builder")
+
+
+def _build_sub_style() -> str:
+    """Build ASS subtitle force_style string from config values."""
+    return (
+        f"FontName={REELS_SUB_FONT},"
+        f"FontSize={REELS_SUB_FONTSIZE},"
+        f"Bold=0,"
+        f"PrimaryColour={REELS_SUB_COLOR},"
+        f"OutlineColour={REELS_SUB_OUTLINE_COLOR},"
+        f"BackColour=&H00000000&,"
+        f"Outline={REELS_SUB_OUTLINE},"
+        f"Shadow=0,"
+        f"Alignment=2,"
+        f"MarginV={REELS_SUB_MARGIN_V},"
+        f"MarginL={REELS_SUB_MARGIN_H},"
+        f"MarginR={REELS_SUB_MARGIN_H}"
+    )
 
 
 def is_ffmpeg_available() -> bool:
@@ -118,16 +143,27 @@ def build_reel_video(
             )
             prev = out
 
-    # 4. Subtitle overlay
-    # FFmpeg subtitles filter: filename and force_style are colon-separated options.
-    # The filename must have special chars escaped, but force_style uses its own quoting.
+    # 4. Subtitle overlay — uses config values (configurable via painel)
     abs_srt = os.path.abspath(srt_path)
-    # Use the filename option with single-quote wrapping to avoid path parsing issues
+    fontsdir = os.path.abspath("assets/fonts")
+    sub_style = (
+        f"FontName={REELS_SUB_FONT},"
+        f"FontSize={REELS_SUB_FONTSIZE},"
+        f"Bold=0,"
+        f"PrimaryColour={REELS_SUB_COLOR},"
+        f"OutlineColour={REELS_SUB_OUTLINE_COLOR},"
+        f"BackColour=&H00000000&,"
+        f"Outline={REELS_SUB_OUTLINE},"
+        f"Shadow=0,"
+        f"Alignment=2,"
+        f"MarginV={REELS_SUB_MARGIN_V},"
+        f"MarginL={REELS_SUB_MARGIN_H},"
+        f"MarginR={REELS_SUB_MARGIN_H}"
+    )
     subtitle_filter = (
         f"[vout]subtitles=filename='{abs_srt}'"
-        f":force_style='FontSize=28,PrimaryColour=&HFFFFFF&,"
-        f"OutlineColour=&H000000&,Outline=3,Alignment=2,MarginV=80,"
-        f"Bold=1'[final]"
+        f":fontsdir='{fontsdir}'"
+        f":force_style='{sub_style}'[final]"
     )
 
     filter_complex = ";".join(scale_filters + xfade_filters + [subtitle_filter])
@@ -486,11 +522,12 @@ def concat_clips_with_audio(
 
     if len(clip_paths) == 1:
         abs_srt = os.path.abspath(srt_path)
+        fontsdir = os.path.abspath("assets/fonts")
+        sub_style = _build_sub_style()
         subtitle_filter = (
             f"[0:v]subtitles=filename='{abs_srt}'"
-            f":force_style='FontSize=28,PrimaryColour=&HFFFFFF&,"
-            f"OutlineColour=&H000000&,Outline=3,Alignment=2,MarginV=80,"
-            f"Bold=1'[final]"
+            f":fontsdir='{fontsdir}'"
+            f":force_style='{sub_style}'[final]"
         )
         cmd = [
             "ffmpeg", "-y", "-i", clip_paths[0], "-i", audio_path,
@@ -530,11 +567,12 @@ def concat_clips_with_audio(
 
     # Subtitle overlay on concatenated video
     abs_srt = os.path.abspath(srt_path)
+    fontsdir = os.path.abspath("assets/fonts")
+    sub_style = _build_sub_style()
     sub_filter = (
         f"[vconcat]subtitles=filename='{abs_srt}'"
-        f":force_style='FontSize=28,PrimaryColour=&HFFFFFF&,"
-        f"OutlineColour=&H000000&,Outline=3,Alignment=2,MarginV=80,"
-        f"Bold=1'[final]"
+        f":fontsdir='{fontsdir}'"
+        f":force_style='{sub_style}'[final]"
     )
     xfade_filters.append(sub_filter)
 

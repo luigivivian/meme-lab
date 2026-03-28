@@ -648,7 +648,7 @@ class ReelsConfig(TimestampMixin, Base):
 
     # TTS
     tts_provider: Mapped[str] = mapped_column(String(20), default="gemini", server_default="gemini")
-    tts_voice: Mapped[str] = mapped_column(String(50), default="Puck", server_default="Puck")
+    tts_voice: Mapped[str] = mapped_column(String(50), default="Charon", server_default="Charon")
     tts_speed: Mapped[float] = mapped_column(Float, default=1.1, server_default="1.1")
 
     # Transcription
@@ -663,8 +663,12 @@ class ReelsConfig(TimestampMixin, Base):
 
     # Subtitles
     subtitle_position: Mapped[str] = mapped_column(String(20), default="bottom", server_default="bottom")
-    subtitle_font_size: Mapped[int] = mapped_column(Integer, default=52, server_default="52")
-    subtitle_color: Mapped[str] = mapped_column(String(10), default="#FFFFFF", server_default="#FFFFFF")
+    subtitle_font_size: Mapped[int] = mapped_column(Integer, default=12, server_default="12")
+    subtitle_color: Mapped[str] = mapped_column(String(20), default="&H00B4EBFF&", server_default="&H00B4EBFF&")
+    subtitle_font: Mapped[str] = mapped_column(String(50), default="MedievalSharp", server_default="MedievalSharp")
+    subtitle_outline: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    subtitle_margin_v: Mapped[int] = mapped_column(Integer, default=35, server_default="35")
+    subtitle_margin_h: Mapped[int] = mapped_column(Integer, default=15, server_default="15")
 
     # Branding
     logo_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
