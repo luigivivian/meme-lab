@@ -424,8 +424,8 @@ function JobHistory() {
                 )}
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{formatDate(job.created_at)}</span>
-                  <span>{formatCost(job.cost_brl)}</span>
+                  <span>{job.created_at ? formatDate(job.created_at) : ""}</span>
+                  <span>{formatCost(job.cost_brl ?? 0)}</span>
                 </div>
               </div>
             );
