@@ -58,9 +58,9 @@ export default function ReelJobPage() {
       case 0:
         return <StepPrompt jobId={jobId} stepState={state} />;
       case 1:
-        return <StepImages jobId={jobId} stepState={state} />;
-      case 2:
         return <StepScript jobId={jobId} stepState={state} />;
+      case 2:
+        return <StepImages jobId={jobId} stepState={state} />;
       case 3:
         return (
           <StepNarration
