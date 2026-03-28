@@ -1445,6 +1445,8 @@ export async function getVideoCredits(days = 30): Promise<VideoCreditsResponse> 
 export interface ReelGenerateRequest {
   tema: string;
   character_id?: number;
+  character_slug?: string;
+  no_character?: boolean;
   config_id?: number;
   tone?: string;
   target_duration?: number;

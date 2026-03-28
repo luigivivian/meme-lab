@@ -201,6 +201,33 @@ async def generate_reel(
                 "logo_enabled": config.logo_enabled,
             }
 
+    # Resolve character_id: explicit id > slug > auto-detect > none
+    from src.database.models import Character
+    character_id = req.character_id
+    if not character_id and req.character_slug:
+        slug_result = await db.execute(
+            select(Character).where(
+                Character.slug == req.character_slug,
+                Character.user_id == current_user.id,
+            )
+        )
+        slug_char = slug_result.scalar_one_or_none()
+        if slug_char:
+            character_id = slug_char.id
+    if not req.no_character and character_id is None:
+        # Auto-detect: use user's first character
+        char_result = await db.execute(
+            select(Character).where(
+                Character.user_id == current_user.id,
+                Character.is_deleted == False,
+            ).limit(1)
+        )
+        default_char = char_result.scalar_one_or_none()
+        if default_char:
+            character_id = default_char.id
+    elif req.no_character:
+        character_id = None
+
     # Merge request params into config (request takes priority)
     if req.tone != "inspiracional":
         config_override["tone"] = req.tone
@@ -211,11 +238,14 @@ async def generate_reel(
     if req.keywords:
         config_override["keywords"] = req.keywords
 
+    # Update request character_id for pipeline
+    req.character_id = character_id
+
     # Create job in DB
     job = ReelsJob(
         job_id=job_id,
         user_id=current_user.id,
-        character_id=req.character_id,
+        character_id=character_id,
         config_id=req.config_id,
         tema=req.tema,
         status="queued",

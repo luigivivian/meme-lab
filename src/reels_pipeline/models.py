@@ -32,7 +32,9 @@ class RoteiroSchema(BaseModel):
 class ReelGenerateRequest(BaseModel):
     """Request to generate a new Reel."""
     tema: str = Field(..., description="Theme/topic for the reel")
-    character_id: Optional[int] = Field(default=None, description="Character to use")
+    character_id: Optional[int] = Field(default=None, description="Character ID to use (None = auto-detect first)")
+    character_slug: Optional[str] = Field(default=None, description="Character slug to use (alternative to character_id)")
+    no_character: bool = Field(default=False, description="If true, generate without character (generic)")
     config_id: Optional[int] = Field(default=None, description="Reels config preset to use")
     tone: str = Field(default="inspiracional", description="Tone: inspiracional/humor/educativo")
     target_duration: int = Field(default=30, description="Target duration in seconds: 15/30/60")

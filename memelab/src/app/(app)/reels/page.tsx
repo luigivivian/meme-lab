@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useReelJobs, useReelStatus, useReelsConfig, useReelsPresets } from "@/hooks/use-reels";
+import { useCharacters } from "@/hooks/use-api";
 import {
   generateReel,
   saveReelsConfig,
@@ -64,6 +65,7 @@ function formatCost(brl: number): string {
 
 function GenerationForm() {
   const [tema, setTema] = useState("");
+  const [characterId, setCharacterId] = useState<string>("auto");
   const [tone, setTone] = useState("inspiracional");
   const [duration, setDuration] = useState("30");
   const [niche, setNiche] = useState("lifestyle");
@@ -74,6 +76,7 @@ function GenerationForm() {
   const [error, setError] = useState<string | null>(null);
 
   const { data: presets } = useReelsPresets();
+  const { data: characters } = useCharacters();
   const { data: jobStatus } = useReelStatus(activeJobId);
 
   const isComplete = jobStatus?.status === "complete";
@@ -90,6 +93,11 @@ function GenerationForm() {
         tone,
         target_duration: parseInt(duration),
         niche,
+        ...(characterId === "none"
+          ? { no_character: true }
+          : characterId !== "auto"
+            ? { character_slug: characterId }
+            : {}),
       };
       const res = await generateReel(req);
       setActiveJobId(res.job_id);
@@ -171,6 +179,21 @@ function GenerationForm() {
         {/* Form (hidden while generating) */}
         {!isGenerating && !isComplete && !isFailed && (
           <>
+            {/* Character selector */}
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Personagem</label>
+              <Select value={characterId} onValueChange={setCharacterId}>
+                <SelectTrigger><SelectValue placeholder="Selecionar personagem" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Automatico (primeiro personagem)</SelectItem>
+                  <SelectItem value="none">Sem personagem (generico)</SelectItem>
+                  {(characters?.characters ?? []).map((c) => (
+                    <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <Textarea
               placeholder="Ex: 3 habitos matinais que mudaram minha produtividade"
               value={tema}

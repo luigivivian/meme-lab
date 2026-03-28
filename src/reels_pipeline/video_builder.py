@@ -32,14 +32,13 @@ def is_ffmpeg_available() -> bool:
 def _escape_srt_path(path: str) -> str:
     """Escape SRT file path for FFmpeg subtitles filter.
 
-    FFmpeg subtitles filter needs backslashes as forward slashes
-    and colons escaped (Windows drive letters).
+    FFmpeg subtitles filter treats : [ ] ; ' as special chars.
+    All must be escaped with backslash for the path portion.
     """
-    p = str(path).replace("\\", "/")
-    if platform.system() == "Windows" and len(p) >= 2 and p[1] == ":":
-        p = p[0] + "\\:" + p[2:]
-    # Escape colons in path (FFmpeg filter syntax uses colon as separator)
-    p = p.replace(":", "\\:")
+    p = os.path.abspath(path).replace("\\", "/")
+    # Escape special FFmpeg filter chars in path
+    for ch in (":", "'", "[", "]", ";", ","):
+        p = p.replace(ch, f"\\{ch}")
     return p
 
 
@@ -117,9 +116,12 @@ def build_reel_video(
             prev = out
 
     # 4. Subtitle overlay
-    escaped_srt = _escape_srt_path(srt_path)
+    # FFmpeg subtitles filter: filename and force_style are colon-separated options.
+    # The filename must have special chars escaped, but force_style uses its own quoting.
+    abs_srt = os.path.abspath(srt_path)
+    # Use the filename option with single-quote wrapping to avoid path parsing issues
     subtitle_filter = (
-        f"[vout]subtitles={escaped_srt}"
+        f"[vout]subtitles=filename='{abs_srt}'"
         f":force_style='FontSize=52,PrimaryColour=&HFFFFFF&,"
         f"OutlineColour=&H000000&,Outline=2,Alignment=2,MarginV=200'[final]"
     )

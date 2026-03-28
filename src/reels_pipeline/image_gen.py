@@ -51,6 +51,54 @@ def _scale_and_pad(img: PIL.Image.Image, width: int, height: int) -> PIL.Image.I
     return canvas
 
 
+async def _load_character_context(character_id: int) -> dict | None:
+    """Load character DNA, refs, and persona from DB for image generation."""
+    from src.database.session import get_session_factory
+    from src.database.models import Character, CharacterRef
+    from sqlalchemy import select
+    from io import BytesIO
+
+    factory = get_session_factory()
+    async with factory() as session:
+        result = await session.execute(
+            select(Character).where(Character.id == character_id)
+        )
+        char = result.scalar_one_or_none()
+        if not char:
+            return None
+
+        # Load approved refs
+        refs_result = await session.execute(
+            select(CharacterRef).where(
+                CharacterRef.character_id == character_id,
+                CharacterRef.status == "approved",
+            ).limit(3)
+        )
+        refs = refs_result.scalars().all()
+
+        # Load ref images
+        ref_images = []
+        from config import BASE_DIR
+        for ref in refs:
+            ref_path = BASE_DIR / ref.file_path
+            if ref_path.exists():
+                try:
+                    ref_images.append(PIL.Image.open(ref_path))
+                except Exception:
+                    pass
+
+        return {
+            "name": char.name,
+            "character_dna": char.character_dna,
+            "negative_traits": char.negative_traits,
+            "composition": char.composition,
+            "system_prompt": char.system_prompt,
+            "humor_style": char.humor_style,
+            "tone": char.tone,
+            "ref_images": ref_images,
+        }
+
+
 async def generate_reel_images(
     tema: str,
     character_id: int | None,
@@ -62,7 +110,7 @@ async def generate_reel_images(
 
     Args:
         tema: Theme/topic for image generation.
-        character_id: Optional character ID (for future ref image lookup).
+        character_id: Optional character ID — loads DNA + refs for consistent character.
         output_dir: Directory to save generated images.
         count: Number of images to generate (overrides config).
         db_config: Optional DB config dict with image_count override.
@@ -76,20 +124,40 @@ async def generate_reel_images(
     client = _get_client()
     saved_paths: list[str] = []
 
-    prompt_base = (
-        f"Instagram Reels vertical 9:16, {tema}. "
-        "High quality, photographic, vibrant colors, professional. "
-        "Full vertical composition 1080x1920 pixels."
-    )
+    # Load character context if provided
+    char_ctx = None
+    if character_id:
+        char_ctx = await _load_character_context(character_id)
+        if char_ctx:
+            logger.info(f"Using character '{char_ctx['name']}' with {len(char_ctx['ref_images'])} refs")
+
+    # Build prompt based on whether character is attached
+    if char_ctx and char_ctx.get("character_dna"):
+        prompt_base = (
+            f"Instagram Reels vertical 9:16 scene. Theme: {tema}.\n\n"
+            f"CHARACTER (replicate precisely from reference images):\n"
+            f"{char_ctx['character_dna']}\n\n"
+            f"COMPOSITION: Vertical 9:16 (1080x1920). {char_ctx.get('composition', '')}\n\n"
+            f"NEGATIVE: {char_ctx.get('negative_traits', '')}\n\n"
+            "High quality, cinematic lighting, professional."
+        )
+    else:
+        prompt_base = (
+            f"Instagram Reels vertical 9:16, {tema}. "
+            "High quality, photographic, vibrant colors, professional. "
+            "Full vertical composition 1080x1920 pixels."
+        )
 
     for i in range(n_images):
         if i > 0:
             await asyncio.sleep(_PAUSE_BETWEEN_GENERATIONS)
 
         image_path = str(Path(output_dir) / f"image_{i:02d}.jpg")
-        prompt = f"{prompt_base} Variation {i + 1} of {n_images}."
+        prompt = f"{prompt_base}\nScene {i + 1} of {n_images} — vary pose and angle."
 
-        img = await _generate_single_image(client, prompt)
+        # Pass ref images for character consistency
+        ref_images = char_ctx["ref_images"] if char_ctx else []
+        img = await _generate_single_image(client, prompt, ref_images=ref_images)
         if img is None:
             logger.error(f"Failed to generate image {i}, skipping")
             continue
@@ -105,16 +173,26 @@ async def generate_reel_images(
     return saved_paths
 
 
-async def _generate_single_image(client, prompt: str) -> PIL.Image.Image | None:
-    """Generate a single image with retry on 429."""
+async def _generate_single_image(
+    client, prompt: str, ref_images: list[PIL.Image.Image] | None = None,
+) -> PIL.Image.Image | None:
+    """Generate a single image with retry on 429. Optionally includes ref images for character consistency."""
     from io import BytesIO
+
+    # Build contents: ref images first, then prompt text
+    contents: list = []
+    for ref in (ref_images or []):
+        buf = BytesIO()
+        ref.save(buf, format="JPEG", quality=85)
+        contents.append(types.Part.from_bytes(data=buf.getvalue(), mime_type="image/jpeg"))
+    contents.append(prompt)
 
     for attempt in range(_MAX_RETRIES_429 + 1):
         try:
             response = await asyncio.to_thread(
                 client.models.generate_content,
                 model=_IMAGE_MODEL,
-                contents=prompt,
+                contents=contents,
                 config=types.GenerateContentConfig(
                     response_modalities=["IMAGE", "TEXT"],
                 ),

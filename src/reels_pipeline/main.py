@@ -86,7 +86,14 @@ class ReelsPipeline:
         logger.info(f"Pipeline started: tema='{tema}', job_dir={job_dir}")
 
         # Step 1 - Images (0-20%)
-        from src.reels_pipeline.image_gen import generate_reel_images
+        from src.reels_pipeline.image_gen import generate_reel_images, _load_character_context
+
+        # Load character context once, reuse for images + script
+        char_ctx = None
+        if character_id:
+            char_ctx = await _load_character_context(character_id)
+            if char_ctx:
+                logger.info(f"Using character '{char_ctx['name']}' with {len(char_ctx['ref_images'])} refs")
 
         image_paths = await generate_reel_images(
             tema=tema,
@@ -104,6 +111,7 @@ class ReelsPipeline:
             image_paths=image_paths,
             tema=tema,
             config_override=self.config,
+            character_context=char_ctx,
         )
         # Save roteiro JSON as artifact
         roteiro_path = os.path.join(job_dir, "roteiro.json")

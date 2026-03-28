@@ -71,6 +71,7 @@ async def generate_script(
     image_paths: list[str],
     tema: str,
     config_override: dict | None = None,
+    character_context: dict | None = None,
 ) -> dict:
     """Generate a structured roteiro (script) from images via Gemini multimodal.
 
@@ -78,6 +79,7 @@ async def generate_script(
         image_paths: Paths to the generated reel images.
         tema: Theme/topic for the script.
         config_override: Optional DB config values to merge with defaults.
+        character_context: Optional dict with character persona (name, system_prompt, humor_style, tone).
 
     Returns:
         Parsed JSON dict matching RoteiroSchema structure.
@@ -91,6 +93,22 @@ async def generate_script(
     language = cfg.get("script_language", REELS_SCRIPT_LANGUAGE)
     model = cfg.get("script_model", REELS_SCRIPT_MODEL)
 
+    # Inject character persona into script generation
+    character_section = ""
+    if character_context:
+        char_name = character_context.get("name", "")
+        char_prompt = character_context.get("system_prompt", "")
+        char_humor = character_context.get("humor_style", "")
+        char_tone = character_context.get("tone", "")
+        if char_prompt:
+            character_section = (
+                f"\n\nPERSONAGEM: {char_name}\n"
+                f"Use a persona deste personagem para narrar o Reel:\n{char_prompt}\n"
+                f"Estilo de humor: {char_humor}\nTom: {char_tone}\n"
+                f"A narracao deve soar como se o personagem estivesse falando diretamente."
+            )
+            tom = char_tone or tom
+
     system_prompt = _SYSTEM_PROMPT.format(
         tom=tom,
         duracao=duracao,
@@ -99,7 +117,7 @@ async def generate_script(
         cta=cta,
         n_imagens=len(image_paths),
         max_index=len(image_paths) - 1,
-    )
+    ) + character_section
 
     # Build multimodal content: images + text prompt
     parts = []
