@@ -31,6 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density (completed 2026-03-27)
 - [x] **Phase 999.4: Instagram Reels Pipeline** - Geracao automatizada de Reels: imagens → roteiro Claude → TTS → legendas → FFmpeg → MP4 (completed 2026-03-28)
 - [ ] **Phase 999.5: Interactive Reels Pipeline** - Stepper UI com aprovacao por etapa, regeneracao individual, videos longos via segmentacao (BACKLOG)
+- [ ] **Phase 999.6: Reels Pipeline v2 — Hailuo + Scene Context + Interactive Fix** - Fix interactive stepper flow, scene-by-scene image gen following script, Hailuo video generation per scene, mobile-optimized subtitles (BACKLOG)
 
 ## Phase Details
 
@@ -320,7 +321,18 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 999.5-01-PLAN.md — Backend: DB migration (step_state), per-step pipeline methods, video segmentation
-- [ ] 999.5-02-PLAN.md — Step-based API endpoints (approve, regenerate, edit, file serving)
-- [ ] 999.5-03-PLAN.md — Frontend: API client, hooks, stepper component, first 3 step components
+- [x] 999.5-01-PLAN.md — Backend: DB migration (step_state), per-step pipeline methods, video segmentation
+- [x] 999.5-02-PLAN.md — Step-based API endpoints (approve, regenerate, edit, file serving)
+- [x] 999.5-03-PLAN.md — Frontend: API client, hooks, stepper component, first 3 step components
 - [ ] 999.5-04-PLAN.md — Frontend: narration, subtitles, video step components, full wiring + checkpoint
+
+### Phase 999.6: Reels Pipeline v2 — Hailuo + Scene Context + Interactive Fix (BACKLOG)
+**Goal**: Fix the interactive stepper to actually work step-by-step (not sequential), generate per-scene images following script context, replace FFmpeg slideshow with Hailuo AI video generation per scene, and optimize subtitles for mobile 9:16 format.
+**Depends on**: Phase 999.5 (stepper UI), Phase 999.1 (Kie.ai client)
+**Requirements**: REELV2-01, REELV2-02, REELV2-03, REELV2-04
+**Success Criteria** (what must be TRUE):
+  1. User clicks "Criar Reel Interativo" and lands on stepper at step 1, must approve each step before next runs
+  2. Images are generated per-scene following the script roteiro — each cena gets its own contextual image matching the story
+  3. Video is generated using Hailuo 2.3 Fast via Kie.ai API (image-to-video per scene), not FFmpeg slideshow
+  4. Subtitles are sized and styled for mobile 9:16 format, matching the meme visual style
+**Plans**: TBD
