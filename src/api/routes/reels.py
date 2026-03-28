@@ -144,12 +144,23 @@ async def _execute_step_task(
             job_dir = step_state.get("prompt", {}).get("job_dir", "")
 
             if step_name == "images":
-                paths = await pipeline.run_step_images(
-                    tema=job.tema,
-                    character_id=job.character_id,
-                    job_dir=job_dir,
-                    images_dir=os.path.join(job_dir, "images") if job_dir else "",
-                )
+                script_json = step_state.get("script", {}).get("json", {})
+                if script_json and script_json.get("cenas"):
+                    # v2: per-cena image generation using script context
+                    paths = await pipeline.run_step_images_per_cena(
+                        script=script_json,
+                        character_id=job.character_id,
+                        job_dir=job_dir,
+                        images_dir=os.path.join(job_dir, "images") if job_dir else "",
+                    )
+                else:
+                    # Fallback: generic image generation (no script available)
+                    paths = await pipeline.run_step_images(
+                        tema=job.tema,
+                        character_id=job.character_id,
+                        job_dir=job_dir,
+                        images_dir=os.path.join(job_dir, "images") if job_dir else "",
+                    )
                 step_data["paths"] = paths
                 step_data["status"] = "complete"
 

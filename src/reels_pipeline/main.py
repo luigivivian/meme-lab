@@ -123,6 +123,36 @@ class ReelsPipeline:
         )
         return image_paths
 
+    async def run_step_images_per_cena(
+        self,
+        script: dict,
+        character_id: int | None,
+        job_dir: str,
+        images_dir: str,
+    ) -> list[str]:
+        """Step 3 (v2): Generate per-cena images using script context. Per REELV2-02.
+
+        Args:
+            script: Approved script dict with cenas list.
+            character_id: Optional character for consistent style.
+            job_dir: Job working directory.
+            images_dir: Directory for output images.
+
+        Returns:
+            List of image file paths (1 per cena).
+        """
+        from src.reels_pipeline.image_gen import generate_reel_images_per_cena
+
+        cenas = script.get("cenas", [])
+        if not cenas:
+            raise ValueError("Script has no cenas for image generation")
+
+        return await generate_reel_images_per_cena(
+            cenas=cenas,
+            character_id=character_id,
+            output_dir=images_dir,
+        )
+
     async def run_step_script(
         self,
         image_paths: list[str] | None = None,

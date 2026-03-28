@@ -173,6 +173,74 @@ async def generate_reel_images(
     return saved_paths
 
 
+async def generate_reel_images_per_cena(
+    cenas: list[dict],
+    character_id: int | None,
+    output_dir: str,
+) -> list[str]:
+    """Generate one image per cena using script context. Per REELV2-02.
+
+    Each image prompt includes character DNA + cena narracao + legenda_overlay + position.
+    Generates exactly len(cenas) images (1 per cena).
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    client = _get_client()
+    saved_paths: list[str] = []
+
+    char_ctx = None
+    if character_id:
+        char_ctx = await _load_character_context(character_id)
+        if char_ctx:
+            logger.info(f"Per-cena gen: character '{char_ctx['name']}' with {len(char_ctx['ref_images'])} refs")
+
+    ref_images = char_ctx["ref_images"] if char_ctx else []
+    n = len(cenas)
+
+    for i, cena in enumerate(cenas):
+        if i > 0:
+            await asyncio.sleep(_PAUSE_BETWEEN_GENERATIONS)
+
+        image_path = str(Path(output_dir) / f"image_{i:02d}.jpg")
+        narracao = cena.get("narracao", "")
+        overlay = cena.get("legenda_overlay", "")
+
+        if char_ctx and char_ctx.get("character_dna"):
+            prompt = (
+                f"Instagram Reels vertical 9:16 scene.\n"
+                f"CHARACTER (replicate precisely from reference images):\n"
+                f"{char_ctx['character_dna']}\n\n"
+                f"SCENE {i+1} of {n}:\n"
+                f"Narration: {narracao}\n"
+                f"Visual: {overlay}\n\n"
+                f"COMPOSITION: Vertical 9:16 (1080x1920). {char_ctx.get('composition', '')}\n"
+                f"NEGATIVE: {char_ctx.get('negative_traits', '')}\n"
+                f"High quality, cinematic lighting, professional."
+            )
+        else:
+            prompt = (
+                f"Instagram Reels vertical 9:16 scene {i+1} of {n}.\n"
+                f"Narration: {narracao}\n"
+                f"Visual: {overlay}\n"
+                f"High quality, photographic, vibrant colors, professional. "
+                f"Full vertical composition 1080x1920 pixels."
+            )
+
+        img = await _generate_single_image(client, prompt, ref_images=ref_images)
+        if img is None:
+            logger.error(f"Failed to generate per-cena image {i}, skipping")
+            continue
+
+        img_padded = _scale_and_pad(img, REELS_IMAGE_WIDTH, REELS_IMAGE_HEIGHT)
+        img_padded.save(image_path, "JPEG", quality=95)
+        saved_paths.append(image_path)
+        logger.info(f"Saved per-cena image {i+1}/{n}: {image_path}")
+
+    if not saved_paths:
+        raise RuntimeError("Failed to generate any per-cena images")
+
+    return saved_paths
+
+
 async def _generate_single_image(
     client, prompt: str, ref_images: list[PIL.Image.Image] | None = None,
 ) -> PIL.Image.Image | None:
