@@ -17,7 +17,7 @@ export function StepPrompt({ jobId, stepState }: { jobId: string; stepState: Ste
     setLoading(true);
     try {
       await approveStep(jobId, "prompt");
-      await executeStep(jobId, "images");
+      await executeStep(jobId, "script");
     } finally {
       setLoading(false);
     }
@@ -81,7 +81,7 @@ export function StepPrompt({ jobId, stepState }: { jobId: string; stepState: Ste
             ) : (
               <ArrowRight className="mr-2 h-4 w-4" />
             )}
-            Gerar Imagens
+            Gerar Roteiro
           </Button>
         </div>
       </CardContent>

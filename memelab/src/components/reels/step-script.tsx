@@ -81,7 +81,7 @@ export function StepScript({ jobId, stepState }: { jobId: string; stepState: Ste
         setDirty(false);
       }
       await approveStep(jobId, "script");
-      await executeStep(jobId, "tts");
+      await executeStep(jobId, "images");
     } finally {
       setLoading(false);
     }
@@ -205,7 +205,7 @@ export function StepScript({ jobId, stepState }: { jobId: string; stepState: Ste
             ) : (
               <Check className="mr-2 h-4 w-4" />
             )}
-            Aprovar Roteiro
+            Gerar Imagens
           </Button>
         </div>
       </CardContent>

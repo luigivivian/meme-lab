@@ -17,7 +17,7 @@ export function StepImages({ jobId, stepState }: { jobId: string; stepState: Ste
     setLoading(true);
     try {
       await approveStep(jobId, "images");
-      await executeStep(jobId, "script");
+      await executeStep(jobId, "tts");
     } finally {
       setLoading(false);
     }
@@ -95,7 +95,7 @@ export function StepImages({ jobId, stepState }: { jobId: string; stepState: Ste
             ) : (
               <Check className="mr-2 h-4 w-4" />
             )}
-            Aprovar Imagens
+            Aprovar e Gerar Narracao
           </Button>
         </div>
       </CardContent>
