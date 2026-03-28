@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Clapperboard,
   Play,
@@ -12,6 +13,7 @@ import {
   ChevronUp,
   Clock,
   ExternalLink,
+  Wand2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ import { useReelJobs, useReelStatus, useReelsConfig, useReelsPresets } from "@/h
 import { useCharacters } from "@/hooks/use-api";
 import {
   generateReel,
+  createInteractiveReel,
   saveReelsConfig,
   type ReelGenerateRequest,
   type ReelJob,
@@ -64,6 +67,7 @@ function formatCost(brl: number): string {
 // ── Generation Form ────────────────────────────────────────────────
 
 function GenerationForm() {
+  const router = useRouter();
   const [tema, setTema] = useState("");
   const [characterId, setCharacterId] = useState<string>("auto");
   const [tone, setTone] = useState("inspiracional");
@@ -73,6 +77,7 @@ function GenerationForm() {
   const [showAjustes, setShowAjustes] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingInteractive, setSubmittingInteractive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { data: presets } = useReelsPresets();
@@ -112,6 +117,28 @@ function GenerationForm() {
     setActiveJobId(null);
     setTema("");
     setError(null);
+  }
+
+  async function handleInteractive() {
+    if (!tema.trim()) return;
+    setSubmittingInteractive(true);
+    setError(null);
+    try {
+      const res = await createInteractiveReel({
+        tema: tema.trim(),
+        target_duration: parseInt(duration),
+        ...(characterId === "none"
+          ? { no_character: true }
+          : characterId !== "auto"
+            ? { character_slug: characterId }
+            : {}),
+      });
+      router.push(`/reels/${res.job_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao criar reel interativo");
+    } finally {
+      setSubmittingInteractive(false);
+    }
   }
 
   return (
@@ -266,18 +293,33 @@ function GenerationForm() {
 
             {error && <p className="text-sm text-red-400">{error}</p>}
 
-            <Button
-              className="w-full"
-              onClick={handleGenerate}
-              disabled={!tema.trim() || submitting}
-            >
-              {submitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="mr-2 h-4 w-4" />
-              )}
-              Gerar Reel
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={handleGenerate}
+                disabled={!tema.trim() || submitting || submittingInteractive}
+              >
+                {submitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-2 h-4 w-4" />
+                )}
+                Gerar Reel
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleInteractive}
+                disabled={!tema.trim() || submitting || submittingInteractive}
+              >
+                {submittingInteractive ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wand2 className="mr-2 h-4 w-4" />
+                )}
+                Criar Reel Interativo
+              </Button>
+            </div>
           </>
         )}
       </CardContent>
