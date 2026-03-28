@@ -13,9 +13,12 @@ import platform
 import shutil
 import subprocess
 
+import re
+
 from src.reels_pipeline.config import (
     REELS_FPS,
     REELS_IMAGE_DURATION,
+    REELS_SEGMENT_MAX_DURATION,
     REELS_TRANSITION_DURATION,
     REELS_TRANSITION_TYPE,
     REELS_VIDEO_CRF,
@@ -184,3 +187,270 @@ def get_video_duration(video_path: str) -> float:
         raise RuntimeError(f"ffprobe failed: {result.stderr[:500]}")
 
     return float(result.stdout.strip())
+
+
+# ------------------------------------------------------------------
+# SRT timestamp helpers
+# ------------------------------------------------------------------
+
+def _parse_srt_time(time_str: str) -> float:
+    """Parse SRT timestamp 'HH:MM:SS,mmm' to seconds."""
+    match = re.match(r"(\d{2}):(\d{2}):(\d{2}),(\d{3})", time_str.strip())
+    if not match:
+        return 0.0
+    h, m, s, ms = match.groups()
+    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
+
+
+def _format_srt_time(seconds: float) -> str:
+    """Format seconds to SRT timestamp 'HH:MM:SS,mmm'."""
+    if seconds < 0:
+        seconds = 0.0
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    ms = int(round((seconds - int(seconds)) * 1000))
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+# ------------------------------------------------------------------
+# Video segmentation for >30s content
+# ------------------------------------------------------------------
+
+def segment_roteiro(
+    script: dict, max_segment_duration: float = REELS_SEGMENT_MAX_DURATION
+) -> list[dict]:
+    """Split script cenas into segments of ~max_segment_duration seconds.
+
+    Args:
+        script: Script dict with 'cenas' list, each cena has 'duracao_segundos'.
+        max_segment_duration: Max duration per segment in seconds.
+
+    Returns:
+        List of segment dicts: {"cenas": [...], "duration": float, "index": int}.
+    """
+    cenas = script.get("cenas", [])
+    if not cenas:
+        return []
+
+    segments = []
+    current_cenas = []
+    current_duration = 0.0
+
+    for cena in cenas:
+        cena_dur = cena.get("duracao_segundos", 0)
+        # If adding this cena would exceed max and we already have cenas, start new segment
+        if current_cenas and current_duration + cena_dur > max_segment_duration:
+            segments.append({
+                "cenas": current_cenas,
+                "duration": current_duration,
+                "index": len(segments),
+            })
+            current_cenas = []
+            current_duration = 0.0
+        current_cenas.append(cena)
+        current_duration += cena_dur
+
+    # Flush remaining
+    if current_cenas:
+        segments.append({
+            "cenas": current_cenas,
+            "duration": current_duration,
+            "index": len(segments),
+        })
+
+    return segments
+
+
+def _slice_srt(srt_path: str, start_s: float, end_s: float, output_path: str) -> str:
+    """Extract SRT entries within a time range, reindex and adjust timestamps.
+
+    Args:
+        srt_path: Path to source SRT file.
+        start_s: Start time in seconds.
+        end_s: End time in seconds.
+        output_path: Path to write the sliced SRT.
+
+    Returns:
+        output_path.
+    """
+    with open(srt_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    blocks = content.strip().split("\n\n")
+    filtered = []
+    idx = 1
+
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if len(lines) < 3:
+            continue
+        # Parse timestamp line: "00:00:01,000 --> 00:00:03,500"
+        ts_line = lines[1]
+        parts = ts_line.split(" --> ")
+        if len(parts) != 2:
+            continue
+        entry_start = _parse_srt_time(parts[0])
+        entry_end = _parse_srt_time(parts[1])
+
+        # Keep entries that overlap with the slice range
+        if entry_end <= start_s or entry_start >= end_s:
+            continue
+
+        # Adjust timestamps relative to segment start
+        adj_start = max(entry_start - start_s, 0.0)
+        adj_end = min(entry_end - start_s, end_s - start_s)
+        text = "\n".join(lines[2:])
+
+        filtered.append(
+            f"{idx}\n{_format_srt_time(adj_start)} --> {_format_srt_time(adj_end)}\n{text}"
+        )
+        idx += 1
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("\n\n".join(filtered) + "\n" if filtered else "")
+
+    return output_path
+
+
+def build_segment_videos(
+    segments: list[dict],
+    image_paths_by_segment: list[list[str]],
+    audio_path: str,
+    srt_path: str,
+    job_dir: str,
+    config_override: dict | None = None,
+) -> list[str]:
+    """Build individual video segments from sliced audio/SRT.
+
+    Args:
+        segments: List of segment dicts from segment_roteiro().
+        image_paths_by_segment: Images for each segment.
+        audio_path: Full audio file path.
+        srt_path: Full SRT file path.
+        job_dir: Job working directory for temp files.
+        config_override: Optional config overrides.
+
+    Returns:
+        List of segment video file paths.
+    """
+    segment_paths = []
+    cumulative_start = 0.0
+
+    for i, seg in enumerate(segments):
+        seg_duration = seg["duration"]
+        seg_end = cumulative_start + seg_duration
+
+        # Slice audio
+        seg_audio = os.path.join(job_dir, f"segment_audio_{i}.wav")
+        audio_cmd = [
+            "ffmpeg", "-y", "-i", audio_path,
+            "-ss", str(cumulative_start), "-to", str(seg_end),
+            "-c", "copy", seg_audio,
+        ]
+        result = subprocess.run(audio_cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            logger.warning(f"Audio slice failed for segment {i}: {result.stderr[:200]}")
+            # Fallback: copy full audio
+            seg_audio = audio_path
+
+        # Slice SRT
+        seg_srt = os.path.join(job_dir, f"segment_subtitles_{i}.srt")
+        _slice_srt(srt_path, cumulative_start, seg_end, seg_srt)
+
+        # Build segment video
+        seg_video = os.path.join(job_dir, f"segment_{i}.mp4")
+        images = image_paths_by_segment[i] if i < len(image_paths_by_segment) else []
+        if not images:
+            logger.warning(f"No images for segment {i}, skipping")
+            cumulative_start = seg_end
+            continue
+
+        build_reel_video(
+            image_paths=images,
+            audio_path=seg_audio,
+            srt_path=seg_srt,
+            output_path=seg_video,
+            config_override=config_override,
+        )
+        segment_paths.append(seg_video)
+        cumulative_start = seg_end
+
+    return segment_paths
+
+
+def concat_segments(
+    segment_paths: list[str],
+    output_path: str,
+    transition_duration: float = 0.5,
+) -> str:
+    """Concatenate segment videos with xfade crossfade transitions.
+
+    Args:
+        segment_paths: Paths to segment MP4 files.
+        output_path: Path for the concatenated output.
+        transition_duration: Duration of crossfade between segments.
+
+    Returns:
+        output_path.
+    """
+    if not segment_paths:
+        raise ValueError("No segment paths to concatenate")
+
+    if len(segment_paths) == 1:
+        # Single segment: just copy
+        import shutil
+        shutil.copy2(segment_paths[0], output_path)
+        return output_path
+
+    # Get durations for xfade offset calculation
+    durations = [get_video_duration(p) for p in segment_paths]
+
+    # Build xfade filter chain
+    cmd = ["ffmpeg", "-y"]
+    for p in segment_paths:
+        cmd += ["-i", p]
+
+    n = len(segment_paths)
+    xfade_filters = []
+    prev = "0:v"
+
+    for i in range(1, n):
+        # offset = sum of durations so far minus accumulated transitions
+        offset = sum(durations[:i]) - i * transition_duration
+        offset = max(offset, 0)
+        out = f"v{i}" if i < n - 1 else "vout"
+        xfade_filters.append(
+            f"[{prev}][{i}:v]xfade=transition=fade:duration={transition_duration}:offset={offset}[{out}]"
+        )
+        prev = out
+
+    # Audio: concat all audio streams
+    audio_inputs = "".join(f"[{i}:a]" for i in range(n))
+    audio_filter = f"{audio_inputs}concat=n={n}:v=0:a=1[aout]"
+
+    filter_complex = ";".join(xfade_filters + [audio_filter])
+
+    cmd += [
+        "-filter_complex", filter_complex,
+        "-map", "[vout]",
+        "-map", "[aout]",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "18",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+
+    logger.info(f"Concatenating {n} segments with xfade")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Segment concat failed (exit {result.returncode}): {result.stderr[:1000]}"
+        )
+
+    logger.info(f"Segments concatenated: {output_path}")
+    return output_path
