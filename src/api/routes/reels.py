@@ -145,6 +145,10 @@ async def _execute_step_task(
 
             if step_name == "images":
                 script_json = step_state.get("script", {}).get("json", {})
+                logger.info("Images step: script_json keys=%s, has_cenas=%s, n_cenas=%d",
+                            list(script_json.keys()) if script_json else "None",
+                            bool(script_json.get("cenas")),
+                            len(script_json.get("cenas", [])))
                 if script_json and script_json.get("cenas"):
                     # v2: per-cena image generation using script context
                     paths = await pipeline.run_step_images_per_cena(
@@ -794,21 +798,25 @@ async def serve_artifact_file(
     """Serve artifact files (images, audio, video) via FileResponse.
 
     Per Research Pitfall 3: enables frontend previews.
-    Resolves filename relative to job's job_dir.
+    Accepts both relative-to-job_dir and absolute paths stored in step_state.
     """
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = job.step_state or {}
 
-    # Get job_dir from step_state
     job_dir = step_state.get("prompt", {}).get("job_dir", "")
     if not job_dir:
         raise HTTPException(status_code=400, detail="Job directory not initialized")
 
-    file_path = os.path.join(job_dir, filename)
+    # If filename is an absolute path or starts with the output dir, use directly
+    if os.path.isabs(filename) or filename.startswith("output/"):
+        resolved = os.path.realpath(filename)
+    else:
+        resolved = os.path.realpath(os.path.join(job_dir, filename))
 
-    # Security: ensure the resolved path is under job_dir
-    resolved = os.path.realpath(file_path)
-    if not resolved.startswith(os.path.realpath(job_dir)):
+    # Security: ensure the resolved path is under job_dir or output/reels
+    job_dir_real = os.path.realpath(job_dir)
+    output_real = os.path.realpath("output/reels")
+    if not (resolved.startswith(job_dir_real) or resolved.startswith(output_real)):
         raise HTTPException(status_code=403, detail="Access denied")
 
     if not os.path.isfile(resolved):

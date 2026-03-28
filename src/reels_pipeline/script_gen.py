@@ -51,7 +51,7 @@ Regras:
 - Gancho forte nos primeiros 3 segundos para prender a atencao
 - Cada cena deve ter entre 3-6 segundos de duracao
 - Narracao de cada cena: maximo 15 palavras
-- legenda_overlay de cada cena: maximo 5 palavras (texto curto para overlay visual)
+- legenda_overlay de cada cena: descricao visual detalhada do cenario (15-30 palavras, ex: 'mago idoso meditando no topo de montanha com neblina ao amanhecer'). Sera usado como prompt para gerar a imagem da cena
 - CTA final claro e direto
 - Linguagem PT-BR coloquial, tom {tom}
 - Duracao total alvo: {duracao}s
@@ -141,8 +141,12 @@ async def generate_script(
         user_prompt = (
             f"Tema do Reel: {tema}\n"
             f"Idioma: {language}\n"
-            f"Crie o roteiro completo para este Reel. Descreva em cada cena "
-            f"o visual que deve aparecer (legenda_overlay) para guiar a geracao de imagens."
+            f"Crie o roteiro completo para este Reel.\n"
+            f"IMPORTANTE: Em cada cena, o campo 'legenda_overlay' deve descrever detalhadamente "
+            f"o cenario visual, objetos, acoes e ambiente da cena (ex: 'mago meditando em montanha ao amanhecer', "
+            f"'pessoa servindo cafe em cozinha moderna', 'close no rosto com expressao de surpresa'). "
+            f"Esse campo sera usado diretamente como prompt para gerar a imagem da cena. "
+            f"Quanto mais descritivo e visual, melhor a imagem gerada."
         )
     parts.append(user_prompt)
 

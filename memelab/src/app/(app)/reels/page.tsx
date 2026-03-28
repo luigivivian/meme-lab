@@ -14,6 +14,7 @@ import {
   Clock,
   ExternalLink,
   Wand2,
+  ArrowRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ const STEP_LABELS: Record<string, string> = {
 const STATUS_BADGE: Record<string, { color: string; label: string }> = {
   queued: { color: "bg-amber-500/20 text-amber-400 border-amber-500/30", label: "Na fila" },
   generating: { color: "bg-blue-500/20 text-blue-400 border-blue-500/30", label: "Gerando" },
+  interactive: { color: "bg-purple-500/20 text-purple-400 border-purple-500/30", label: "Interativo" },
   complete: { color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", label: "Completo" },
   failed: { color: "bg-red-500/20 text-red-400 border-red-500/30", label: "Falhou" },
 };
@@ -394,6 +396,16 @@ function JobHistory() {
                     {badge.label}
                   </Badge>
                 </div>
+
+                {job.status === "interactive" && (
+                  <a
+                    href={`/reels/${job.job_id}`}
+                    className="inline-flex items-center gap-1 text-xs text-purple-400 hover:underline"
+                  >
+                    <ArrowRight className="h-3 w-3" />
+                    Continuar
+                  </a>
+                )}
 
                 {job.status === "complete" && job.video_url && (
                   <a
