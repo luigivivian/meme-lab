@@ -317,7 +317,10 @@ Plans:
   3. User can edit generated text (prompt, roteiro, legendas) inline before approving
   4. Videos >30s are automatically segmented into consistent blocks and concatenated
   5. Final video preview plays in-browser before download
-**Plans**: 0 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] TBD
+- [ ] 999.5-01-PLAN.md — Backend: DB migration (step_state), per-step pipeline methods, video segmentation
+- [ ] 999.5-02-PLAN.md — Step-based API endpoints (approve, regenerate, edit, file serving)
+- [ ] 999.5-03-PLAN.md — Frontend: API client, hooks, stepper component, first 3 step components
+- [ ] 999.5-04-PLAN.md — Frontend: narration, subtitles, video step components, full wiring + checkpoint
