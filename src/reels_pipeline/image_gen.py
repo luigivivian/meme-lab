@@ -206,23 +206,26 @@ async def generate_reel_images_per_cena(
 
         if char_ctx and char_ctx.get("character_dna"):
             prompt = (
-                f"Instagram Reels vertical 9:16 scene.\n"
-                f"CHARACTER (replicate precisely from reference images):\n"
+                f"SCENE DESCRIPTION (THIS IS THE PRIORITY — illustrate exactly this):\n"
+                f"{overlay}\n"
+                f"Context: {narracao}\n\n"
+                f"The scene must visually depict the action and setting described above. "
+                f"Do NOT just show the character standing — show the specific action, objects, and environment.\n\n"
+                f"CHARACTER STYLE (use this character in the scene above):\n"
                 f"{char_ctx['character_dna']}\n\n"
-                f"SCENE {i+1} of {n}:\n"
-                f"Narration: {narracao}\n"
-                f"Visual: {overlay}\n\n"
-                f"COMPOSITION: Vertical 9:16 (1080x1920). {char_ctx.get('composition', '')}\n"
-                f"NEGATIVE: {char_ctx.get('negative_traits', '')}\n"
-                f"High quality, cinematic lighting, professional."
+                f"FORMAT: Instagram Reels vertical 9:16 (1080x1920). Scene {i+1} of {n}.\n"
+                f"{char_ctx.get('composition', '')}\n"
+                f"AVOID: {char_ctx.get('negative_traits', '')}\n"
+                f"Cinematic lighting, high detail, professional illustration."
             )
         else:
             prompt = (
-                f"Instagram Reels vertical 9:16 scene {i+1} of {n}.\n"
-                f"Narration: {narracao}\n"
-                f"Visual: {overlay}\n"
-                f"High quality, photographic, vibrant colors, professional. "
-                f"Full vertical composition 1080x1920 pixels."
+                f"SCENE DESCRIPTION (illustrate exactly this):\n"
+                f"{overlay}\n"
+                f"Context: {narracao}\n\n"
+                f"Show the specific action, objects, and environment described. "
+                f"Instagram Reels vertical 9:16 (1080x1920). Scene {i+1} of {n}.\n"
+                f"High quality, photographic, vibrant colors, cinematic lighting."
             )
 
         img = await _generate_single_image(client, prompt, ref_images=ref_images)

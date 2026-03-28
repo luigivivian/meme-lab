@@ -59,8 +59,9 @@ Regras:
 - Keywords: {keywords}
 - CTA padrao: {cta}
 
-Voce recebera {n_imagens} imagens que serao usadas no Reel. Crie um roteiro que:
-1. Use cada imagem em ordem (imagem_index 0 a {max_index})
+{image_instruction}
+Crie um roteiro que:
+1. {cena_instruction}
 2. Distribua a narracao entre as cenas de forma natural
 3. Crie um gancho irresistivel
 4. Termine com CTA forte
@@ -113,15 +114,25 @@ async def generate_script(
             )
             tom = char_tone or tom
 
-    n_imagens = len(image_paths) if image_paths else 5
+    if image_paths:
+        n_imagens = len(image_paths)
+        image_instruction = f"Voce recebera {n_imagens} imagens que serao usadas no Reel."
+        cena_instruction = f"Use cada imagem em ordem (imagem_index 0 a {n_imagens - 1})"
+    else:
+        image_instruction = (
+            "Crie quantas cenas forem necessarias para cobrir o tema completo "
+            "(minimo 3, sem limite maximo). Cada cena gerara uma imagem propria."
+        )
+        cena_instruction = "Crie uma cena para cada momento/topico do roteiro (numere imagem_index sequencialmente a partir de 0)"
+
     system_prompt = _SYSTEM_PROMPT.format(
         tom=tom,
         duracao=duracao,
         nicho=nicho,
         keywords=keywords or "nenhuma",
         cta=cta,
-        n_imagens=n_imagens,
-        max_index=n_imagens - 1,
+        image_instruction=image_instruction,
+        cena_instruction=cena_instruction,
     ) + character_section
 
     # Build content parts
