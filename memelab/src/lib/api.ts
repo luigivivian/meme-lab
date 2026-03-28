@@ -1426,6 +1426,149 @@ export async function getVideoCredits(days = 30): Promise<VideoCreditsResponse> 
   return request<VideoCreditsResponse>(`/generate/video/credits/summary?days=${days}`);
 }
 
+// --- Reels Pipeline (Phase 999.4) ---
+
+export interface ReelGenerateRequest {
+  tema: string;
+  character_id?: number;
+  character_slug?: string;
+  no_character?: boolean;
+  config_id?: number;
+  tone?: string;
+  target_duration?: number;
+  niche?: string;
+  keywords?: string[];
+}
+
+export interface ReelJob {
+  job_id: string;
+  status: string;
+  tema: string;
+  current_step?: string;
+  progress_pct: number;
+  video_url?: string;
+  caption?: string;
+  hashtags?: string[];
+  cost_brl: number;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface ReelsConfig {
+  id: number;
+  name: string;
+  image_count: number;
+  tone: string;
+  target_duration: number;
+  niche: string;
+  tts_provider: string;
+  tts_voice: string;
+  tts_speed: number;
+  image_duration: number;
+  transition_type: string;
+  transition_duration: number;
+  subtitle_font_size: number;
+  preset?: string;
+}
+
+export interface ReelsPresets {
+  presets: Record<string, Partial<ReelsConfig>>;
+}
+
+export async function generateReel(req: ReelGenerateRequest) {
+  return request<{ job_id: string; status: string }>("/reels/generate", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export async function getReelStatus(jobId: string) {
+  return request<ReelJob>(`/reels/status/${jobId}`);
+}
+
+export async function getReelJobs(status?: string) {
+  const params = status ? `?status=${status}` : "";
+  return request<ReelJob[]>(`/reels/jobs${params}`);
+}
+
+export async function getReelsConfig() {
+  return request<ReelsConfig[]>("/reels/config");
+}
+
+export async function saveReelsConfig(config: Partial<ReelsConfig>) {
+  return request<ReelsConfig>("/reels/config", {
+    method: "POST",
+    body: JSON.stringify(config),
+  });
+}
+
+export async function getReelsPresets() {
+  return request<ReelsPresets>("/reels/config/presets");
+}
+
+// --- Interactive Reels (Phase 999.5) ---
+
+export interface StepState {
+  job_id: string;
+  current_step: number;
+  prompt?: { text: string; approved: boolean; job_dir?: string };
+  images?: { paths: string[]; approved: boolean; status?: string };
+  script?: { json: Record<string, unknown>; approved: boolean; status?: string };
+  tts?: { path: string; approved: boolean; status?: string };
+  srt?: { path: string; approved: boolean; status?: string };
+  video?: { path: string; approved: boolean; status?: string };
+}
+
+export interface StepEditPayload {
+  text?: string;
+  script_json?: Record<string, unknown>;
+  srt_entries?: Array<{ index: number; start: string; end: string; text: string }>;
+}
+
+export interface InteractiveReelRequest {
+  tema: string;
+  character_id?: number;
+  character_slug?: string;
+  no_character?: boolean;
+  config_id?: number;
+  target_duration?: number;
+}
+
+export async function createInteractiveReel(req: InteractiveReelRequest) {
+  return request<{ job_id: string; step_state: StepState }>("/reels/interactive", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export async function getStepState(jobId: string) {
+  return request<StepState>(`/reels/${jobId}/step-state`);
+}
+
+export async function executeStep(jobId: string, step: string) {
+  return request<{ status: string }>(`/reels/${jobId}/step/${step}`, { method: "POST" });
+}
+
+export async function approveStep(jobId: string, step: string) {
+  return request<{ step: string; approved: boolean; current_step: number }>(
+    `/reels/${jobId}/approve/${step}`, { method: "POST" }
+  );
+}
+
+export async function regenerateStep(jobId: string, step: string) {
+  return request<{ status: string }>(`/reels/${jobId}/regenerate/${step}`, { method: "POST" });
+}
+
+export async function editStep(jobId: string, step: string, payload: StepEditPayload) {
+  return request<{ step: string; updated: boolean }>(
+    `/reels/${jobId}/edit/${step}`, { method: "PUT", body: JSON.stringify(payload) }
+  );
+}
+
+export function reelFileUrl(jobId: string, filename: string): string {
+  return `/api/reels/${jobId}/file/${encodeURIComponent(filename)}`;
+}
+
 // --- Content Export ---
 export const exportContentPack = (packageId: number) =>
   `${BASE}/content/${packageId}/export`;
