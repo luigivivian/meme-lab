@@ -1586,3 +1586,87 @@ export function reelFileUrl(jobId: string, filename: string): string {
 // --- Content Export ---
 export const exportContentPack = (packageId: number) =>
   `${BASE}/content/${packageId}/export`;
+
+// ===== Product Ads =====
+
+export interface AdJob {
+  job_id: string;
+  status: "draft" | "generating" | "complete" | "failed";
+  style: "cinematic" | "narrated" | "lifestyle";
+  product_name: string;
+  video_model: string;
+  audio_mode: "mute" | "music" | "narrated" | "ambient";
+  step_state: Record<string, { status: string; result?: unknown }> | null;
+  current_step: string | null;
+  progress_pct: number;
+  cost_brl: number | null;
+  outputs: Record<string, string> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdCreateRequest {
+  product_name: string;
+  style: "cinematic" | "narrated" | "lifestyle";
+  video_model?: string;
+  audio_mode?: "mute" | "music" | "narrated" | "ambient";
+  output_formats?: string[];
+  target_duration?: number;
+  tone?: string;
+  niche?: string;
+  audience?: string;
+  scene_description?: string;
+  with_human?: boolean;
+}
+
+export interface AdCostEstimate {
+  video_brl: number;
+  audio_brl: number;
+  image_brl: number;
+  total_brl: number;
+}
+
+export interface AdAnalysisResult {
+  niche: string;
+  tone: string;
+  audience: string;
+  scene_suggestions: string[];
+  product_description: string;
+}
+
+export async function createAdJob(data: AdCreateRequest): Promise<AdJob> {
+  return request<AdJob>("/ads/create", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export const fetchAdJobs = () => request<AdJob[]>("/ads/jobs");
+
+export const fetchAdJob = (jobId: string) => request<AdJob>(`/ads/${jobId}`);
+
+export const fetchAdSteps = (jobId: string) =>
+  request<{ step_state: Record<string, unknown>; current_step: string; progress_pct: number }>(
+    `/ads/${jobId}/steps`
+  );
+
+export async function executeAdStep(jobId: string, stepName: string) {
+  return request<{ status: string }>(`/ads/${jobId}/step/${stepName}`, { method: "POST" });
+}
+
+export async function approveAdStep(jobId: string, stepName: string) {
+  return request<{ step: string; approved: boolean }>(`/ads/${jobId}/approve/${stepName}`, {
+    method: "POST",
+  });
+}
+
+export async function regenerateAdStep(jobId: string, stepName: string) {
+  return request<{ status: string }>(`/ads/${jobId}/regenerate/${stepName}`, { method: "POST" });
+}
+
+export const fetchAdCostEstimate = (jobId: string) =>
+  request<AdCostEstimate>(`/ads/${jobId}/cost-estimate`);
+
+export async function deleteAdJob(jobId: string) {
+  return request<void>(`/ads/${jobId}`, { method: "DELETE" });
+}
