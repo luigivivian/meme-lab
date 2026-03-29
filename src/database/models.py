@@ -732,3 +732,54 @@ class ReelsJob(TimestampMixin, Base):
         Index("idx_reels_jobs_status", "status"),
         Index("idx_reels_jobs_job_id", "job_id"),
     )
+
+
+# ============================================================
+# 17. product_ad_jobs
+# ============================================================
+
+class ProductAdJob(TimestampMixin, Base):
+    __tablename__ = "product_ad_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+
+    # Product info
+    product_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    product_images: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    # Style and generation settings
+    style: Mapped[str] = mapped_column(String(20), nullable=False, default="cinematic", server_default="cinematic")
+    video_model: Mapped[Optional[str]] = mapped_column(String(100), default="wan2.1-i2v", server_default="wan2.1-i2v")
+    audio_mode: Mapped[Optional[str]] = mapped_column(String(20), default="music", server_default="music")
+    output_formats: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    target_duration: Mapped[int] = mapped_column(Integer, default=15, server_default="15")
+    tone: Mapped[Optional[str]] = mapped_column(String(50), default="premium", server_default="premium")
+    niche: Mapped[Optional[str]] = mapped_column(String(100), default="", server_default="")
+    audience: Mapped[Optional[str]] = mapped_column(String(255), default="", server_default="")
+    scene_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    prompt_generated: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Status tracking
+    step_state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft", server_default="draft")
+    current_step: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    progress_pct: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Cost tracking
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    cost_brl: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+
+    # Output
+    outputs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("idx_product_ad_jobs_user_id", "user_id"),
+        Index("idx_product_ad_jobs_status", "status"),
+        Index("idx_product_ad_jobs_job_id", "job_id"),
+    )
