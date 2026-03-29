@@ -511,10 +511,10 @@ class ReelsPipeline:
             except Exception as e:
                 logger.error(f"Scene {idx}: Hailuo poll/download failed: {e}")
 
-            # Fallback: static image for 6s
+            # Fallback: static image using per-scene duration
             logger.warning(f"Scene {idx}: Hailuo failed, using static fallback")
             subprocess.run([
-                "ffmpeg", "-y", "-loop", "1", "-t", str(hailuo_duration),
+                "ffmpeg", "-y", "-loop", "1", "-t", str(clip_dur),
                 "-i", img_path,
                 "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
