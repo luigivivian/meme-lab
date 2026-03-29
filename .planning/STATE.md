@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
-status: v2.0 milestone complete
-stopped_at: "Completed 999.4-05-PLAN.md (checkpoint: human-verify pending)"
-last_updated: "2026-03-28T18:24:45.742Z"
+status: Phase complete — ready for verification
+stopped_at: Phase 421 context gathered
+last_updated: "2026-03-29T20:30:50.965Z"
 progress:
-  total_phases: 14
-  completed_phases: 5
-  total_plans: 13
-  completed_plans: 13
+  total_phases: 16
+  completed_phases: 7
+  total_plans: 20
+  completed_plans: 20
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 21 — dashboard-business-metrics
+**Current focus:** Phase 999.6 — reels-pipeline-v2
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 999.6 (reels-pipeline-v2) — EXECUTING
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -75,6 +75,13 @@ Plan: Not started
 | Phase 999.4 P03 | 2min | 2 tasks | 2 files |
 | Phase 999.4 P04 | 2min | 2 tasks | 2 files |
 | Phase 999.4 P05 | 3min | 2 tasks | 4 files |
+| Phase 999.5 P01 | 3min | 3 tasks | 5 files |
+| Phase 999.5 P02 | 2min | 1 tasks | 2 files |
+| Phase 999.5 P03 | 5min | 2 tasks | 8 files |
+| Phase 999.5 P04 | 3min | 2 tasks | 5 files |
+| Phase 999.6 P02 | 2min | 1 tasks | 3 files |
+| Phase 999.6 P01 | 2min | 2 tasks | 4 files |
+| Phase 999.6 P03 | 1min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -142,6 +149,17 @@ Recent decisions affecting current work:
 - [Phase 999.4]: xfade filter for crossfade transitions (not concat demuxer); lazy imports in pipeline orchestrator
 - [Phase 999.4]: Models imported from src/reels_pipeline/models.py (no duplication in api/models.py)
 - [Phase 999.4]: Native HTML range inputs for config sliders (no Slider component in project)
+- [Phase 999.5]: Per-step pipeline methods take explicit I/O for interactive execution (no hidden class state)
+- [Phase 999.5]: Video segmentation uses greedy bin-packing at ~30s boundaries; SRT slicing filters and re-indexes entries
+- [Phase 999.5]: Prompt step runs sync, heavy steps in background; flag_modified on all step_state mutations; regenerate clears downstream
+- [Phase 999.5]: Approve-then-execute pattern: each step component calls approveStep then executeStep for next step
+- [Phase 999.5]: StepScript auto-saves dirty edits on approve to prevent data loss
+- [Phase 999.5]: Shared handleApprove/handleRegenerate in jobId page centralizes API calls and SWR refresh for all 6 steps
+- [Phase 999.5]: StepSubtitles auto-saves dirty SRT edits on approve to prevent data loss (same pattern as StepScript)
+- [Phase 999.6]: Hailuo 2.3 Standard model for per-scene image-to-video (R$1.31/6s); static image fallback on failure; FontSize=28 Bold=1 Outline=3 MarginV=80 for mobile subtitles
+- [Phase 999.6]: n_imagens defaults to 5 when image_paths=None (text-only script gen mode)
+- [Phase 999.6]: Per-cena image gen falls back to generic gen when no script available in step_state
+- [Phase 999.6]: Button labels reflect next action (Gerar Roteiro, Gerar Imagens, Aprovar e Gerar Narracao) for clearer UX
 
 ### Pending Todos
 
@@ -155,6 +173,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T18:24:45.738Z
-Stopped at: Completed 999.4-05-PLAN.md (checkpoint: human-verify pending)
-Resume file: None
+Last session: 2026-03-29T20:30:50.955Z
+Stopped at: Phase 421 context gathered
+Resume file: .planning/phases/421-product-studio-ai-video-ads-generator/421-CONTEXT.md
