@@ -365,14 +365,17 @@ VIDEO_USD_TO_BRL = float(os.getenv("VIDEO_USD_TO_BRL", "5.75"))
 # prices_brl: {5s, 10s, 15s} — None means duration not supported
 # input_format: how the model receives the image
 VIDEO_MODELS = {
+    # Kie.ai pricing: 30 credits/call = $0.15/call = R$0.86/call (any duration)
+    # $5.00 per 1000 credits, 30 credits per video generation
     "hailuo/2-3-image-to-video-standard": {
         "name": "Hailuo 2.3 Standard",
         "resolution": "720p",
         "tier": "cost",
         "durations": [6, 10],
-        "prices_brl": {6: 1.31, 10: 2.62},
+        "prices_brl": {6: 0.86, 10: 0.86},
+        "credits_per_call": 30,
         "speed": 3,
-        "notes": "Motion aprimorado, estilos",
+        "notes": "Motion aprimorado, estilos. 30 cred/call",
         "input_format": "hailuo",
     },
     "hailuo/2-3-image-to-video-pro": {
@@ -380,9 +383,10 @@ VIDEO_MODELS = {
         "resolution": "1080p",
         "tier": "cost",
         "durations": [6, 10],
-        "prices_brl": {6: 2.88, 10: 5.75},
+        "prices_brl": {6: 0.86, 10: 0.86},
+        "credits_per_call": 30,
         "speed": 3,
-        "notes": "Fotorrealista, iluminacao avancada",
+        "notes": "Fotorrealista, iluminacao avancada. 30 cred/call",
         "input_format": "hailuo",
     },
     "bytedance/v1-pro-fast-image-to-video": {
