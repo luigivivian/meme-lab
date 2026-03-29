@@ -88,8 +88,7 @@ async def me_usage(
     from src.database.repositories.usage_repo import UsageRepository
 
     repo = UsageRepository(session)
-    user_plan = getattr(current_user, "subscription_plan", None) or "free"
-    data = await repo.get_user_usage(current_user.id, user_plan=user_plan)
+    data = await repo.get_user_usage(current_user.id, user_plan="free")
     return data
 
 
