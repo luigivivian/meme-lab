@@ -2,25 +2,21 @@ import useSWR from "swr";
 import * as api from "@/lib/api";
 
 export function useAdJobs() {
-  return useSWR(
-    "ad-jobs",
-    () => api.fetchAdJobs(),
-    { refreshInterval: 5000 }
-  );
+  return useSWR("ad-jobs", () => api.getAdJobs(), { refreshInterval: 5000 });
 }
 
 export function useAdJob(jobId: string | null) {
   return useSWR(
     jobId ? `ad-job-${jobId}` : null,
-    () => api.fetchAdJob(jobId!),
-    { refreshInterval: 3000 }
+    () => api.getAdJob(jobId!),
+    { refreshInterval: 3000, errorRetryCount: 1 }
   );
 }
 
 export function useAdSteps(jobId: string | null) {
   return useSWR(
     jobId ? `ad-steps-${jobId}` : null,
-    () => api.fetchAdSteps(jobId!),
-    { refreshInterval: 2000 }
+    () => api.getAdSteps(jobId!),
+    { refreshInterval: 2000, errorRetryCount: 1 }
   );
 }
