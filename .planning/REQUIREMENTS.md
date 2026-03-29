@@ -93,6 +93,28 @@ Tracked for backlog phases. Not in current milestone but planned and allocated.
 - [x] **LEG-07**: Config constants VIDEO_LEGEND_ENABLED (default false), VIDEO_LEGEND_MODE (default static), VIDEO_LEGEND_FONT_SIZE (default 48)
 - [x] **LEG-08**: ContentPackage has legend_status and legend_path columns for tracking
 
+### Product Studio — AI Video Ads (Phase 421)
+
+- [ ] **ADS-01**: product_ad_jobs table exists with all required columns (job_id, user_id, style, video_model, audio_mode, step_state, status, cost_brl, outputs)
+- [ ] **ADS-02**: ADS_* config constants load from env with defaults (ADS_ENABLED, ADS_STEP_ORDER, MUSIC_MAP, NEGATIVE_PROMPTS, TEXT_LAYOUTS)
+- [ ] **ADS-03**: rembg removes background from product photo returning RGBA PNG
+- [ ] **ADS-04**: Gemini Vision analyzes product photo and suggests wizard defaults (niche, tone, audience, scene)
+- [ ] **ADS-05**: Gemini Image composes product cutout onto AI-generated scene preserving product appearance
+- [ ] **ADS-06**: LLM generates cinematic video prompt per style with negative prompts, and headline + CTA + hashtags
+- [ ] **ADS-07**: KieMusicClient generates instrumental tracks via Kie.ai Suno API (create/poll/download)
+- [ ] **ADS-08**: FFmpeg multi-format export produces 9:16, 16:9, 1:1 variants with blur background padding
+- [ ] **ADS-09**: FFmpeg text overlay (drawtext) and audio mix (amix TTS+music) work per style config
+- [ ] **ADS-10**: ProductAdPipeline has 8 step methods (analysis, scene, prompt, video, copy, audio, assembly, export)
+- [ ] **ADS-11**: Pipeline calculates cost estimate in BRL before video generation, user confirms
+- [ ] **ADS-12**: REST API under /ads/* with create, step execute/approve/regenerate, cost estimate, file serve, delete
+- [ ] **ADS-13**: All /ads/* endpoints enforce tenant isolation via get_current_user
+- [ ] **ADS-14**: Frontend API client has typed functions and SWR hooks for all /ads/* endpoints
+- [ ] **ADS-15**: Wizard page at /ads/new with 4 collapsible sections (Produto, Contexto, Estilo, Audio & Formato)
+- [ ] **ADS-16**: Jobs listing page at /ads shows ad jobs with status badges and create button
+- [ ] **ADS-17**: Stepper UI at /ads/[jobId] with 8 steps, approve/regenerate per step
+- [ ] **ADS-18**: Export step auto-completes with download links for each format (no approval needed)
+- [ ] **ADS-19**: Product Ads appears in sidebar navigation as separate section
+
 ## Future Requirements
 
 Deferred to future milestones. Tracked but not in current roadmap.
@@ -197,13 +219,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LEG-06 | Phase 999.2 | Complete |
 | LEG-07 | Phase 999.2 | Complete |
 | LEG-08 | Phase 999.2 | Complete |
+| ADS-01 | Phase 421 | Pending |
+| ADS-02 | Phase 421 | Pending |
+| ADS-03 | Phase 421 | Pending |
+| ADS-04 | Phase 421 | Pending |
+| ADS-05 | Phase 421 | Pending |
+| ADS-06 | Phase 421 | Pending |
+| ADS-07 | Phase 421 | Pending |
+| ADS-08 | Phase 421 | Pending |
+| ADS-09 | Phase 421 | Pending |
+| ADS-10 | Phase 421 | Pending |
+| ADS-11 | Phase 421 | Pending |
+| ADS-12 | Phase 421 | Pending |
+| ADS-13 | Phase 421 | Pending |
+| ADS-14 | Phase 421 | Pending |
+| ADS-15 | Phase 421 | Pending |
+| ADS-16 | Phase 421 | Pending |
+| ADS-17 | Phase 421 | Pending |
+| ADS-18 | Phase 421 | Pending |
+| ADS-19 | Phase 421 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 40 total (24 original + 16 VIRAL)
 - Mapped to phases: 40
 - Unmapped: 0
-- Backlog requirements: 18 (VID-01 through VID-10, LEG-01 through LEG-08)
+- Backlog requirements: 37 (VID-01 through VID-10, LEG-01 through LEG-08, ADS-01 through ADS-19)
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-26 after Phase 999.2 planning*
+*Last updated: 2026-03-29 after Phase 421 planning*

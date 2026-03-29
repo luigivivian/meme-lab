@@ -342,3 +342,25 @@ Plans:
 - [x] 999.6-01-PLAN.md — Backend: reorder steps, text-only script gen, per-cena image gen
 - [x] 999.6-02-PLAN.md — Backend: Hailuo video step (Kie.ai per scene), mobile subtitle fix
 - [ ] 999.6-03-PLAN.md — Frontend: reorder stepper, fix step wiring, visual checkpoint
+
+### Phase 421: Product Studio — AI Video Ads Generator (BACKLOG)
+**Goal**: Users can generate professional product advertisement videos 100% via AI — from product photo to multi-format video — through a wizard-driven 8-step pipeline with 3 styles (cinematic, narrated, lifestyle)
+**Depends on**: Phase 999.1 (Kie.ai client), Phase 999.5 (stepper UI pattern)
+**Requirements**: ADS-01, ADS-02, ADS-03, ADS-04, ADS-05, ADS-06, ADS-07, ADS-08, ADS-09, ADS-10, ADS-11, ADS-12, ADS-13, ADS-14, ADS-15, ADS-16, ADS-17, ADS-18, ADS-19
+**Success Criteria** (what must be TRUE):
+  1. User uploads product photo and wizard suggests defaults (nicho, tom, cenario) via Gemini Vision
+  2. Pipeline generates scene image (rembg bg removal + Gemini inpainting) and user approves
+  3. Video is generated via configurable model (Wan 2.6 / Kling 2.5 / Hailuo) through Kie.ai
+  4. Final video includes text overlay (headline + CTA) and audio (Suno trilha + optional TTS narration)
+  5. Export produces multi-format videos (9:16, 16:9, 1:1) via intelligent crop + background blur padding
+**Plans**: 7 plans
+**UI hint**: yes
+
+Plans:
+- [ ] 421-01-PLAN.md — Foundation: rembg install, DB migration (product_ad_jobs), config.py, models.py
+- [ ] 421-02-PLAN.md — Scene modules: bg_remover, scene_composer (Gemini Vision + Image), prompt_builder, copy_generator
+- [ ] 421-03-PLAN.md — Audio & export modules: KieMusicClient (Suno via Kie.ai), format_exporter (blur pad + drawtext + amix)
+- [ ] 421-04-PLAN.md — Pipeline orchestrator: ProductAdPipeline with 8 step methods
+- [ ] 421-05-PLAN.md — API routes: ads.py (10 endpoints) + app.py wiring
+- [ ] 421-06-PLAN.md — Frontend: API client, SWR hooks, wizard page (/ads/new), jobs listing (/ads)
+- [ ] 421-07-PLAN.md — Frontend: stepper UI (8 step components), job detail page (/ads/[jobId]), sidebar nav
