@@ -32,6 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 999.4: Instagram Reels Pipeline** - Geracao automatizada de Reels: imagens → roteiro Claude → TTS → legendas → FFmpeg → MP4 (completed 2026-03-28)
 - [ ] **Phase 999.5: Interactive Reels Pipeline** - Stepper UI com aprovacao por etapa, regeneracao individual, videos longos via segmentacao (BACKLOG)
 - [ ] **Phase 999.6: Reels Pipeline v2 — Hailuo + Scene Context + Interactive Fix** - Fix interactive stepper flow, scene-by-scene image gen following script, Hailuo video generation per scene, mobile-optimized subtitles (BACKLOG)
+- [ ] **Phase 999.7: Product Studio — AI Video Ads Generator** - Wizard progressivo para geracao 100% IA de videos comerciais de produto. 8-step pipeline: analise, cenario, prompt, video (Wan 2.6/Kling 2.5), copy, audio (Suno+TTS), montagem, export multi-formato. 3 estilos: cinematico, narrado, lifestyle. Secao /ads (BACKLOG)
 
 ## Phase Details
 
@@ -338,6 +339,6 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 999.6-01-PLAN.md — Backend: reorder steps, text-only script gen, per-cena image gen
-- [ ] 999.6-02-PLAN.md — Backend: Hailuo video step (Kie.ai per scene), mobile subtitle fix
+- [x] 999.6-01-PLAN.md — Backend: reorder steps, text-only script gen, per-cena image gen
+- [x] 999.6-02-PLAN.md — Backend: Hailuo video step (Kie.ai per scene), mobile subtitle fix
 - [ ] 999.6-03-PLAN.md — Frontend: reorder stepper, fix step wiring, visual checkpoint
