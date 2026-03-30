@@ -4,18 +4,44 @@ import { useState } from "react";
 import { Loader2, Check, RefreshCw, ZoomIn } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 import { adFileUrl, type AdStepData } from "@/lib/api";
+import {
+  NICHE_BACKGROUNDS,
+  NICHE_SCENE_LIGHTS,
+  COMPOSITIONS,
+  getPresetsForNiche,
+} from "@/components/ads/ad-presets";
 
 interface Props {
   stepState: AdStepData;
   onApprove: () => void;
   onRegenerate: () => void;
   jobId: string;
+  niche?: string;
 }
 
-export function StepScene({ stepState, onApprove, onRegenerate, jobId }: Props) {
+export function StepScene({ stepState, onApprove, onRegenerate, jobId, niche = "" }: Props) {
+  const backgrounds = getPresetsForNiche(NICHE_BACKGROUNDS, niche);
+  const sceneLights = getPresetsForNiche(NICHE_SCENE_LIGHTS, niche);
+
+  const defaultBg = backgrounds.find((b) => b.value !== "custom")?.value ?? "";
+  const defaultLight = sceneLights[0]?.value ?? "";
+
   const [loading, setLoading] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const [background, setBackground] = useState(defaultBg);
+  const [customBg, setCustomBg] = useState("");
+  const [sceneLight, setSceneLight] = useState(defaultLight);
+  const [composition, setComposition] = useState(COMPOSITIONS[0]?.value ?? "centered");
+
   const result = stepState.result as { image_path?: string } | undefined;
   const imageUrl = result?.image_path ? adFileUrl(jobId, result.image_path) : "";
 
@@ -89,13 +115,57 @@ export function StepScene({ stepState, onApprove, onRegenerate, jobId }: Props) 
             </button>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-8">Nenhum cenario gerado.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Fundo</label>
+              <Select value={background} onValueChange={setBackground}>
+                <SelectTrigger><SelectValue placeholder="Selecionar fundo" /></SelectTrigger>
+                <SelectContent>
+                  {backgrounds.map((b) => (
+                    <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {background === "custom" && (
+                <Input
+                  placeholder="Descreva o fundo personalizado"
+                  value={customBg}
+                  onChange={(e) => setCustomBg(e.target.value)}
+                  className="mt-1"
+                />
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Iluminacao</label>
+              <Select value={sceneLight} onValueChange={setSceneLight}>
+                <SelectTrigger><SelectValue placeholder="Selecionar luz" /></SelectTrigger>
+                <SelectContent>
+                  {sceneLights.map((l) => (
+                    <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-xs text-muted-foreground">Composicao</label>
+              <Select value={composition} onValueChange={setComposition}>
+                <SelectTrigger><SelectValue placeholder="Selecionar composicao" /></SelectTrigger>
+                <SelectContent>
+                  {COMPOSITIONS.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         )}
         <div className="flex gap-2 justify-end">
           <Button variant="outline" onClick={onRegenerate} disabled={loading}>
             <RefreshCw className="mr-2 h-4 w-4" /> Regenerar
           </Button>
-          <Button onClick={handleApprove} disabled={loading || !imageUrl}>
+          <Button onClick={handleApprove} disabled={loading || (!imageUrl && !background)}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
             Aprovar Cenario
           </Button>

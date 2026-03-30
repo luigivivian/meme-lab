@@ -5,20 +5,40 @@ import { Loader2, Check, RefreshCw, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 import type { AdStepData } from "@/lib/api";
+import {
+  NICHE_CAMERAS,
+  NICHE_LIGHTINGS,
+  MOODS,
+  getPresetsForNiche,
+} from "@/components/ads/ad-presets";
 
 interface Props {
   stepState: AdStepData;
   onApprove: () => void;
   onRegenerate: () => void;
   jobId: string;
+  niche?: string;
 }
 
-export function StepPrompt({ stepState, onApprove, onRegenerate }: Props) {
+export function StepPrompt({ stepState, onApprove, onRegenerate, niche = "" }: Props) {
+  const cameras = getPresetsForNiche(NICHE_CAMERAS, niche);
+  const lightings = getPresetsForNiche(NICHE_LIGHTINGS, niche);
+
   const result = stepState.result as { prompt_text?: string } | undefined;
   const [text, setText] = useState(result?.prompt_text ?? "");
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [camera, setCamera] = useState(cameras[0]?.value ?? "");
+  const [lighting, setLighting] = useState(lightings[0]?.value ?? "");
+  const [mood, setMood] = useState(MOODS[0]?.value ?? "");
 
   if (stepState.status === "generating") {
     return (
@@ -78,6 +98,46 @@ export function StepPrompt({ stepState, onApprove, onRegenerate }: Props) {
         <CardTitle className="text-lg">Prompt Cinematico</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {!promptText && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Camera</label>
+              <Select value={camera} onValueChange={setCamera}>
+                <SelectTrigger><SelectValue placeholder="Movimento" /></SelectTrigger>
+                <SelectContent>
+                  {cameras.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Iluminacao</label>
+              <Select value={lighting} onValueChange={setLighting}>
+                <SelectTrigger><SelectValue placeholder="Setup" /></SelectTrigger>
+                <SelectContent>
+                  {lightings.map((l) => (
+                    <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Mood</label>
+              <Select value={mood} onValueChange={setMood}>
+                <SelectTrigger><SelectValue placeholder="Clima" /></SelectTrigger>
+                <SelectContent>
+                  {MOODS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
         {editing ? (
           <Textarea
             value={text || promptText}
@@ -85,11 +145,12 @@ export function StepPrompt({ stepState, onApprove, onRegenerate }: Props) {
             rows={6}
             className="resize-none"
           />
-        ) : (
+        ) : promptText ? (
           <div className="rounded-lg bg-secondary/50 p-4">
             <p className="text-sm whitespace-pre-wrap">{promptText}</p>
           </div>
-        )}
+        ) : null}
+
         <div className="flex gap-2 justify-end">
           {!editing && promptText && (
             <Button variant="outline" size="sm" onClick={() => { setText(promptText); setEditing(true); }}>
