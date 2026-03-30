@@ -61,6 +61,12 @@ export default function AdJobPage() {
     mutate();
   }
 
+  const analysisStep = stepsMap["analysis"];
+  const analysisNiche =
+    (analysisStep?.status === "approved" || analysisStep?.status === "completed")
+      ? ((analysisStep.result as Record<string, unknown> | undefined)?.niche as string) ?? ""
+      : "";
+
   function renderStepContent() {
     const stepData = stepsMap[currentStepName];
     const props = {
@@ -74,9 +80,9 @@ export default function AdJobPage() {
       case "analysis":
         return <StepAnalysis {...props} />;
       case "scene":
-        return <StepScene {...props} />;
+        return <StepScene {...props} niche={analysisNiche} />;
       case "prompt":
-        return <StepPrompt {...props} />;
+        return <StepPrompt {...props} niche={analysisNiche} />;
       case "video":
         return <StepVideo {...props} />;
       case "copy":
