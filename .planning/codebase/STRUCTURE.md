@@ -1,401 +1,381 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-03-23
+**Analysis Date:** 2026-03-30
 
 ## Directory Layout
 
 ```
-clip-flow/
-├── config.py                          # Central configuration (images, prompts, pipeline, Gemini, ComfyUI)
-├── requirements.txt                   # Python dependencies
-├── .env                               # Environment vars (GOOGLE_API_KEY, DATABASE_URL)
-├── alembic.ini                        # Alembic migration config
+meme-lab/                        # Monorepo root
+├── config.py                    # Global config (paths, API keys, model IDs, flags)
+├── requirements.txt             # Python dependencies
+├── pyproject.toml               # Python project metadata
+├── alembic.ini                  # Alembic migrations config
+├── .env                         # Secrets (not committed)
+├── .env.example                 # Required env var template
 │
-├── assets/                            # Static assets
-│   ├── backgrounds/mago/              # Reference images for Gemini Image generation
-│   ├── fonts/                         # Custom fonts (fallback: Windows Impact/Arial)
-│   └── character_model.md             # Character DNA template
-│
-├── config/                            # Configuration files
-│   └── themes.yaml                    # Visual situations (13+ themes with mood keywords)
-│
-├── data/                              # Database storage
-│   └── clipflow.db                    # SQLite (dev) or MySQL connection via .env
-│
-├── output/                            # Generated images (gitignored)
-│   └── backgrounds_generated/         # ComfyUI/Gemini output
-│
-├── src/                               # Main Python package
-│   ├── __init__.py
-│   ├── cli.py                         # Original CLI (--topic "tema" --count N)
-│   ├── pipeline_cli.py                # Main CLI (--mode agents|once|schedule)
-│   ├── llm_client.py                  # Unified Gemini API client (wraps google.genai)
-│   ├── phrases.py                     # Phrase generation (via llm_client)
-│   ├── image_maker.py                 # Pillow composition engine
-│   ├── characters.py                  # Character YAML loader
-│   ├── scrape_assets.py               # Asset downloading utilities
+├── src/                         # Python backend source
+│   ├── api/                     # FastAPI app, routes, models, deps
+│   │   ├── app.py               # FastAPI app factory + lifespan
+│   │   ├── deps.py              # Shared FastAPI Depends (session, auth, helpers)
+│   │   ├── models.py            # All Pydantic request/response models
+│   │   ├── serializers.py       # ORM → dict serialization helpers
+│   │   ├── registry.py          # Agent/worker registry
+│   │   ├── log_sanitizer.py     # Strips API keys from logs
+│   │   └── routes/              # One file per domain (16 modules)
+│   │       ├── auth.py          # /auth/* (login, register, logout, me)
+│   │       ├── generation.py    # /generate/* (single, batch, refine, compose)
+│   │       ├── video.py         # /generate/video/* (Kie.ai jobs, legend)
+│   │       ├── pipeline.py      # /pipeline/* (run, status, manual)
+│   │       ├── reels.py         # /reels/* (create, step execution, config)
+│   │       ├── ads.py           # /ads/* (create, step execution, file upload)
+│   │       ├── characters.py    # /characters/* (CRUD + refs)
+│   │       ├── content.py       # /content, /images, /phrases
+│   │       ├── jobs.py          # /jobs/* (status, list, sync)
+│   │       ├── themes.py        # /themes/* (CRUD + AI generate)
+│   │       ├── publishing.py    # /publishing/* (schedule, calendar)
+│   │       ├── dashboard.py     # /dashboard/* (metrics, stats)
+│   │       ├── billing.py       # /billing/* (Stripe, plans)
+│   │       ├── agents.py        # /agents, /trends
+│   │       ├── drive.py         # /drive/*, /status (file serving)
+│   │       └── instagram.py     # /instagram/* (OAuth callback)
 │   │
-│   ├── api/                           # FastAPI REST server
-│   │   ├── __init__.py
-│   │   ├── __main__.py                # Entry: python -m src.api --port 8000
-│   │   ├── app.py                     # FastAPI app definition + lifespan
-│   │   ├── deps.py                    # Dependency injection (db_session)
-│   │   ├── models.py                  # Pydantic request/response schemas
-│   │   ├── registry.py                # Service registry for character/theme loaders
-│   │   ├── serializers.py             # ORM → dict conversion functions
-│   │   └── routes/                    # Route modules (each is APIRouter with prefix)
-│   │       ├── __init__.py
-│   │       ├── pipeline.py            # POST /pipeline/run, GET /pipeline/status
-│   │       ├── generation.py          # POST /generate/compose, /generate/batch
-│   │       ├── characters.py          # /characters CRUD + refs
-│   │       ├── themes.py              # /themes CRUD
-│   │       ├── agents.py              # /agents status
-│   │       ├── content.py             # /images, /phrases, /content list
-│   │       ├── jobs.py                # /jobs status/results
-│   │       ├── publishing.py          # /publishing queue/schedule
-│   │       └── drive.py               # /drive/* image browser + /status
+│   ├── database/                # ORM models, session, migrations, repositories
+│   │   ├── base.py              # DeclarativeBase + TimestampMixin
+│   │   ├── models.py            # All SQLAlchemy ORM models (16 tables)
+│   │   ├── session.py           # Async engine + session factory + init_db()
+│   │   ├── seed.py              # Dev seed data
+│   │   ├── converters.py        # ORM <-> dict conversion helpers
+│   │   ├── migrations/          # Alembic migration scripts
+│   │   │   └── versions/        # 020 numbered migrations (001-020)
+│   │   └── repositories/        # Per-entity repository classes
+│   │       ├── character_repo.py
+│   │       ├── content_repo.py
+│   │       ├── job_repo.py
+│   │       ├── pipeline_repo.py
+│   │       ├── schedule_repo.py
+│   │       ├── theme_repo.py
+│   │       ├── usage_repo.py
+│   │       └── user_repo.py
 │   │
-│   ├── database/                      # SQLAlchemy 2.0 async ORM + migrations
-│   │   ├── __init__.py
-│   │   ├── base.py                    # Base class + TimestampMixin
-│   │   ├── models.py                  # 11 ORM tables: Character, CharacterRef, Theme, GeneratedImage, etc.
-│   │   ├── session.py                 # Async session factory + init_db()
-│   │   ├── converters.py              # ORM ↔ dataclass conversion
-│   │   ├── seed.py                    # Idempotent seed: YAML → MySQL
-│   │   ├── repositories/              # Data access layer
-│   │   │   ├── __init__.py
-│   │   │   ├── character_repo.py      # Character CRUD
-│   │   │   ├── content_repo.py        # GeneratedImage + ContentPackage queries
-│   │   │   ├── pipeline_repo.py       # PipelineRun CRUD
-│   │   │   ├── job_repo.py            # BatchJob queries
-│   │   │   ├── schedule_repo.py       # ScheduledPost CRUD
-│   │   │   └── theme_repo.py          # Theme CRUD
-│   │   └── migrations/                # Alembic versioned migrations
-│   │       ├── env.py                 # Migration environment (reads DATABASE_URL from .env)
-│   │       ├── versions/
-│   │       │   ├── 001_initial_schema.py
-│   │       │   ├── 002_nullable_work_order_id.py
-│   │       │   ├── 003_add_image_metadata.py
-│   │       │   ├── 004_add_scheduled_posts.py
-│   │       │   ├── 005_add_quick_wins.py
-│   │       │   └── ee583b64523f_add_rendering_column_to_characters.py
-│   │       └── script.py.mako
+│   ├── auth/                    # JWT auth: tokens, user service, schemas
+│   │   ├── jwt.py               # create_access_token, verify_access_token
+│   │   ├── service.py           # register/login/logout business logic
+│   │   └── schemas.py           # Auth Pydantic schemas
 │   │
-│   ├── image_gen/                     # Image generation backends
-│   │   ├── __init__.py
-│   │   ├── prompt_builder.py          # KEYWORD_MAP, SCENE_TEMPLATES (theme → situation mapping)
-│   │   ├── gemini_client.py           # GeminiImageClient with refs + refinement (Nano Banana)
-│   │   ├── comfyui_client.py          # ComfyUIClient REST/WS for local Flux Dev GGUF
-│   │   └── workflows/
-│   │       └── flux_img2img.json       # ComfyUI Flux img2img workflow
+│   ├── billing/                 # Stripe billing integration
+│   │   ├── stripe_service.py
+│   │   ├── plans.py
+│   │   └── schemas.py
 │   │
-│   ├── pipeline/                      # Multi-agent orchestration (5 layers)
-│   │   ├── __init__.py
-│   │   ├── models.py                  # Old TrendItem, AnalyzedTopic (legacy, preserved for compat)
-│   │   ├── models_v2.py               # New TrendEvent, WorkOrder, ContentPackage, AgentPipelineResult
-│   │   ├── async_orchestrator.py      # AsyncPipelineOrchestrator (L1-L5 coordinator)
-│   │   ├── orchestrator.py            # Old orchestrator (legacy)
-│   │   ├── monitoring.py              # MonitoringLayer (L1) — parallel agent fetch
-│   │   ├── broker.py                  # TrendBroker (L2) — dedup + queue
-│   │   ├── curator.py                 # CuratorAgent (L3) — theme selection via LLM
-│   │   ├── scheduler.py               # APScheduler wrapper for auto-runs
-│   │   │
-│   │   ├── agents/                    # Trend source implementations
-│   │   │   ├── __init__.py
-│   │   │   ├── base.py                # BaseSourceAgent (abstract sync base)
-│   │   │   ├── async_base.py          # AsyncSourceAgent (abstract async) + SyncAgentAdapter
-│   │   │   ├── google_trends.py       # GoogleTrendsAgent (sync via trendspyg RSS)
-│   │   │   ├── reddit_memes.py        # RedditMemesAgent (sync via Reddit RSS)
-│   │   │   ├── rss_feeds.py           # RSSFeedAgent (sync via feedparser)
-│   │   │   ├── youtube_rss.py         # YouTubeRSSAgent (async native)
-│   │   │   ├── gemini_web_trends.py   # GeminiWebTrendsAgent (async native, uses Gemini API)
-│   │   │   ├── brazil_viral_rss.py    # BrazilViralRSSAgent (async native)
-│   │   │   ├── bluesky_trends.py      # BlueSkyTrendsAgent (async native)
-│   │   │   ├── hackernews.py          # HackerNewsAgent (async native)
-│   │   │   ├── lemmy_communities.py   # LemmyCommunitiesAgent (async native)
-│   │   │   ├── tiktok_trends.py       # Stub (requires API key)
-│   │   │   ├── instagram_explore.py   # Stub (requires API key)
-│   │   │   ├── twitter_x.py           # Stub (requires API key)
-│   │   │   ├── facebook_viral.py      # Stub (requires API key)
-│   │   │   └── youtube_shorts.py      # Stub (requires API key)
-│   │   │
-│   │   ├── processors/                # Data processing (trend aggregation, analysis, generation)
-│   │   │   ├── __init__.py
-│   │   │   ├── aggregator.py          # TrendAggregator (dedup via title similarity)
-│   │   │   ├── analyzer.py            # ClaudeAnalyzer (LLM-based topic selection)
-│   │   │   └── generator.py           # ContentGenerator (wraps phrase + image workers)
-│   │   │
-│   │   └── workers/                   # Generation layer implementations
-│   │       ├── __init__.py
-│   │       ├── generation_layer.py    # GenerationLayer (L4) — phrase + image parallelization
-│   │       ├── phrase_worker.py       # PhraseWorker (Gemini text with A/B scoring)
-│   │       ├── image_worker.py        # ImageWorker (ComfyUI/Gemini/static with Semaphore)
-│   │       ├── post_production.py     # PostProductionLayer (L5) — caption/hashtag/quality
-│   │       ├── caption_worker.py      # CaptionWorker (Instagram caption generation)
-│   │       ├── hashtag_worker.py      # HashtagWorker (trending + branded hashtags)
-│   │       └── quality_worker.py      # QualityWorker (content scoring 0-100)
+│   ├── pipeline/                # Meme content multi-agent pipeline
+│   │   ├── orchestrator.py      # Sync orchestrator (legacy)
+│   │   ├── async_orchestrator.py # Async orchestrator (current)
+│   │   ├── broker.py            # Ingest queue + dedup
+│   │   ├── curator.py           # Topic selection
+│   │   ├── scheduler.py         # Run scheduling
+│   │   ├── monitoring.py        # Pipeline metrics
+│   │   ├── models.py            # PipelineResult, AnalyzedTopic, TrendItem
+│   │   ├── models_v2.py         # WorkOrder, ContentPackage (v2 data models)
+│   │   ├── agents/              # Trend-fetching source agents
+│   │   │   ├── base.py          # BaseAgent abstract class
+│   │   │   ├── async_base.py    # AsyncBaseAgent
+│   │   │   ├── google_trends.py
+│   │   │   ├── reddit_memes.py
+│   │   │   ├── rss_feeds.py
+│   │   │   ├── youtube_rss.py
+│   │   │   ├── youtube_shorts.py
+│   │   │   ├── bluesky_trends.py
+│   │   │   ├── brazil_viral_rss.py
+│   │   │   ├── gemini_web_trends.py
+│   │   │   └── ...              # tiktok, twitter, instagram, facebook stubs
+│   │   ├── processors/          # Aggregation, analysis, generation
+│   │   │   ├── aggregator.py    # TrendAggregator (dedup + rank)
+│   │   │   ├── analyzer.py      # ClaudeAnalyzer (Gemini topic analysis)
+│   │   │   └── generator.py     # ContentGenerator (wraps workers)
+│   │   └── workers/             # Per-content-type generators
+│   │       ├── phrase_worker.py # Gemini text phrase generation
+│   │       ├── image_worker.py  # Gemini/ComfyUI image + Pillow compose
+│   │       ├── caption_worker.py
+│   │       ├── hashtag_worker.py
+│   │       ├── quality_worker.py
+│   │       ├── legend_worker.py
+│   │       ├── generation_layer.py  # Coordinates phrase + image workers
+│   │       └── post_production.py
 │   │
-│   └── services/                      # External integrations (publishing, scheduling, analytics)
-│       ├── __init__.py
-│       ├── __main__.py                # Service worker entry point
-│       ├── scheduler_worker.py        # APScheduler for auto-publishing
-│       ├── publisher.py               # Instagram publishing client
-│       ├── instagram_client.py        # Instagram API wrapper
-│       └── insights_collector.py      # Analytics aggregator
-│
-├── memelab/                           # Next.js 15 frontend dashboard
-│   ├── src/
-│   │   ├── app/                       # App router pages (Next.js 15)
-│   │   │   ├── layout.tsx             # Root layout with Shell
-│   │   │   ├── page.tsx               # Home page redirect
-│   │   │   ├── dashboard/page.tsx     # Main dashboard (stats + agent modals)
-│   │   │   ├── agents/page.tsx        # Agent status / monitoring
-│   │   │   ├── pipeline/page.tsx      # Pipeline orchestrator UI
-│   │   │   ├── trends/page.tsx        # Trend browser
-│   │   │   ├── phrases/page.tsx       # Phrase generator test
-│   │   │   ├── characters/            # Character CRUD + management
-│   │   │   │   ├── page.tsx
-│   │   │   │   ├── [slug]/page.tsx
-│   │   │   │   └── [slug]/refs/page.tsx
-│   │   │   ├── themes/page.tsx        # Theme/situation editor
-│   │   │   ├── gallery/page.tsx       # Generated images browser
-│   │   │   ├── jobs/page.tsx          # Batch job history
-│   │   │   ├── publishing/page.tsx    # Publication queue + scheduling
-│   │   │   ├── globals.css            # Global styles
-│   │   │   └── [layout]/page.tsx      # Dynamic layout preview
-│   │   │
-│   │   ├── components/                # Reusable UI components
-│   │   │   ├── layout/
-│   │   │   │   ├── shell.tsx          # Main layout wrapper (sidebar + content)
-│   │   │   │   ├── sidebar.tsx        # Navigation sidebar
-│   │   │   │   └── header.tsx         # Top header bar
-│   │   │   ├── ui/                    # Base UI primitives (button, card, input, etc.)
-│   │   │   ├── panels/                # Composite panels
-│   │   │   │   ├── pipeline-diagram.tsx   # 5-layer visualization
-│   │   │   │   └── stats-card.tsx     # Stats display
-│   │   │   ├── agents/                # Agent-specific components
-│   │   │   │   ├── agent-modal.tsx    # Agent status modal
-│   │   │   │   └── agent-config.ts    # Agent metadata
-│   │   │   └── ...
-│   │   │
-│   │   ├── hooks/
-│   │   │   └── use-api.ts             # API client hook
-│   │   │
-│   │   ├── lib/
-│   │   │   ├── api.ts                 # API client (fetch wrapper)
-│   │   │   └── constants.ts           # UI constants
-│   │   │
-│   │   └── tsconfig.json
+│   ├── image_gen/               # Image generation clients
+│   │   ├── gemini_client.py     # Gemini image API client + SITUACOES dict
+│   │   ├── comfyui_client.py    # ComfyUI local API client
+│   │   ├── prompt_builder.py    # Image prompt construction
+│   │   └── workflows/           # ComfyUI workflow JSON files
 │   │
-│   ├── package.json                   # Next.js dependencies
-│   ├── next.config.js
-│   ├── tsconfig.json
-│   └── ...
+│   ├── video_gen/               # Kie.ai video generation
+│   │   ├── kie_client.py        # KieSora2Client (async, exponential backoff)
+│   │   ├── gcs_uploader.py      # Google Cloud Storage uploader
+│   │   ├── legend_renderer.py   # FFmpeg text overlay
+│   │   ├── video_prompt_builder.py
+│   │   └── stale_job_scanner.py # Background scanner for stuck jobs
+│   │
+│   ├── reels_pipeline/          # Instagram Reels end-to-end pipeline
+│   │   ├── main.py              # ReelsPipeline orchestrator
+│   │   ├── image_gen.py         # Gemini scene image generation
+│   │   ├── script_gen.py        # Gemini multimodal script generation
+│   │   ├── tts.py               # Gemini Flash TTS narration
+│   │   ├── transcriber.py       # Gemini audio transcription → SRT
+│   │   ├── video_builder.py     # FFmpeg xfade assembly
+│   │   ├── config.py            # Reels-specific config
+│   │   └── models.py            # Pydantic models for reels API
+│   │
+│   ├── product_studio/          # Product Ad 8-step pipeline
+│   │   ├── pipeline.py          # ProductAdPipeline orchestrator
+│   │   ├── bg_remover.py        # rembg background removal
+│   │   ├── scene_composer.py    # Gemini scene composition
+│   │   ├── prompt_builder.py    # Cinematic video prompt generation
+│   │   ├── copy_generator.py    # Headline + CTA + hashtag generation
+│   │   ├── music_client.py      # Suno music API client
+│   │   ├── format_exporter.py   # FFmpeg multi-format export
+│   │   ├── config.py            # Ad pipeline config + step order
+│   │   └── models.py            # Pydantic models for ads API
+│   │
+│   ├── services/                # Background services + integrations
+│   │   ├── publisher.py         # PublishingService (Instagram Graph API)
+│   │   ├── scheduler_worker.py  # Scheduled post processor (60s interval)
+│   │   ├── instagram_oauth.py   # OAuth token exchange
+│   │   ├── instagram_client.py  # Instagram Graph API client
+│   │   ├── insights_collector.py
+│   │   ├── key_selector.py      # Gemini API key rotation selector
+│   │   └── stripe_billing.py    # Stripe webhook handler
+│   │
+│   ├── llm_client.py            # Unified LLM interface (Gemini/Ollama)
+│   ├── image_maker.py           # Pillow image composition (text overlay)
+│   ├── characters.py            # Character config helpers (legacy)
+│   ├── phrases.py               # Phrase generation helpers (legacy)
+│   ├── pipeline_cli.py          # CLI entry point for pipeline
+│   └── cli.py                   # General CLI helpers
 │
-├── tests/                             # Test suite
-│   └── test_agents_quick.py           # Quick validation tests for agents
+├── memelab/                     # Next.js 15 frontend dashboard
+│   ├── next.config.ts           # Proxy rewrites: /api/* → localhost:8000
+│   ├── package.json
+│   └── src/
+│       ├── app/                 # Next.js App Router
+│       │   ├── layout.tsx       # Root layout (AuthProvider wrap)
+│       │   ├── page.tsx         # / → redirect to /dashboard
+│       │   ├── globals.css      # Tailwind 4 @theme design tokens
+│       │   ├── login/page.tsx
+│       │   ├── register/page.tsx
+│       │   ├── landing/page.tsx
+│       │   └── (app)/           # Auth-protected route group
+│       │       ├── layout.tsx   # Auth guard + Shell wrapper
+│       │       ├── dashboard/page.tsx
+│       │       ├── gallery/page.tsx
+│       │       ├── pipeline/page.tsx
+│       │       ├── agents/page.tsx
+│       │       ├── trends/page.tsx
+│       │       ├── phrases/page.tsx
+│       │       ├── characters/
+│       │       │   ├── page.tsx
+│       │       │   ├── new/page.tsx
+│       │       │   └── [slug]/page.tsx + refs/page.tsx
+│       │       ├── jobs/page.tsx
+│       │       ├── videos/page.tsx
+│       │       ├── reels/
+│       │       │   ├── page.tsx
+│       │       │   └── [jobId]/page.tsx
+│       │       ├── ads/
+│       │       │   ├── page.tsx
+│       │       │   ├── new/page.tsx
+│       │       │   └── [jobId]/page.tsx
+│       │       ├── publishing/page.tsx
+│       │       ├── billing/page.tsx
+│       │       ├── settings/page.tsx + instagram/callback/page.tsx
+│       │       └── themes/page.tsx
+│       ├── components/
+│       │   ├── layout/          # Shell, Sidebar, Header, VideoProgress
+│       │   ├── ads/             # 8 step components + stepper + wizard
+│       │   ├── reels/           # 6 step components + stepper + SRT editor
+│       │   ├── agents/          # Agent config + modal
+│       │   ├── panels/          # PipelineDiagram (SVG), StatsCard
+│       │   └── ui/              # shadcn/ui primitives (button, card, dialog, etc.)
+│       ├── contexts/
+│       │   ├── auth-context.tsx # JWT auth state, login/logout/register
+│       │   └── character-context.tsx
+│       ├── hooks/
+│       │   ├── use-api.ts       # SWR hooks for status, images, pipeline
+│       │   ├── use-pipeline.ts  # Pipeline execution + polling
+│       │   ├── use-ads.ts       # Ad job polling hooks
+│       │   └── use-reels.ts     # Reels job polling hooks
+│       └── lib/
+│           ├── api.ts           # HTTP client + all API function calls + TypeScript types
+│           ├── constants.ts     # NAV_ITEMS, color maps
+│           ├── utils.ts         # cn() (clsx + tailwind-merge)
+│           └── animations.ts    # Framer Motion presets
 │
-├── scripts/                           # Utility scripts
-│   ├── setup_comfyui.py               # Install ComfyUI + Flux Dev GGUF
-│   ├── start_comfyui.py               # Launch ComfyUI server
-│   ├── train_lora.py                  # LoRA fine-tuning
-│   └── prepare_lora_dataset.py        # Dataset preparation
+├── assets/                      # Static assets
+│   ├── backgrounds/             # Character background images (organized by character)
+│   └── fonts/                   # Pillow font files (.ttf)
 │
-├── docs/                              # Documentation
-│   ├── API_README.md                  # API endpoint reference
-│   ├── CLAUDE.md                      # Project instructions
-│   └── roadmap-monetizacao.md         # Monetization roadmap
+├── characters/                  # Per-character reference image directories
+│   ├── mago-mestre/refs/approved/
+│   └── mario-sincero/refs/approved/
 │
-└── .planning/
-    └── codebase/                      # GSD mapping documents
-        ├── ARCHITECTURE.md            # This file
-        ├── STRUCTURE.md               # File organization guide
-        ├── CONVENTIONS.md             # Code style standards
-        ├── TESTING.md                 # Test patterns
-        ├── STACK.md                   # Technology stack
-        └── CONCERNS.md                # Technical debt + issues
+├── output/                      # Generated output (not committed)
+│   ├── ads/                     # Product ad job directories
+│   ├── reels/                   # Reels job directories
+│   ├── videos/                  # Generated MP4 files
+│   └── backgrounds_generated/   # Gemini-generated backgrounds
+│
+├── tests/                       # Python test suite
+├── scripts/                     # One-off utility scripts
+├── config/                      # YAML config files (themes.yaml)
+├── data/                        # SQLite DB file (dev)
+├── docs/                        # Additional documentation
+└── .planning/                   # GSD planning docs (not committed)
 ```
 
 ## Directory Purposes
 
-**config.py**
-- Purpose: Central configuration point for all settings
-- Contains: Image dimensions, text styling, prompt templates, pipeline params, Gemini/ComfyUI settings, cost modes
-- Key configs: IMAGE_WIDTH/HEIGHT (1080x1350), WATERMARK_TEXT, PIPELINE_IMAGES_PER_RUN, GEMINI_MAX_CONCURRENT (5), COMFYUI_MAX_CONCURRENT (1)
+**`src/api/routes/`:**
+- Purpose: One module per feature domain; each defines a FastAPI `APIRouter` with a `prefix`
+- Contains: Route handlers, inline `BackgroundTask` calls, validation, ORM queries via repositories
+- Key files: `ads.py` (product ad wizard), `reels.py` (reels wizard), `video.py` (Kie.ai video), `generation.py` (meme images)
 
-**src/api/**
-- Purpose: FastAPI REST gateway for pipeline control and monitoring
-- Entry: `python -m src.api --port 8000 [--ngrok TOKEN]`
-- Lifespan: Initializes database on startup, starts scheduler
-- Dependency injection: db_session, config overrides via request
+**`src/database/repositories/`:**
+- Purpose: Encapsulate all SQLAlchemy queries; enforce user ownership for multi-tenant isolation
+- Contains: One class per entity (e.g., `CharacterRepository`, `UserRepository`)
+- Key files: `character_repo.py` (most complex — ownership check on every query), `user_repo.py`
 
-**src/database/**
-- Purpose: SQLAlchemy 2.0 async ORM + migration management
-- Models: 11 tables (Character, CharacterRef, Theme, PipelineRun, GeneratedImage, ContentPackage, ScheduledPost, BatchJob, etc.)
-- Session: Agnóstic to SQLite (dev) or MySQL (prod) via DATABASE_URL
-- Repositories: Data access layer for each domain (character, content, pipeline, job, schedule, theme)
-- Migrations: Alembic version control (001-005+)
+**`src/pipeline/agents/`:**
+- Purpose: Pluggable trend-data fetchers, each wrapping one external source
+- Contains: Classes extending `BaseAgent` or `AsyncBaseAgent`
+- Key files: `google_trends.py`, `reddit_memes.py`, `rss_feeds.py` (active); TikTok/Instagram/Twitter are stubs
 
-**src/image_gen/**
-- Purpose: Image generation backend abstraction
-- Clients: GeminiImageClient (API + visual refs), ComfyUIClient (local GPU via WebSocket)
-- Prompt builder: KEYWORD_MAP (theme keyword → visual situation) + SCENE_TEMPLATES
-- SITUACOES: 13 pre-defined visual moods (cafe, meditando, confronto, sabedoria, etc.)
+**`memelab/src/app/(app)/`:**
+- Purpose: All auth-protected pages; the route group's `layout.tsx` enforces auth redirect
+- Contains: Page components, mostly `"use client"` with SWR hooks
+- Key files: `ads/[jobId]/page.tsx` (stepper UI), `reels/[jobId]/page.tsx` (reels stepper)
 
-**src/pipeline/**
-- Purpose: Multi-layer orchestration for trend→content pipeline
-- Layers:
-  - L1 Monitoring: Parallel agent fetch via asyncio.gather
-  - L2 Broker: Event deduplication + queueing
-  - L3 Curator: LLM-based topic selection + situation mapping
-  - L4 Generation: Phrase + image production in parallel
-  - L5 Post-Production: Caption + hashtag + quality enrichment
-- Models: TrendEvent, WorkOrder, ContentPackage (v2 event-driven models)
-- Agents: 9 active + 5 stub sources (RSS, Gemini Trends, BlueSky, HN, Lemmy)
-- Processors: Aggregator (dedup), Analyzer (LLM), Generator (phrase+image)
-- Workers: Phrase, Image, Caption, Hashtag, Quality, GenerationLayer, PostProductionLayer
+**`memelab/src/components/ads/`:**
+- Purpose: 8-step product ad pipeline wizard UI
+- Contains: `wizard.tsx` (job creation form), `stepper.tsx` (step orchestration), `step-*.tsx` (one per step)
+- Key files: `stepper.tsx` (polls step state, renders per-step component), `wizard.tsx` (initial job creation)
 
-**src/services/**
-- Purpose: Background services (scheduling, publishing, analytics)
-- Scheduler: APScheduler for auto-pipeline runs (default every 6 hours)
-- Publisher: Instagram API client for posting ContentPackages
-- Insights: Analytics aggregation from published content
-
-**memelab/**
-- Purpose: Next.js 15 dashboard frontend
-- App Router: File-based routing (pages = files in src/app/)
-- Pages: Dashboard, Pipeline, Trends, Phrases, Characters (CRUD), Themes, Gallery, Jobs, Publishing
-- Components: Shell layout, Sidebar nav, Agent modals, Pipeline diagram, Stats cards
-- API: use-api.ts hook + lib/api.ts fetch wrapper
+**`memelab/src/lib/api.ts`:**
+- Purpose: Single file for all backend communication — HTTP client, TypeScript types, and every API function
+- CRITICAL: TypeScript types here must match FastAPI response shapes exactly
 
 ## Key File Locations
 
 **Entry Points:**
-- `config.py` — Central configuration
-- `src/api/__main__.py` — REST API server
-- `src/pipeline_cli.py` — CLI orchestrator
-- `memelab/src/app/layout.tsx` — Next.js root
+- `src/api/app.py`: FastAPI app — start with `python -m src.api --port 8000`
+- `memelab/next.config.ts`: Next.js config + `/api/*` proxy rewrite
+- `memelab/src/app/layout.tsx`: Root Next.js layout (AuthProvider)
+- `memelab/src/app/(app)/layout.tsx`: Auth guard for all protected routes
 
 **Configuration:**
-- `config.py` — Main settings
-- `config/themes.yaml` — Visual situation definitions
-- `.env` — Environment variables (GOOGLE_API_KEY, DATABASE_URL)
-- `alembic.ini` — Migration config
+- `config.py`: All Python config (DATABASE_URL, API keys, model IDs, cost limits)
+- `.env`: Runtime secrets (never committed)
+- `.env.example`: Documents required variables
+- `memelab/src/app/globals.css`: Tailwind 4 design tokens (`@theme`)
 
 **Core Logic:**
-- `src/pipeline/async_orchestrator.py` — Main orchestrator (L1-L5)
-- `src/pipeline/monitoring.py` — L1 agent coordination
-- `src/pipeline/broker.py` — L2 deduplication
-- `src/pipeline/curator.py` — L3 topic selection
-- `src/pipeline/workers/generation_layer.py` — L4 content production
-- `src/pipeline/workers/post_production.py` — L5 enrichment
-- `src/image_maker.py` — Pillow composition
+- `src/api/deps.py`: Shared FastAPI dependencies (`get_current_user`, `db_session`)
+- `src/api/models.py`: All Pydantic schemas for the API
+- `src/database/models.py`: All SQLAlchemy ORM models (16 tables)
+- `src/database/session.py`: Async session factory
+- `src/llm_client.py`: Unified LLM interface
+- `memelab/src/lib/api.ts`: All frontend API calls and TypeScript types
+
+**Pipeline Orchestrators:**
+- `src/pipeline/async_orchestrator.py`: Meme content pipeline (async)
+- `src/reels_pipeline/main.py`: Reels pipeline
+- `src/product_studio/pipeline.py`: Product ad pipeline
 
 **Testing:**
-- `tests/test_agents_quick.py` — Agent validation tests
+- `tests/`: Python tests
+- `memelab/src/__tests__/`: TypeScript/React tests
 
 ## Naming Conventions
 
-**Files:**
-- Modules: `snake_case.py` (phrase_worker.py, async_orchestrator.py)
-- Routes: `routes/{domain}.py` (pipeline.py, characters.py, generation.py)
-- Migrations: `NNNNN_description.py` (001_initial_schema.py, 005_add_quick_wins.py)
-- Components: `PascalCase.tsx` (Shell.tsx, PipelineModal.tsx)
+**Python Files:**
+- snake_case for all modules: `kie_client.py`, `character_repo.py`, `image_worker.py`
+- `_client.py` suffix for external API clients
+- `_repo.py` suffix for repository classes
+- `_worker.py` suffix for pipeline workers
+- Route files named after domain: `ads.py`, `reels.py`, `video.py`
 
-**Directories:**
-- Package modules: `lowercase` (api, database, pipeline, image_gen)
-- Domains: `plural` (routes, agents, processors, workers, repositories)
-- Frontend: `app` (Next.js), `components` (React), `hooks` (React), `lib` (utilities)
+**Python Classes:**
+- PascalCase: `ProductAdPipeline`, `KieSora2Client`, `CharacterRepository`
+- Pydantic models end with `Request` or `Response`: `AdCreateRequest`, `AdJobResponse`
 
-**Classes/Functions:**
-- Classes: `PascalCase` (AsyncPipelineOrchestrator, TrendBroker, CuratorAgent)
-- Functions: `snake_case` (fetch_all, ingest, curate)
-- Private: `_snake_case` (_safe_fetch, _notify, _load_stub_agents)
-- Constants: `UPPER_SNAKE_CASE` (PIPELINE_IMAGES_PER_RUN, GEMINI_MAX_CONCURRENT)
+**TypeScript Files:**
+- kebab-case for all files: `auth-context.tsx`, `step-analysis.tsx`, `use-ads.ts`
+- `step-*.tsx` for pipeline step components
+- `use-*.ts` for SWR hooks
 
-**Database:**
-- Tables: `snake_case` (characters, character_refs, pipeline_runs)
-- Columns: `snake_case` (created_at, updated_at, character_slug)
-- Enums: `PascalCase` (TrendSource)
+**Routes/Directories:**
+- kebab-case for Next.js routes: `[jobId]`, `mago-mestre`
+- Snake_case for Python packages: `reels_pipeline`, `product_studio`, `video_gen`
 
 ## Where to Add New Code
 
-**New Trend Source (Agent):**
-- File: `src/pipeline/agents/{platform_name}.py`
-- Inherit: AsyncSourceAgent (native async) or BaseSourceAgent (wrap with SyncAgentAdapter)
-- Implement: `async def fetch() -> List[TrendEvent]`, `async def is_available() -> bool`
-- Register: Add instance to agents list in `AsyncPipelineOrchestrator.__init__`
-- Example: `src/pipeline/agents/bluesky_trends.py`
+**New API Route Domain:**
+- Create `src/api/routes/{domain}.py` with `router = APIRouter(prefix="/{domain}", tags=[...])`
+- Register in `src/api/app.py`: `app.include_router({domain}.router)`
+- Add Pydantic models to `src/api/models.py` (or a domain-specific `src/{domain}/models.py`)
 
-**New API Route:**
-- File: `src/api/routes/{domain}.py`
-- Pattern: FastAPI APIRouter with prefix, inject db_session via deps.py
-- Register: Include router in `src/api/app.py` (app.include_router)
-- Serializers: Add conversion functions in `src/api/serializers.py`
-- Example: `src/api/routes/characters.py`
-
-**New Worker (Generation Layer):**
-- File: `src/pipeline/workers/{worker_type}_worker.py`
-- Pattern: Class with async process(input) -> output
-- Semaphore: Use global asyncio.Semaphore for resource limits
-- Integration: Add to GenerationLayer or PostProductionLayer
-- Example: `src/pipeline/workers/phrase_worker.py`
-
-**New Database Table:**
-- File: `src/database/models.py` (append new class)
-- Pattern: Inherit Base + TimestampMixin (if needed)
-- Migration: `alembic revision --autogenerate -m "add_{table}"`
-- Run: `alembic upgrade head`
+**New Pipeline Step (Reels or Ads):**
+- Add step logic to `src/reels_pipeline/` or `src/product_studio/`
+- Add step name to `ADS_STEP_ORDER` in `src/product_studio/config.py` (or reels equivalent)
+- Add `run_step_{name}()` method to the pipeline class
+- Add route handler in the relevant routes file
+- Add frontend step component in `memelab/src/components/ads/step-{name}.tsx` or `reels/`
+- Wire step into `stepper.tsx`
 
 **New Frontend Page:**
-- File: `memelab/src/app/{feature}/page.tsx`
-- Pattern: Default export React component (Server Component by default)
-- API: Use use-api hook from `src/hooks/use-api.ts`
-- Layout: Wrap in Shell from `src/components/layout/shell.tsx`
-- Example: `memelab/src/app/characters/page.tsx`
+- Create `memelab/src/app/(app)/{slug}/page.tsx` for authenticated pages
+- Add to `NAV_ITEMS` in `memelab/src/lib/constants.ts` for sidebar navigation
+- If data fetching needed, add a hook in `memelab/src/hooks/use-{domain}.ts`
+- Add API functions and types to `memelab/src/lib/api.ts`
 
-**Utilities/Helpers:**
-- Shared: `src/{module}/helpers.py` or `src/utils/` (if creating)
-- Frontend: `memelab/src/lib/{utility}.ts`
+**New Database Table:**
+- Add ORM model class to `src/database/models.py`
+- Create Alembic migration: `alembic revision --autogenerate -m "description"`
+- Add repository class in `src/database/repositories/{entity}_repo.py`
+
+**New Trend Agent:**
+- Create `src/pipeline/agents/{source}.py` extending `AsyncBaseAgent`
+- Implement `is_available()` and `fetch()` methods
+- Register in `src/api/registry.py`
+
+**Shared UI Components:**
+- Add to `memelab/src/components/ui/` following shadcn/ui pattern (Radix UI + CVA + Tailwind)
 
 ## Special Directories
 
-**output/**
-- Purpose: Generated images output directory
-- Generated: Yes (runtime created)
-- Committed: No (.gitignore)
-- Structure: `output/image_YYYYMMDD_HHMMSS.png` + `output/backgrounds_generated/`
+**`output/`:**
+- Purpose: All generated files (images, videos, ad job directories)
+- Generated: Yes
+- Committed: No (in `.gitignore`)
 
-**assets/backgrounds/mago/**
-- Purpose: Reference images for Gemini Image generation (visual inspiration)
-- Generated: No (manually curated)
-- Committed: Yes (tracked in git)
-- Usage: Used by GeminiImageClient via visual refs in prompt
+**`data/`:**
+- Purpose: SQLite database file for local development
+- Generated: Yes (on first run)
+- Committed: No
 
-**config/themes.yaml**
-- Purpose: Visual situation definitions (additional to hardcoded SITUACOES)
-- Generated: Can be seeded from DB via `src/database/seed.py`
-- Committed: Yes (tracked in git)
-- Format: YAML array of {key, name, mood_keywords, description, ...}
+**`.planning/`:**
+- Purpose: GSD planning docs, phase plans, debug notes
+- Generated: By GSD tooling
+- Committed: Selectively (phases and docs yes, debug notes no)
 
-**data/**
-- Purpose: Database storage (SQLite in dev)
-- Generated: Yes (created by init_db())
-- Committed: No (.gitignore)
-- MySQL: Connection via DATABASE_URL in .env
+**`src/database/migrations/versions/`:**
+- Purpose: Alembic migration history (20 migrations covering all schema changes)
+- Generated: Via `alembic revision`
+- Committed: Yes — required for schema reproducibility
 
-**src/database/migrations/versions/**
-- Purpose: Alembic versioned migrations
-- Generated: Yes (via `alembic revision --autogenerate`)
-- Committed: Yes (tracked in git for reproducibility)
-- Execution: `alembic upgrade head` (idempotent per version)
-
-**.env**
-- Purpose: Environment variables (secrets + config)
-- Generated: No (user-created from .env.example)
-- Committed: No (.gitignore)
-- Required: GOOGLE_API_KEY, DATABASE_URL (optional, defaults to SQLite)
+**`src/image_gen/workflows/`:**
+- Purpose: ComfyUI workflow JSON files for local GPU image generation
+- Generated: No (authored manually)
+- Committed: Yes
 
 ---
 
-*Structure analysis: 2026-03-23*
+*Structure analysis: 2026-03-30*

@@ -1,124 +1,116 @@
 # Technology Stack
 
-**Analysis Date:** 2026-03-23
+**Analysis Date:** 2026-03-30
 
 ## Languages
 
 **Primary:**
-- Python 3.14 - Backend pipeline, CLI, API, agents, image composition
-- TypeScript / Next.js 15 - Frontend (memeLab dashboard in `memelab/`)
-- YAML - Configuration (`config/themes.yaml`)
+- Python 3.12+ - Backend API, image/video pipeline, ML orchestration (`src/`)
+- TypeScript 5.8 - Frontend Next.js app (`memelab/src/`)
 
 **Secondary:**
-- JSON - Workflow definitions for ComfyUI (`src/image_gen/workflows/`)
+- SQL - Database schema via SQLAlchemy ORM + Alembic migrations
 
 ## Runtime
 
-**Environment:**
-- Python 3.14 with pip package manager
-- Node.js / npm - Frontend build and development
+**Backend Environment:**
+- Python (CPython) — no explicit version pin in pyproject.toml; SQLAlchemy 2.0+ union types require 3.10+
+- Async throughout: `asyncio`, `async/await` on all FastAPI routes, SQLAlchemy async engine
+
+**Frontend Environment:**
+- Node.js (managed via npm)
+- Lockfile: `memelab/package-lock.json` present
 
 **Package Manager:**
-- `pip` (Python) - Lockfile: `requirements.txt`
-- `npm` / `pnpm` - Frontend dependencies
+- Python: pip (requirements.txt at root — `requirements.txt`)
+- Node: npm (`memelab/package.json`, `memelab/package-lock.json`)
 
 ## Frameworks
 
-**Core:**
-- FastAPI 0.115.0+ - REST API and route handlers (`src/api/`)
-- Uvicorn 0.34.0+ - ASGI server for FastAPI
-- Next.js 15 - Frontend dashboard (`memelab/`)
+**Backend:**
+- FastAPI `>=0.115.0` — REST API server, 14 route modules, CORS middleware, lifespan events
+- SQLAlchemy `>=2.0` — async ORM with `mapped_column` declarative style, 16 DB tables
+- Alembic `>=1.13` — DB migration tooling (`src/database/migrations/`)
+- Uvicorn `>=0.34.0` — ASGI server (run via `python -m src.api --port 8000`)
+- APScheduler `>=3.10.0` — in-process job scheduler for publish queue (60s interval)
 
-**LLM & Image Generation:**
-- google-genai >=1.0.0 - Google Gemini API (text generation, image generation, analysis)
-- Pillow >=10.0.0 - Image composition and manipulation (1080x1350 Instagram posts)
-- ComfyUI (local) - Flux Dev GGUF image generation fallback (`localhost:8188`)
-
-**Scheduling & Async:**
-- APScheduler >=3.10.0 - Task scheduling and automation
-- asyncio (stdlib) - Async orchestration and concurrency
-- SQLAlchemy >=2.0 - Async ORM (SQLAlchemy 2.0 with async support)
+**Frontend:**
+- Next.js `^15.3.3` — App Router, all routes in `memelab/src/app/(app)/`
+- React `^19.1.0` + React DOM `^19.1.0`
+- No server-side API routes — Next.js rewrites all `/api/*` → `http://127.0.0.1:8000/*`
 
 **Testing:**
-- pytest - Test framework (configured with `.pytest_cache/`)
-- aiosqlite >=0.20 - SQLite async driver for testing
+- Vitest `^4.1.1` — frontend test runner (`memelab/vitest.config.ts`)
+- pytest — backend test runner (`tests/`, config in `pyproject.toml`)
+- @testing-library/react `^16.3.2` — React component testing
+- jsdom `^29.0.1` — DOM environment for Vitest
 
 **Build/Dev:**
-- Alembic >=1.13 - Database migrations (`alembic.ini`)
-- pyngrok >=7.0.0 - Public tunnel for API (optional local testing)
+- Tailwind CSS `^4.1.8` via `@tailwindcss/postcss` — no `tailwind.config.js`; design tokens in `memelab/src/app/globals.css` using `@theme`
+- ESLint `^9.27.0` + `eslint-config-next`
+- TypeScript strict compilation (`memelab/tsconfig.json`)
 
 ## Key Dependencies
 
-**Critical:**
-- google-genai - Gemini API for phrase generation, trend analysis, image generation with visual references
-- Pillow - Image composition: overlay, vignette, glow, text stroke, watermark on 1080x1350 canvas
-- trendspyg >=0.3.0 - Google Trends RSS feed parser (replaces pytrends, archived 2025)
-- feedparser >=6.0.0 - RSS feed parsing (Reddit, Sensacionalista, YouTube channels, etc.)
-- sqlalchemy >=2.0 - Async ORM with 10 database tables (MySQL + SQLite compatible)
+**Backend Critical:**
+- `google-genai>=1.0.0` — primary LLM and image gen SDK (Gemini 2.5 Flash, TTS, image models)
+- `google-cloud-storage>=2.14.0` — GCS for Kie.ai public image URL uploads
+- `httpx>=0.27.0` — async HTTP client for Kie.ai, Ollama, external APIs
+- `Pillow>=10.0.0` — image compositing (text overlay, watermark, vignette, meme assembly)
+- `rembg[cpu]>=2.0.0` — background removal for product studio (`src/product_studio/bg_remover.py`)
+- `sqlalchemy>=2.0` + `aiosqlite>=0.20` + `aiomysql>=0.2.0` — async DB, supports both SQLite (dev) and MySQL (prod)
+- `bcrypt>=5.0.0` — password hashing for custom auth
+- `cryptography>=42.0` — JWT signing (`src/auth/jwt.py`)
 
-**Web & HTTP:**
-- fastapi >=0.115.0 - REST API framework with automatic Swagger docs
-- uvicorn >=0.34.0 - ASGI server (host: 127.0.0.1 on Windows, port: 8000)
-- httpx >=0.27.0 - Async HTTP client (Ollama, BlueSky API, HackerNews, Instagram Graph API)
-- requests >=2.31.0 - Sync HTTP client (ComfyUI REST calls)
-- websocket-client >=1.6.0 - WebSocket for ComfyUI progress tracking
+**Backend Infrastructure:**
+- `playwright>=1.40.0` — headless browser scraping (asset collection in `src/scrape_assets.py`)
+- `feedparser>=6.0.0` — RSS feed parsing (trends agents)
+- `trendspyg>=0.3.0` — Google Trends wrapper (`src/pipeline/agents/google_trends.py`)
+- `beautifulsoup4>=4.12.0` — HTML parsing for scraping
+- `pyngrok>=7.0.0` — ngrok tunnel for Colab/public API exposure
+- `pyyaml>=6.0` — config file parsing
+- `APScheduler>=3.10.0` — publish scheduler
 
-**Infrastructure & Utilities:**
-- aiomysql >=0.2.0 - Async MySQL driver (primary DB on branch estrutura-agents)
-- aiosqlite >=0.20 - Async SQLite driver (development/testing)
-- python-dotenv >=1.0.0 - Environment variable loading (.env)
-- beautifulsoup4 >=4.12.0 - HTML parsing (unused, available for future scraping)
-- playwright >=1.40.0 - Browser automation (unused, available for dynamic scraping)
-- pyyaml >=6.0 - YAML parsing (`config/themes.yaml` for theme definitions)
-- cryptography >=42.0 - Password hashing and encryption (dependency for other packages)
+**Frontend Critical:**
+- `swr ^2.3.3` — data fetching with auto-revalidation; all hooks in `memelab/src/hooks/use-api.ts`
+- `@radix-ui/*` — 9 primitive packages (Dialog, DropdownMenu, Progress, ScrollArea, Select, Separator, Slot, Switch, Tabs, Tooltip)
+- `framer-motion ^12.35.2` — animation in step components and UI transitions
+- `lucide-react ^0.513.0` — icon set
+- `class-variance-authority ^0.7.1` + `tailwind-merge ^3.3.0` + `clsx ^2.1.1` — shadcn/ui component pattern
+- `@xyflow/react ^12.10.1` — React Flow (imported but pipeline diagram uses custom SVG)
+- `recharts ^3.8.1` — charts in dashboard
+- `mermaid ^11.6.0` — imported but replaced by custom SVG diagram
 
 ## Configuration
 
-**Environment Variables (.env):**
-- `GOOGLE_API_KEY` - Google Gemini API key (required)
-- `DATABASE_URL` - MySQL or SQLite connection string (default: `sqlite:///data/clipflow.db`)
-- `LLM_BACKEND` - "gemini" or "ollama" for text generation backend (default: "gemini")
-- `COST_MODE` - "normal", "eco", or "ultra-eco" cost optimization (default: "normal")
-- `IMAGE_BACKEND_PRIORITY` - "comfyui" or "gemini" for image generation order (default: "comfyui")
-- `BLUESKY_HANDLE` - BlueSky username for auth (optional)
-- `BLUESKY_APP_PASSWORD` - BlueSky app password (optional)
-- `INSTAGRAM_ACCESS_TOKEN` - Meta Graph API token for publishing (optional, long-lived)
-- `INSTAGRAM_BUSINESS_ID` - Instagram Business Account ID (optional)
-- `OLLAMA_HOST` - Ollama server URL (default: `http://localhost:11434`)
-- `OLLAMA_MODEL` - Ollama model name (default: `gemma3:4b`)
+**Environment:**
+- Backend: `.env` at project root, loaded via `python-dotenv` in `config.py` and `src/llm_client.py`
+- Required: `GOOGLE_API_KEY`
+- Optional: `DATABASE_URL`, `KIE_API_KEY`, `STRIPE_SECRET_KEY`, `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_BUSINESS_ID`, `GCS_BUCKET_NAME`, `GOOGLE_APPLICATION_CREDENTIALS`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`, `LLM_BACKEND`, `OLLAMA_MODEL`
+- `.env.example` at project root documents all vars
 
-**Build Configuration:**
-- `alembic.ini` - Database migration configuration
-- `config.py` - Centralized settings: IMAGE_WIDTH=1080, IMAGE_HEIGHT=1350, WATERMARK_TEXT="@magomestre420", font, colors, pipeline intervals
-- `config/themes.yaml` - 13+ visual themes (sabedoria, cafe, tecnologia, etc.) with situacao/acao/cenario
-- `tsconfig.json` - TypeScript configuration (frontend)
-- `.env.example` - Template for required environment variables
+**Database:**
+- Default dev: `sqlite+aiosqlite:///data/clipflow.db`
+- Default prod: `mysql+aiomysql://root:masterkey@localhost/memelab`
+- Controlled by `DATABASE_URL` env var in `config.py`
+
+**Build:**
+- Frontend: `memelab/next.config.ts` — configures API proxy rewrite and image remote patterns
+- Backend: `alembic.ini` — migration scripts in `src/database/migrations/`
 
 ## Platform Requirements
 
 **Development:**
-- Windows 11 Pro (primary), Linux compatible
-- Python 3.14+
-- Node.js 18+
-- MySQL server (or SQLite for dev)
-- ComfyUI server (optional, localhost:8188) with:
-  - Flux Dev GGUF Q4_K_S model
-  - LoRA trained on Mago Mestre references
-  - RTX 4060 Ti 8GB VRAM (with --lowvram flag)
+- FFmpeg installed system-wide (video assembly in `src/reels_pipeline/video_builder.py`, `src/product_studio/pipeline.py`, `src/video_gen/legend_renderer.py`)
+- ComfyUI server at `127.0.0.1:8188` (optional — feature-flagged via `COMFYUI_ENABLED`)
+- Ollama at `http://localhost:11434` (optional — feature-flagged via `LLM_BACKEND=ollama`)
 
 **Production:**
-- Python 3.14+
-- MySQL database (aiomysql async driver)
-- Google Gemini API key (quota based on usage)
-- Optional: ComfyUI local instance or Gemini Image API calls
-- Optional: Instagram Business Account for publishing (Meta Graph API)
-- Optional: Ollama server for cost-free local text generation
-
-**Hosting Target:**
-- Linux (Ubuntu 22.04+) for deployment
-- Docker-compatible (can containerize FastAPI + Alembic)
-- API: runs on port 8000, CORS enabled
+- MySQL database (aiomysql driver)
+- GCS bucket for video pipeline image hosting (`GCS_BUCKET_NAME`)
+- Google service account credentials (`GOOGLE_APPLICATION_CREDENTIALS`) for GCS
+- FastAPI on port 8000, Next.js on port 3000
 
 ---
 
-*Stack analysis: 2026-03-23*
+*Stack analysis: 2026-03-30*

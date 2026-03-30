@@ -1,227 +1,183 @@
 # External Integrations
 
-**Analysis Date:** 2026-03-23
+**Analysis Date:** 2026-03-30
 
 ## APIs & External Services
 
-**LLM & Content Generation:**
-- **Google Gemini API** - Text phrase generation, trend analysis, image generation
-  - SDK/Client: `google-genai` via `src/llm_client.py`
-  - Auth: `GOOGLE_API_KEY` (required, from .env)
-  - Models: `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.0-flash`
-  - Features:
-    - Text generation with system prompts (frases, captions, analysis)
-    - JSON mode for structured output (analyzer)
-    - Google Search grounding via `types.Tool(google_search=...)` (GeminiWebTrendsAgent)
-    - Image generation with visual references (Nano Banana pipeline)
+**AI / LLM:**
+- Google Gemini API — primary LLM for text generation, image generation, TTS, audio transcription, web search grounding
+  - SDK/Client: `google-genai>=1.0.0`, client at `src/llm_client.py` (singleton `genai.Client`)
+  - Auth: `GOOGLE_API_KEY` env var (optional paid key: `GOOGLE_API_KEY_PAID`)
+  - Models used: `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-flash-preview-tts`, `gemini-2.5-flash-image`
+  - Image model discovery runs at API startup (`src/image_gen/gemini_client.py`: `discover_image_models`)
+  - Supports Gemini Google Search grounding for trend discovery (`src/pipeline/agents/gemini_web_trends.py`)
+- Ollama — optional local LLM fallback for cost-zero text generation
+  - SDK/Client: direct HTTP via `httpx`, client at `src/llm_client.py`
+  - Auth: none (local)
+  - Config: `LLM_BACKEND=ollama`, `OLLAMA_HOST`, `OLLAMA_MODEL` env vars
+  - Fallback: auto-reverts to Gemini if Ollama unavailable (`OLLAMA_FALLBACK_TO_GEMINI`)
 
-**Trend Sources (Public APIs - No Auth):**
-- **Google Trends RSS** - Brazilian trending keywords
-  - Agent: `src/pipeline/agents/google_trends.py` (GoogleTrendsAgent)
-  - SDK: `trendspyg` library (RSS feed parser)
-  - Endpoint: `trends.google.com` RSS by geo
-  - Config: `PIPELINE_GOOGLE_TRENDS_GEO="BR"`
+**Video Generation:**
+- Kie.ai API — image-to-video and music generation
+  - SDK/Client: custom async httpx client at `src/video_gen/kie_client.py` (video) and `src/product_studio/music_client.py` (Suno music)
+  - Auth: `KIE_API_KEY` env var, `Authorization: Bearer` header
+  - Base URL: `https://api.kie.ai/api/v1`
+  - Video models: Hailuo 2.3, Seedance, Wan 2.6, Kling v2.1/3.0, Grok Imagine (configured in `config.py` `VIDEO_MODELS`)
+  - Music: Suno V4 instrumental via `KieMusicClient` (`src/product_studio/music_client.py`)
+  - Polling: exponential backoff, 5s initial → 30s max, 600s timeout
+  - Budget cap: `VIDEO_DAILY_BUDGET_USD` (default $3.00/day)
 
-- **BlueSky Public API** - Viral Brazilian posts
-  - Agent: `src/pipeline/agents/bluesky_trends.py` (BlueSkyTrendsAgent)
+**Image Generation (Local):**
+- ComfyUI — local Stable Diffusion / Flux image generation
+  - SDK/Client: custom WebSocket client at `src/image_gen/comfyui_client.py`
+  - Auth: none (local)
+  - Config: `COMFYUI_HOST=127.0.0.1`, `COMFYUI_PORT=8188`
+  - Feature-flagged: `COMFYUI_ENABLED` (default `True`), used as primary backend when `IMAGE_BACKEND_PRIORITY=comfyui`
+  - Workflows in `src/image_gen/workflows/`
+
+**Trend Intelligence:**
+- Google Trends — pytrends wrapper via `trendspyg`
+  - SDK/Client: `trendspyg>=0.3.0`, used in `src/pipeline/agents/google_trends.py`
+  - Auth: none (public)
+  - Config: `PIPELINE_GOOGLE_TRENDS_GEO=BR`
+- Gemini Web Trends — uses Gemini `google_search` grounding tool to discover BR viral topics
+  - SDK/Client: `google-genai` (same as LLM), at `src/pipeline/agents/gemini_web_trends.py`
+  - Auth: `GOOGLE_API_KEY`
+- Reddit — RSS feeds parsed via `feedparser`
+  - SDK/Client: `feedparser>=6.0.0`, no auth
+  - Subreddits: `brasil`, `eu_nvr`, `DiretoDoZapZap`, `memes`, `dankmemes`, `meirl` (config in `config.py`)
+- BlueSky — public AT Protocol API (no auth required)
+  - SDK/Client: `urllib.request`, at `src/pipeline/agents/bluesky_trends.py`
   - Endpoint: `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts`
-  - Auth: Public/no auth required
-  - SDK: `urllib` (stdlib) + `httpx`
-  - Keywords: Brazilian meme/humor keywords (pt-BR)
-  - Optional Credentials (for authenticated access, unused):
-    - `BLUESKY_HANDLE` - BlueSky username
-    - `BLUESKY_APP_PASSWORD` - App password from bsky.app/settings/app-passwords
+  - Optional authenticated posting: `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD` env vars
+- YouTube RSS — public YouTube RSS feeds for trending content
+  - SDK/Client: `feedparser`, at `src/pipeline/agents/youtube_rss.py`
+  - Auth: none (public)
 
-- **HackerNews Public API** - Trending tech stories
-  - Agent: `src/pipeline/agents/hackernews.py` (HackerNewsAgent)
-  - Endpoint: `https://hacker-news.firebaseio.com/v0/` (Firebase public)
-  - Auth: None required
-  - SDK: `urllib` + `httpx`
-
-- **Lemmy Public API** - Community discussions (Brazilian communities)
-  - Agent: `src/pipeline/agents/lemmy_communities.py` (LemmyCommunitiesAgent)
-  - Endpoint: `https://lemmy.world/api/v3/` (v3 JSON API)
-  - Auth: None required
-  - SDK: `httpx`
-
-**RSS Feed Sources (Public):**
-- **Reddit RSS** - Hot posts from 8 Brazilian subreddits
-  - Agents: `src/pipeline/agents/reddit_memes.py`, `src/pipeline/agents/rss_feeds.py`
-  - Feeds: Reddit RSS endpoints (reddit.com/r/*/hot/.rss)
-  - Subreddits: brasil, eu_nvr, DiretoDoZapZap, memes, dankmemes, meirl
-  - Auth: None required
-  - SDK: `feedparser`
-
-- **Sensacionalista Feed** - Brazilian humor portal
-  - Agent: `src/pipeline/agents/rss_feeds.py`
-  - Endpoint: `https://www.sensacionalista.com.br/feed/`
-  - Auth: None required
-  - SDK: `feedparser`
-
-- **YouTube Channels RSS** - Brazilian content creators
-  - Agent: `src/pipeline/agents/youtube_rss.py` (YouTubeRSSAgent)
-  - Endpoints: YouTube channel RSS feeds via `youtube.com/feeds/videos.xml?channel_id=`
-  - Verified Channel IDs: Porta dos Fundos, Manual do Mundo, KondZilla, BRKsEDU
-  - Auth: None required
-  - SDK: `feedparser`
-  - Note: YouTube trending RSS (mostpopular) disabled in 2025, uses specific channel RSS
-
-- **Brazil Viral Portals** - Meme aggregators
-  - Agent: `src/pipeline/agents/brazil_viral_rss.py` (BrazilViralRSSAgent)
-  - Sources: Hypeness, Metropoles, meme subreddits
-  - Auth: None required
-  - SDK: `feedparser`
-
-**Stub Agents (Require API Keys, Not Implemented):**
-- TikTok Trends - `src/pipeline/agents/tiktok_trends.py` (stub)
-- Instagram Explore - `src/pipeline/agents/instagram_explore.py` (stub)
-- Twitter/X Trends - `src/pipeline/agents/twitter_x.py` (stub)
-- YouTube Shorts - `src/pipeline/agents/youtube_shorts.py` (stub)
-- Facebook Viral - `src/pipeline/agents/facebook_viral.py` (stub)
+**Web Scraping:**
+- Playwright — headless browser for asset collection
+  - SDK/Client: `playwright>=1.40.0`, used in `src/scrape_assets.py`
+  - Auth: none
 
 ## Data Storage
 
 **Databases:**
-- **MySQL** (primary on branch estrutura-agents)
-  - Connection: `DATABASE_URL` env var (e.g., `mysql+aiomysql://user:pass@localhost/memelab`)
-  - Client: SQLAlchemy 2.0 async ORM + aiomysql driver
-  - Tables: 10 models in `src/database/models.py`
-    - `characters` - Multi-character personas (DNA, rules, rendering)
-    - `character_refs` - Visual references for each character
-    - `themes` - Visual themes (situacao_key, acao, cenario)
-    - `pipeline_runs` - Execution history
-    - `trend_events` - Collected trends from agents
-    - `work_orders` - Curator output (topic + theme assignment)
-    - `content_packages` - Generated content (phrase + background + metadata)
-    - `generated_images` - Final composed images with metadata
-    - `batch_jobs` - Bulk processing jobs
-    - `scheduled_posts` - Posts queued for Instagram publishing
-    - `agent_stats` - Per-agent performance tracking
-
-- **SQLite** (development/testing)
-  - Connection: `sqlite+aiosqlite:///data/clipflow.db` (default)
-  - Client: SQLAlchemy 2.0 async ORM + aiosqlite driver
-  - Fully compatible with MySQL schema for testing
+- SQLite (development)
+  - Driver: `aiosqlite>=0.20` (async)
+  - Default path: `data/clipflow.db`
+  - Connection: `sqlite+aiosqlite:///data/clipflow.db`
+- MySQL (production)
+  - Driver: `aiomysql>=0.2.0` (async)
+  - Connection: `DATABASE_URL` env var (format: `mysql+aiomysql://user:pass@host/db`)
+  - Default: `mysql+aiomysql://root:masterkey@localhost/memelab`
+  - Pool: size 10, max overflow 20, recycle 3600s
+- ORM: SQLAlchemy 2.0 async (`src/database/session.py`, models in `src/database/models.py`)
+- Migrations: Alembic (`src/database/migrations/`, config `alembic.ini`)
+- Schema: 16 tables including `characters`, `users`, `refresh_tokens`, `content_packages`, `video_jobs`, `product_ad_jobs`, `reels_jobs`, `usage_events`
 
 **File Storage:**
-- **Local filesystem only** - No cloud storage integration
-  - Generated backgrounds: `output/backgrounds_generated/`
-  - Composed images (final): `output/`
-  - Character references: `assets/backgrounds/mago/`
-  - ComfyUI LoRA: `assets/backgrounds/mago/lora/` (trigger: `ohwx_mago`)
-  - Fonts: `assets/fonts/`
+- Local filesystem: generated images to `output/`, memes to `output/memes/`, backgrounds to `output/backgrounds_generated/`, videos to `output/videos/`, ads to `output/ads/`, reels to `output/reels/`
+- GCS (Google Cloud Storage) — for Kie.ai video generation (images must be public URLs)
+  - SDK/Client: `google-cloud-storage>=2.14.0`, at `src/video_gen/gcs_uploader.py`
+  - Auth: `GOOGLE_APPLICATION_CREDENTIALS` (service account JSON path)
+  - Config: `GCS_BUCKET_NAME` env var (default: `clipflow-video-uploads`)
+  - Signed URL expiry: `GCS_SIGNED_URL_EXPIRY` (default 3600s)
+  - Fallback: litterbox.catbox.moe (free temporary hosting, no auth, 1h expiry) if GCS not configured
 
 **Caching:**
-- None detected - All processing is stateless (session-based for ORM)
+- None (no Redis or in-memory cache layer)
+- SWR handles frontend client-side cache with auto-revalidation
 
 ## Authentication & Identity
 
-**Auth Providers:**
-- **Google Gemini API** - API key authentication (no OAuth)
-  - Header: `Authorization: Bearer {GOOGLE_API_KEY}`
-  - Scopes: Text generation, image generation, web search
-  - Cost: Pay-as-you-go (pricing depends on model and tokens)
+**Auth Provider:**
+- Custom JWT-based auth (no third-party provider like Supabase or Auth0)
+  - Implementation: `src/auth/service.py` — register, login, refresh, logout
+  - Password hashing: bcrypt (`bcrypt>=5.0.0`, 12 rounds)
+  - Tokens: JWT access token + refresh token rotation (`src/auth/jwt.py`, `cryptography>=42.0`)
+  - Storage: `users` and `refresh_tokens` tables in DB
+  - FastAPI dependency: `get_current_user` in `src/api/deps.py`
+  - Routes: `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`
+  - Multi-tenant: each `Character`, `ContentPackage`, etc. is scoped to `user_id`
 
-- **Meta Graph API** (Instagram Publishing) - Access token
-  - Token type: Long-lived user access token (generated via Facebook Developer Portal)
-  - Required configs: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_BUSINESS_ID`
-  - Permissions: `instagram_business_content_publish`, `instagram_business_manage_messages`
-  - Endpoints: `https://graph.facebook.com/v21.0/`
+## Billing & Payments
 
-- **BlueSky AT Protocol** (optional, for authenticated feed)
-  - Auth: App password (generated in bsky.app/settings/app-passwords)
-  - Unused in current implementation (public API used instead)
+**Payment Provider:**
+- Stripe — subscription billing (Phase 17, not yet active by default)
+  - SDK/Client: `stripe` Python package (imported lazily in `src/services/stripe_billing.py`)
+  - Auth: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` env vars
+  - Config: `STRIPE_PRO_PRICE_ID`, `STRIPE_ENTERPRISE_PRICE_ID` env vars
+  - Plan tiers: Free / Pro ($19/mo) / Enterprise ($49/mo) — defined in `src/services/stripe_billing.py` `PLAN_TIERS`
+  - Endpoints: `/billing/status`, `/billing/create-checkout`, `/billing/webhook`, `/billing/portal`
+  - Webhook handler at `POST /billing/webhook` (no JWT, per design doc D-10)
+  - Graceful degradation: all billing routes work without Stripe configured (returns Free tier info)
 
-**No Built-in Auth:** API endpoints have no authentication layer (open to network)
+## Social Media Publishing
+
+**Instagram Graph API:**
+  - SDK/Client: custom async httpx client at `src/services/instagram_client.py`
+  - Auth: OAuth 2.0 flow — `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_BUSINESS_ID` env vars; OAuth redirect at `/instagram/callback`
+  - API version: `v21.0` at `https://graph.facebook.com/v21.0`
+  - Supports: single image posts, carousel (2–10 images), Reels (video + cover)
+  - Insights: media and account insights via Graph API
+  - OAuth flow: `/instagram/auth-url` → Facebook popup → `/instagram/callback`
+
+**BlueSky (optional posting):**
+  - SDK/Client: direct HTTP via `urllib.request`
+  - Auth: `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD` env vars (app password, not account password)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None detected - Errors logged to stdout/console
+- None (no Sentry or similar)
 
 **Logs:**
-- `logging` (Python stdlib)
-  - Levels: DEBUG, INFO, WARNING, ERROR
-  - Format: `[timestamp] [module] [level]: message`
-  - Loggers: `clip-flow.llm`, `clip-flow.agent.*`, `clip-flow.comfyui`, etc.
-  - Output: console (stderr)
-
-**Database Monitoring:**
-- SQLAlchemy echo mode available (disabled by default in `src/database/session.py`)
-- Agent stats tracked in `agent_stats` table (performance metrics per agent run)
+- Python `logging` module, structured via `src/api/log_sanitizer.py` (redacts secrets from log output)
+- Log format: `%(asctime)s [%(name)s] %(levelname)s: %(message)s` (set in `src/api/app.py`)
+- Logger namespaces: `clip-flow.api`, `clip-flow.llm`, `clip-flow.kie_client`, `clip-flow.instagram`, etc.
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Local machine (Windows 11) for development
-- Production: Requires Python 3.14+, MySQL, internet access (Gemini API calls)
-- Optional: Docker container with Alembic migrations
+- Local development: FastAPI at `localhost:8000`, Next.js at `localhost:3000`
+- Colab support: `pyngrok` for public URL tunneling (`start_server()` in `src/api/app.py`)
+- No Vercel or cloud deployment config detected
 
 **CI Pipeline:**
-- None detected (no GitHub Actions, GitLab CI, etc.)
-- Manual testing via pytest
-
-**Deployment Entry Points:**
-- `python -m src.api [--port 8000]` - FastAPI + Uvicorn
-- `python -m src.pipeline_cli --mode agents` - CLI for pipeline execution
-- `python -m src.database.seed` - Database seeding (idempotent)
-
-## Environment Configuration
-
-**Required Environment Variables:**
-- `GOOGLE_API_KEY` - Google Gemini API key (must be set)
-- `DATABASE_URL` - MySQL or SQLite connection string
-
-**Optional Environment Variables:**
-- `LLM_BACKEND` - "gemini" or "ollama" (default: "gemini")
-- `COST_MODE` - "normal", "eco", "ultra-eco" (default: "normal")
-- `IMAGE_BACKEND_PRIORITY` - "comfyui" or "gemini" (default: "comfyui")
-- `OLLAMA_HOST` - Ollama server URL (default: `http://localhost:11434`)
-- `OLLAMA_MODEL` - Ollama model name (default: `gemma3:4b`)
-- `BLUESKY_HANDLE` - BlueSky username (empty string = skip auth)
-- `BLUESKY_APP_PASSWORD` - BlueSky app password (empty string = skip auth)
-- `INSTAGRAM_ACCESS_TOKEN` - Meta Graph API token (empty string = skip publishing)
-- `INSTAGRAM_BUSINESS_ID` - Instagram Business Account ID (empty string = skip publishing)
-
-**Secrets Location:**
-- `.env` file (Windows: `C:\Users\VIP\testeDev\clip-flow\.env`)
-- Not committed to git (listed in `.gitignore`)
+- None detected (no GitHub Actions, CircleCI, etc.)
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None detected
+- `POST /billing/webhook` — Stripe payment events (no JWT auth, webhook secret validation)
+- `GET /instagram/callback` — Facebook OAuth redirect with authorization code
 
 **Outgoing:**
-- **Instagram Publishing** - `POST https://graph.facebook.com/v21.0/{ig_user_id}/media`
-  - Triggered by: `/publishing/schedule` endpoint or scheduler
-  - Publishes: Image, carousel, or reel to Instagram feed
-  - Response: Media ID for tracking
+- Kie.ai polling (pull-based, not push) — `src/video_gen/kie_client.py`
+- Instagram Graph API publishing calls — `src/services/instagram_client.py`
+- Gemini API calls — `src/llm_client.py`, `src/image_gen/gemini_client.py`
 
-- **Pipeline Events** (future)
-  - Database updates to `pipeline_runs`, `content_packages`, `scheduled_posts`
-  - Frontend polls `/pipeline/status`, `/publishing/queue` for updates
+## Environment Configuration
 
-## Rate Limiting & Quotas
+**Required env vars:**
+- `GOOGLE_API_KEY` — Gemini API (LLM, image gen, TTS, transcription)
 
-**Google Gemini API:**
-- Semaphore: `GEMINI_MAX_CONCURRENT=5` (limit simultaneous requests)
-- Rate limit handling: Exponential backoff with `GEMINI_IMAGE_MAX_RETRIES=2`, `GEMINI_IMAGE_WAIT_BASE=60`
-- Cost tiers: `gemini-2.5-flash-lite` (lite/$0.40/1M) vs `gemini-2.5-flash` (normal/$2.50/1M)
+**Optional env vars (grouped by feature):**
+- Database: `DATABASE_URL`
+- Video generation: `KIE_API_KEY`, `VIDEO_ENABLED=true`, `GCS_BUCKET_NAME`, `GOOGLE_APPLICATION_CREDENTIALS`
+- LLM backend: `LLM_BACKEND`, `OLLAMA_MODEL`, `OLLAMA_HOST`
+- Billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID`, `STRIPE_ENTERPRISE_PRICE_ID`, `STRIPE_PUBLISHABLE_KEY`
+- Instagram: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_BUSINESS_ID`
+- BlueSky: `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`
+- Image backend: `IMAGE_BACKEND_PRIORITY` (`comfyui` | `gemini`)
+- Cost control: `GEMINI_MODEL_LITE`, `GEMINI_MODEL_NORMAL`, `COST_MODE`, `VIDEO_DAILY_BUDGET_USD`
+- Reels: `REELS_ENABLED=true`
+- Product Ads: `ADS_ENABLED=true`
 
-**ComfyUI (GPU):**
-- Semaphore: `COMFYUI_MAX_CONCURRENT=1` (single GPU, max 1 concurrent generation)
-- Timeout: 300 seconds per generation
-- Hardware: RTX 4060 Ti 8GB VRAM
-
-**Instagram Graph API:**
-- Limits: `INSTAGRAM_MAX_HASHTAGS=30`, `INSTAGRAM_MAX_CAPTION_LENGTH=2200`
-- Rate limiting: Handled by Meta (tier-based on app tier)
-
-**Agent Timeouts:**
-- `AGENT_FETCH_TIMEOUT=30` seconds per agent fetch
-- Broker queue size: `BROKER_MAX_QUEUE_SIZE=100` events
+**Secrets location:**
+- `.env` at project root (gitignored)
+- `.env.example` at project root documents all vars with placeholder values
 
 ---
 
-*Integration audit: 2026-03-23*
+*Integration audit: 2026-03-30*

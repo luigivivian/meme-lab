@@ -1,282 +1,204 @@
 # Architecture
 
-**Analysis Date:** 2026-03-23
+**Analysis Date:** 2026-03-30
 
 ## Pattern Overview
 
-**Overall:** Event-driven, multi-layer async pipeline orchestration with pluggable agents
+**Overall:** Full-stack monorepo with a Python FastAPI backend and a Next.js frontend, connected via HTTP proxy. The backend follows a layered pipeline architecture: trend agents feed an orchestrator, which drives workers, which produce content packages stored in a relational database. Multiple specialized sub-pipelines (meme content, Instagram Reels, product ad videos) share the same database and API layer.
 
 **Key Characteristics:**
-- Five-layer asynchronous pipeline (Monitoring → Broker → Curator → Generation → Post-Production)
-- Agent-based trend collection with parallel execution via asyncio
-- Adapter pattern for sync→async bridging (SyncAgentAdapter)
-- Semaphore-based resource locking for GPU and API concurrency
-- Database-backed state persistence (MySQL with SQLAlchemy 2.0 async)
-- REST API gateway for pipeline triggering and monitoring
+- Backend is async throughout (FastAPI + SQLAlchemy async + asyncio)
+- Frontend proxies all requests through Next.js rewrites — no direct browser-to-backend calls, no API routes in Next.js
+- Multi-tenant: all ORM models carry `user_id` foreign key; repository layer enforces ownership
+- Job-based pattern for long-running tasks: route creates a DB record and fires a `BackgroundTask`, frontend polls for status
+- Three distinct pipeline systems share one FastAPI app: meme content pipeline, Reels pipeline (`src/reels_pipeline/`), Product Ad pipeline (`src/product_studio/`)
 
 ## Layers
 
-**Layer 1: Monitoring (L1) — Trend Collection**
-- Purpose: Fetch trends in parallel from multiple independent sources
-- Location: `src/pipeline/monitoring.py`
-- Contains: MonitoringLayer orchestrates all agents (6 sync + 3+ async native agents)
-- Depends on: Agent implementations in `src/pipeline/agents/`
-- Used by: Layer 2 (Broker)
-- Key files:
-  - `src/pipeline/agents/async_base.py` — AsyncSourceAgent ABC + SyncAgentAdapter wrapper
-  - `src/pipeline/agents/google_trends.py` — GoogleTrendsAgent (sync via trendspyg RSS)
-  - `src/pipeline/agents/reddit_memes.py` — RedditMemesAgent (sync via RSS)
-  - `src/pipeline/agents/rss_feeds.py` — RSSFeedAgent (sync via feedparser)
-  - `src/pipeline/agents/youtube_rss.py` — YouTubeRSSAgent (async native)
-  - `src/pipeline/agents/gemini_web_trends.py` — GeminiWebTrendsAgent (async native)
-  - `src/pipeline/agents/brazil_viral_rss.py` — BrazilViralRSSAgent (async native)
-  - `src/pipeline/agents/bluesky_trends.py` — BlueSkyTrendsAgent (async native)
-  - `src/pipeline/agents/hackernews.py` — HackerNewsAgent (async native)
-  - `src/pipeline/agents/lemmy_communities.py` — LemmyCommunitiesAgent (async native)
-- Output: ~227 TrendEvent objects per run
+**Configuration Layer:**
+- Purpose: Single source of truth for all runtime config
+- Location: `config.py` (root)
+- Contains: Directory paths, API keys, model IDs, cost limits, feature flags
+- Depends on: `python-dotenv`, `.env`
+- Used by: Every Python module imports from `config`
 
-**Layer 2: Broker (L2) — Deduplication & Ranking**
-- Purpose: Ingest trends, deduplicate via TrendAggregator, rank by score
-- Location: `src/pipeline/broker.py`
-- Contains: TrendBroker maintains asyncio.Queue with aggregation logic
-- Depends on: TrendAggregator from `src/pipeline/processors/aggregator.py`
-- Used by: Layer 3 (Curator)
-- Key behavior: Converts TrendEvent ↔ TrendItem to reuse existing aggregator logic
-- Output: Ranked, deduplicated event queue
+**Database Layer:**
+- Purpose: Persistence — ORM models, session management, migrations, repositories
+- Location: `src/database/`
+- Contains: SQLAlchemy async models (`models.py`), Alembic migrations (`migrations/versions/`), session factory (`session.py`), per-entity repositories (`repositories/`)
+- Depends on: SQLAlchemy async, config DATABASE_URL (MySQL or SQLite)
+- Used by: API routes (via FastAPI `Depends`), background tasks
 
-**Layer 3: Curator (L3) — Topic Selection & WorkOrder Generation**
-- Purpose: Analyze trending events via LLM, select best themes, emit WorkOrders with visual mappings
-- Location: `src/pipeline/curator.py`
-- Contains: CuratorAgent wraps ClaudeAnalyzer, applies KEYWORD_MAP → situacao_key mapping
-- Depends on: ClaudeAnalyzer in `src/pipeline/processors/analyzer.py`
-- Used by: Layer 4 (Generation)
-- Key logic:
-  - Calls ClaudeAnalyzer.analyze(events) → JSON with best topics + humor angles
-  - Maps topic keywords to visual situations (KEYWORD_MAP in `src/image_gen/prompt_builder.py`)
-  - Falls back to random selection from SITUACOES pool if keyword doesn't match
-  - Supports theme_tags override and exclude_topics (dedup cross-run)
-  - Can operate in shortcut mode (bypass L1/L2/L3 for manual topics)
-- Output: List[WorkOrder] with trend_event, gandalf_topic, situacao_key, layout, carousel_count
+**API Layer:**
+- Purpose: HTTP interface — routing, request validation, auth enforcement, background task dispatch
+- Location: `src/api/`
+- Contains: FastAPI app (`app.py`), shared dependencies (`deps.py`), Pydantic request/response models (`models.py`), 16 route modules (`routes/`)
+- Depends on: Database layer, service layer, pipeline sub-systems
+- Used by: Next.js frontend (via proxy at `/api/*`)
 
-**Layer 4: Generation (L4) — Phrase + Image Production**
-- Purpose: Generate phrases and backgrounds in parallel for each WorkOrder
-- Location: `src/pipeline/workers/generation_layer.py`
-- Contains: GenerationLayer coordinates PhraseWorker + ImageWorker
-- Depends on:
-  - `src/pipeline/workers/phrase_worker.py` — generates phrases via Gemini API (with optional A/B scoring)
-  - `src/pipeline/workers/image_worker.py` — generates backgrounds (priority: ComfyUI → Gemini Image → static)
-  - `src/image_maker.py` — Pillow composition engine
-- Used by: Layer 5 (Post-Production)
-- Key behavior:
-  - Phrase generation respects character_system_prompt, max_chars, humor_angle
-  - A/B testing mode: generates N alternatives, scores via Gemini on viralidade/humor/identificacao
-  - Image worker chooses backend via IMAGE_BACKEND_PRIORITY (comfyui or gemini first)
-  - Carousel mode: generates N slides per phrase if carousel_count > 1
-  - Semaphore limits: Gemini API = 5 concurrent, GPU (ComfyUI) = 1 concurrent
-- Output: List[ContentPackage] with phrase, image_path, background_source, metadata, carousel_slides
+**Service Layer:**
+- Purpose: Business logic that is not pipeline-specific
+- Location: `src/services/`, `src/auth/`, `src/billing/`
+- Contains: Instagram OAuth (`instagram_oauth.py`, `instagram_client.py`), scheduled post publisher (`publisher.py`, `scheduler_worker.py`), Stripe billing (`stripe_billing.py`), JWT auth (`auth/jwt.py`, `auth/service.py`), Gemini API key selector (`key_selector.py`)
+- Depends on: Database layer, external APIs
+- Used by: API routes
 
-**Layer 5: Post-Production (L5) — Enrichment**
-- Purpose: Add captions, hashtags, quality scoring before publication
-- Location: `src/pipeline/workers/post_production.py`
-- Contains: PostProductionLayer coordinates CaptionWorker + HashtagWorker + QualityWorker
-- Depends on:
-  - `src/pipeline/workers/caption_worker.py` — generates Instagram captions via Gemini
-  - `src/pipeline/workers/hashtag_worker.py` — combines trending + branded hashtags
-  - `src/pipeline/workers/quality_worker.py` — scores content quality (0-100)
-- Used by: API responses, publishing queue
-- Key behavior:
-  - Captions include character_name, character_handle, CTA via character_caption_prompt
-  - Hashtags merge 3-5 trending + 2-3 branded (character_branded_hashtags)
-  - Quality scoring: clarity, readability, visual appeal, on-brand alignment
-- Output: Enriched List[ContentPackage] with caption, hashtags, quality_score
+**Pipeline Layer (Meme Content):**
+- Purpose: Multi-step agent orchestration for meme generation
+- Location: `src/pipeline/`
+- Contains: Trend-fetching agents (`agents/`), processors (`processors/`), workers (`workers/`), orchestrators (`orchestrator.py`, `async_orchestrator.py`)
+- Depends on: Image gen layer, LLM client, database layer
+- Used by: `/pipeline` and `/generate` API routes
+
+**Image Generation Layer:**
+- Purpose: Generate and compose meme images
+- Location: `src/image_gen/`, `src/image_maker.py`
+- Contains: Gemini image client (`gemini_client.py`), ComfyUI client (`comfyui_client.py`), prompt builder (`prompt_builder.py`), Pillow composition (`image_maker.py`)
+- Depends on: Google Gemini API, optional local ComfyUI
+- Used by: `ImageWorker` in pipeline, `/generate` routes
+
+**LLM Client:**
+- Purpose: Unified text generation interface with Gemini/Ollama fallback
+- Location: `src/llm_client.py`
+- Contains: Single `generate()` function that routes to Gemini or Ollama based on config
+- Depends on: `google-genai`, optional Ollama
+- Used by: All workers, agents, analyzers
+
+**Video Generation Layer:**
+- Purpose: Image-to-video via Kie.ai, legend overlay via FFmpeg
+- Location: `src/video_gen/`
+- Contains: Kie.ai async client (`kie_client.py`), GCS uploader (`gcs_uploader.py`), legend renderer (`legend_renderer.py`), stale job scanner (`stale_job_scanner.py`)
+- Depends on: Kie.ai API, Google Cloud Storage, FFmpeg
+- Used by: `/generate/video` routes
+
+**Reels Pipeline:**
+- Purpose: End-to-end Instagram Reels video production
+- Location: `src/reels_pipeline/`
+- Contains: Script gen, TTS, image gen, transcription, FFmpeg video builder — each as a module, orchestrated by `main.py`
+- Depends on: Gemini API (images, TTS, transcription), FFmpeg, database
+- Used by: `/reels` routes
+
+**Product Ad Pipeline:**
+- Purpose: 8-step AI video ad production wizard
+- Location: `src/product_studio/`
+- Contains: Background remover (`bg_remover.py`), scene composer (`scene_composer.py`), prompt builder (`prompt_builder.py`), copy generator (`copy_generator.py`), music client (`music_client.py`), format exporter (`format_exporter.py`), `ProductAdPipeline` orchestrator (`pipeline.py`)
+- Depends on: Gemini API, Kie.ai, rembg, FFmpeg, Suno
+- Used by: `/ads` routes
+
+**Frontend Layer:**
+- Purpose: Management dashboard and interactive wizards
+- Location: `memelab/src/`
+- Contains: Next.js App Router pages (`app/`), React components (`components/`), SWR hooks (`hooks/`), API client (`lib/api.ts`), auth context (`contexts/auth-context.tsx`)
+- Depends on: Backend via `/api/*` proxy rewrites
+- Used by: End users in browser
 
 ## Data Flow
 
-**Full Pipeline (L1 → L5):**
+**Meme Content Pipeline:**
 
-1. **L1 Monitoring fetches trends** → 9 agents run in parallel (asyncio.gather)
-   - GoogleTrends RSS, RedditRSS, RSSFeeds, YouTubeRSS, GeminiWebTrends, BrazilViral, BlueSky, HN, Lemmy
-   - Collect ~227 TrendEvent objects with title, source, score, metadata
-   - Timeout per agent: AGENT_FETCH_TIMEOUT (30s default)
-   - Failed agents return empty list; never block pipeline
+1. Frontend (`/pipeline/page.tsx`) calls `POST /pipeline/run` or `POST /generate/manual`
+2. Route creates a `PipelineRun` record in DB, fires `BackgroundTask`
+3. `PipelineOrchestrator` runs trend agents (Google Trends, Reddit, RSS, etc.)
+4. `TrendAggregator` deduplicates and ranks; `ClaudeAnalyzer` picks topics
+5. `GenerationLayer` spawns `PhraseWorker` (Gemini text) + `ImageWorker` (Gemini image or ComfyUI) in parallel
+6. Composed meme images saved to `output/`; `ContentPackage` records written to DB
+7. Frontend polls `GET /jobs` → displays results in gallery
 
-2. **L2 Broker ingests & deduplicates**
-   - Receive 227 events from L1
-   - Convert to TrendItem, run TrendAggregator.aggregate()
-   - Aggregate removes duplicates, boosts multi-source mentions
-   - Enqueue deduplicated events (typically 50-70% unique)
-   - Top 10 logged by score
+**Reels / Ad Job Flow:**
 
-3. **L3 Curator analyzes & curates**
-   - Drain max 20 events from broker queue
-   - Call ClaudeAnalyzer.analyze() with Gemini API
-   - Parse JSON: {topic, humor_angle, category, viability}
-   - Select top N topics (images_per_run, typically 5)
-   - Apply KEYWORD_MAP → situacao_key (visual situation)
-   - Generate WorkOrder per topic with:
-     - gandalf_topic (curated title)
-     - humor_angle (comedy direction)
-     - situacao_key (visual mood: cafe, meditando, confronto, etc.)
-     - layout (bottom, top, center, split_top)
-     - carousel_count (1 or more slides)
+1. Frontend wizard collects config, calls `POST /reels/create-interactive` or `POST /ads/`
+2. Route creates `ReelsJob` or `ProductAdJob` in DB with `step_state` JSON column
+3. Frontend executes steps individually via `POST /reels/{jobId}/step/{step_name}` or `POST /ads/{jobId}/step/{step_name}`
+4. Each step runs in a `BackgroundTask` and updates `step_state` in DB
+5. Frontend polls step state at 2s interval (SWR `refreshInterval: 2000`) and shows per-step progress
+6. Approval/regeneration: `POST /reels/{jobId}/step/{step}/approve` or `reject`
 
-4. **L4 Generation produces content**
-   - For each WorkOrder:
-     - **PhraseWorker:** Generate phrases using character_system_prompt
-       - If A/B enabled: generate N alternatives, score each (0-10 viral/humor/identificacao)
-       - Return top 1 (or N for carousel)
-     - **ImageWorker:** Generate background
-       - Check background_mode (auto/comfyui/gemini/static)
-       - Try primary backend (respecting Semaphore limits)
-       - Fallback to secondary, then static
-       - Use phrase for context if use_phrase_context=True
-     - **Compose:** Pillow overlay text, watermark, effects on background
-   - Create ContentPackage per phrase with image_path, background_source
+**Video Generation:**
 
-5. **L5 Post-Production enriches**
-   - For each ContentPackage:
-     - **CaptionWorker:** Generate Instagram caption (200-300 chars) with handle, CTA
-     - **HashtagWorker:** Append 5-6 hashtags (trending + branded)
-     - **QualityWorker:** Score (0-100) clarity, readability, brand alignment
-   - Update ContentPackage with caption, hashtags, quality_score
+1. Frontend calls `POST /generate/video` with `content_package_id`
+2. Route checks daily budget (`VIDEO_DAILY_BUDGET_USD`) in DB, raises 402 if exceeded
+3. `BackgroundTask` calls `KieSora2Client.generate()` — creates Kie.ai task, polls with exponential backoff (up to 10 min)
+4. On success, video downloaded locally and GCS URL recorded in `ContentPackage`
+5. Frontend polls `GET /generate/video/{id}/status` at 3s interval
 
-**Shortcut Mode (Manual Topics):**
-- Bypass L1/L2/L3: provide list[{topic, humor_angle}]
-- Auto-detect situacao_key via KEYWORD_MAP or random fallback
-- Jump directly to L4
+**Auth Flow:**
+
+1. `POST /auth/login` validates credentials, returns JWT access + refresh tokens
+2. Frontend stores tokens in localStorage (persistent) or sessionStorage (session-only)
+3. `lib/api.ts` `request()` attaches `Authorization: Bearer <token>` to every call
+4. On 401, tokens cleared and user redirected to `/login`
+5. FastAPI `get_current_user` dependency verifies JWT and loads `User` ORM from DB
 
 **State Management:**
-
-- **In-memory during run:** TrendEvents, WorkOrders, ContentPackages flow through layers
-- **Persisted to DB:**
-  - PipelineRun (run_id, character_id, status, started_at, finished_at, image_count, error_messages)
-  - GeneratedImage (image_path, pipeline_run_id, character_id, source, phrase, background_source)
-  - ContentPackage (phrase, caption, hashtags, quality_score, image_id, published)
-  - TrendEvent (title, source, score, fetched_at) — optional, for analytics
-  - ScheduledPost (content_package_id, scheduled_at, status) — for publishing queue
+- Server state: SWR hooks in `hooks/` with deterministic cache keys (e.g., `"ad-job-{jobId}"`)
+- Auth state: React Context in `contexts/auth-context.tsx`, hydrated by `GET /auth/me` on mount
+- No global client state store (no Redux/Zustand) — all data fetched on demand
 
 ## Key Abstractions
 
-**TrendEvent:**
-- Purpose: Unified trend representation across all agent sources
-- Examples: `src/pipeline/models_v2.py:TrendEvent`
-- Pattern: Dataclass with title, source (enum), score, velocity, category, sentiment, metadata
-- Replaces: Old TrendItem for new event-driven architecture
+**Repository Pattern:**
+- Purpose: Encapsulate all DB queries; enforce tenant isolation
+- Examples: `src/database/repositories/character_repo.py`, `user_repo.py`, `job_repo.py`
+- Pattern: Class receives `AsyncSession`; methods take optional `user` parameter; raises `PermissionError` on ownership violations
 
-**WorkOrder:**
-- Purpose: Specification for generation layer (what to make)
-- Examples: `src/pipeline/models_v2.py:WorkOrder`
-- Pattern: Dataclass linking TrendEvent to visual situacao_key, layout, carousel config
-- Flow: Curator emits → Generation consumes
+**FastAPI Depends:**
+- Purpose: Shared injection of DB session and current user
+- Examples: `src/api/deps.py` — `db_session()`, `get_current_user()`, `get_user_character()`
+- Pattern: All protected routes declare `current_user = Depends(get_current_user)`, `db: AsyncSession = Depends(db_session)`
 
-**ContentPackage:**
-- Purpose: Complete content item ready for publication
-- Examples: `src/pipeline/models_v2.py:ContentPackage`
-- Pattern: Dataclass with phrase, image_path, caption, hashtags, quality_score, background_source
-- Flow: Generation creates → PostProduction enriches → Publishing/Gallery displays
+**Step State Pattern (Reels + Ads):**
+- Purpose: Track per-step status of multi-step pipelines in a single JSON column
+- Examples: `ReelsJob.step_state`, `ProductAdJob.step_state` — both are `JSON` columns
+- Pattern: `{"step_name": {"status": "pending|generating|approved|error", ...artifacts...}}`. Routes read/write this column; frontend polls and renders per-step UI
 
-**Agent (AsyncSourceAgent/BaseSourceAgent):**
-- Purpose: Pluggable trend source implementation
-- Pattern: ABC with fetch() → List[TrendEvent/TrendItem]
-- Implementations: GoogleTrendsAgent, RedditMemesAgent, YouTubeRSSAgent, etc.
-- Adapter: SyncAgentAdapter wraps sync agents in async via asyncio.to_thread()
+**SWR Hooks:**
+- Purpose: Typed data fetching with auto-refresh for polling patterns
+- Examples: `hooks/use-ads.ts`, `hooks/use-reels.ts`, `hooks/use-pipeline.ts`
+- Pattern: One hook per entity/operation; `refreshInterval` set to 2000-5000ms for job polling; cache key is a deterministic string
 
-**Semaphore-Protected Resources:**
-- GPU (ComfyUI): asyncio.Semaphore(COMFYUI_MAX_CONCURRENT=1)
-- Gemini API: asyncio.Semaphore(GEMINI_MAX_CONCURRENT=5)
-- Location: `src/pipeline/workers/image_worker.py`, `src/pipeline/workers/phrase_worker.py`
+**Agent Base Pattern:**
+- Purpose: Uniform interface for trend-fetching data sources
+- Examples: `src/pipeline/agents/base.py`, extended by `google_trends.py`, `reddit_memes.py`, etc.
+- Pattern: `is_available()` guard + `fetch()` method returning `list[TrendItem]`
 
 ## Entry Points
 
-**REST API (Main):**
+**FastAPI Backend:**
 - Location: `src/api/app.py`
-- Triggers: `POST /pipeline/run` with optional character_slug, cost_mode, use_phrase_context
-- Responsibilities:
-  - Initialize FastAPI app with CORS middleware
-  - Register 9 route modules (generation, jobs, themes, pipeline, content, agents, drive, characters, publishing)
-  - Manage DB session lifecycle
-  - Start/stop scheduler for auto-publishing
+- Triggers: `python -m src.api --port 8000`
+- Responsibilities: Registers all routers, starts scheduler worker, starts stale job scanner, discovers Gemini image models on startup
 
-**API Gateway Routes:**
-- `src/api/routes/pipeline.py` — `/pipeline/run`, `/pipeline/status/{run_id}`, `/pipeline/list`
-- `src/api/routes/generation.py` — `/generate/compose`, `/generate/batch`, `/generate/refinement`
-- `src/api/routes/characters.py` — `/characters`, `/characters/{slug}`, `/characters/{slug}/refs`
-- `src/api/routes/agents.py` — `/agents`, `/agents/{name}/status`
-- `src/api/routes/publishing.py` — `/publishing/queue`, `/publishing/schedule`
+**Next.js Frontend:**
+- Location: `memelab/src/app/layout.tsx`, `memelab/next.config.ts`
+- Triggers: `cd memelab && npm run dev`
+- Responsibilities: Wraps all pages in `AuthProvider`, configures `/api/*` → `http://127.0.0.1:8000/*` rewrite
 
-**CLI Entry Points:**
-- `src/pipeline_cli.py` — `python -m src.pipeline_cli --mode {once|schedule|agents} --count 5`
-- `src/api/__main__.py` — `python -m src.api --port 8000 [--ngrok TOKEN]`
+**CLI Pipeline Runner:**
+- Location: `src/pipeline_cli.py`
+- Triggers: `python -m src.pipeline_cli --mode once`
+- Responsibilities: Runs the meme content pipeline directly without the API server
 
-**Orchestrator Entry:**
-- `src/pipeline/async_orchestrator.py:AsyncPipelineOrchestrator.run()` — Main pipeline execution
-- Instantiated by: API routes and CLI with config overrides
+**Background Services (started in FastAPI lifespan):**
+- Scheduler worker (`src/services/scheduler_worker.py`): processes scheduled posts every 60s
+- Stale job scanner (`src/video_gen/stale_job_scanner.py`): detects and marks stuck Kie.ai jobs
 
 ## Error Handling
 
-**Strategy:** Graceful degradation with layer isolation — failure in one agent/worker doesn't cascade
+**Strategy:** Errors surface at the API boundary; internal pipeline failures are caught, logged, and written back to the job's `step_state` or `status` field. Frontend reads the status and shows error state per step.
 
 **Patterns:**
-
-- **Agent timeout/failure:** MonitoringLayer._safe_fetch wraps each agent in try-except + asyncio.wait_for(timeout=30s)
-  - Failed agents logged, return empty list, pipeline continues
-  - Layer 1 success criteria: ≥1 agent succeeds
-  - All results: `_pipeline_layers[run_id]` tracks per-agent status
-
-- **Broker dedup failure:** Logged but non-fatal; proceeds with raw events
-
-- **Curator analysis failure:** Caught in async_orchestrator.run(), returns error in AgentPipelineResult.errors[]
-  - Layer 3 failure is fatal: returns immediately with error
-
-- **Generation layer failures:** Per-work-order try-except
-  - Phrase generation fail → return empty ContentPackage (skipped)
-  - Image generation fail → fallback chain (ComfyUI → Gemini → static)
-  - Compose fail → logged, skip image
-  - Layer 4 success criteria: ≥1 ContentPackage succeeds
-
-- **Post-production failures:** Per-package try-except
-  - Caption/hashtag/quality failures logged but don't block
-  - Return package with partial enrichment
-
-- **DB transaction failures:** Session rolled back, error propagated to caller
-
-**Error Collection:** AgentPipelineResult.errors[] aggregates all layer errors for caller
+- Route-level: FastAPI `HTTPException` for 4xx (validation, 401, 403, 404); unhandled exceptions return 500
+- Background tasks: `try/except Exception` wraps entire step; `step_state[step]["status"] = "error"` + `"error": str(e)` written back to DB
+- LLM/API retries: `gemini_client.py` implements retry with exponential backoff for 429 errors; `kie_client.py` implements transient retry for Kie.ai failures
+- Budget enforcement: `VIDEO_DAILY_BUDGET_USD` checked before task creation; returns `HTTP 402`
 
 ## Cross-Cutting Concerns
 
-**Logging:**
-- Framework: Python logging module
-- Level: DEBUG via --verbose flag, INFO for normal runs
-- Format: `%(asctime)s [%(name)s] %(levelname)s: %(message)s`
-- Key loggers:
-  - `clip-flow.api` — REST API events
-  - `clip-flow.async_orchestrator` — Layer summaries
-  - `clip-flow.monitoring` — Agent fetch status
-  - `clip-flow.broker` — Dedup statistics
-  - `clip-flow.curator` — Topic selection
-  - `clip-flow.generation` — Phrase/image progress
-  - `clip-flow.worker.*` — Per-worker details
-
-**Configuration:**
-- Central: `config.py` (BASE_DIR, IMAGE_*, PIPELINE_*, COMFYUI_*, GEMINI_*, etc.)
-- Environment: `.env` with DATABASE_URL, GOOGLE_API_KEY, API keys for stub agents
-- Cost modes: normal (full Gemini), eco (Flash Lite + no A/B), ultra-eco (no GeminiWebTrends)
-- Runtime overrides: API request can set cost_mode, character_slug, use_phrase_context
-
-**Validation:**
-- Pydantic models in `src/api/models.py` for request validation
-- Range checks on image dimensions, phrase counts, cost modes
-- Character config validation: refs_min/ideal, hashtag limits
-
-**Authentication:**
-- API: None (127.0.0.1 only; ngrok optional for Colab)
-- DB: MySQL user/pass via DATABASE_URL
-
-**Resource Management:**
-- Semaphores: GPU (1 ComfyUI job), Gemini API (5 concurrent)
-- Timeouts: Agent fetch (30s), ComfyUI generation (300s), Gemini API (60s)
-- Queue sizes: Broker queue (100 events max)
+**Logging:** `logging.getLogger("clip-flow.<module>")` pattern throughout; `log_sanitizer.py` strips API keys from log output
+**Validation:** Pydantic models on API boundary in `src/api/models.py`; path traversal guard in `deps.validate_filename()`
+**Authentication:** JWT Bearer tokens; `get_current_user` Depends used on all non-public routes; `/health` and `/auth/*` exempt
+**Multi-tenancy:** `user_id` on every major entity; repository `get_by_slug(slug, user=current_user)` raises 403 on ownership mismatch
 
 ---
 
-*Architecture analysis: 2026-03-23*
+*Architecture analysis: 2026-03-30*
