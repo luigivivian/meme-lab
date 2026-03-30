@@ -15,8 +15,9 @@ interface Props {
 
 export function StepAssembly({ stepState, onApprove, onRegenerate, jobId }: Props) {
   const [loading, setLoading] = useState(false);
-  const result = stepState.result as { video_path?: string } | undefined;
-  const videoUrl = result?.video_path ? adFileUrl(jobId, result.video_path) : "";
+  const result = stepState.result as { assembled_path?: string } | undefined;
+  const rawPath = result?.assembled_path;
+  const videoUrl = rawPath ? adFileUrl(jobId, rawPath.split("/").pop()!) : "";
 
   if (stepState.status === "generating") {
     return (
@@ -29,7 +30,7 @@ export function StepAssembly({ stepState, onApprove, onRegenerate, jobId }: Prop
     );
   }
 
-  if (stepState.status === "failed") {
+  if (stepState.status === "error") {
     return (
       <Card>
         <CardContent className="space-y-4 py-6">

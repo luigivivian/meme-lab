@@ -31,12 +31,18 @@ const STYLE_LABELS: Record<string, string> = {
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString("pt-BR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  // Use UTC methods to avoid server/client hydration mismatch from timezone differences
+  const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const day = d.getUTCDate();
+  const month = months[d.getUTCMonth()];
+  const hour = String(d.getUTCHours()).padStart(2, "0");
+  const min = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${day} de ${month}, ${hour}:${min}`;
 }
 
 function formatCost(brl: number | null): string {
   if (brl == null) return "-";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(brl);
+  return `R$ ${brl.toFixed(2).replace(".", ",")}`;
 }
 
 export default function AdsPage() {
@@ -70,7 +76,17 @@ export default function AdsPage() {
           {isLoading && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 rounded-lg bg-secondary animate-pulse" />
+                <div key={i} className="rounded-lg border bg-card p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="h-4 w-32 rounded bg-secondary animate-pulse" />
+                    <div className="h-5 w-16 rounded-full bg-secondary animate-pulse" />
+                  </div>
+                  <div className="h-5 w-20 rounded-full bg-secondary/50 animate-pulse" />
+                  <div className="flex justify-between">
+                    <div className="h-3 w-24 rounded bg-secondary/50 animate-pulse" />
+                    <div className="h-3 w-16 rounded bg-secondary/50 animate-pulse" />
+                  </div>
+                </div>
               ))}
             </div>
           )}

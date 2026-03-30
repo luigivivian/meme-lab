@@ -28,7 +28,7 @@ export function StepAudio({ stepState, onApprove, onRegenerate, jobId }: Props) 
     );
   }
 
-  if (stepState.status === "failed") {
+  if (stepState.status === "error") {
     return (
       <Card>
         <CardContent className="space-y-4 py-6">
@@ -94,19 +94,19 @@ function AudioPlayers({ result, jobId }: { result?: { music_path?: string; tts_p
       {result.music_path && (
         <div className="rounded-lg bg-secondary/50 p-3">
           <p className="text-xs text-muted-foreground mb-2">Musica</p>
-          <audio src={adFileUrl(jobId, result.music_path)} controls className="w-full" />
+          <audio src={adFileUrl(jobId, result.music_path.split("/").pop()!)} controls className="w-full" />
         </div>
       )}
       {result.tts_path && (
         <div className="rounded-lg bg-secondary/50 p-3">
           <p className="text-xs text-muted-foreground mb-2">Narracao</p>
-          <audio src={adFileUrl(jobId, result.tts_path)} controls className="w-full" />
+          <audio src={adFileUrl(jobId, result.tts_path.split("/").pop()!)} controls className="w-full" />
         </div>
       )}
       {result.mixed_path && (
         <div className="rounded-lg bg-secondary/50 p-3">
           <p className="text-xs text-muted-foreground mb-2">Mix Final</p>
-          <audio src={adFileUrl(jobId, result.mixed_path)} controls className="w-full" />
+          <audio src={adFileUrl(jobId, result.mixed_path.split("/").pop()!)} controls className="w-full" />
         </div>
       )}
     </div>

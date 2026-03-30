@@ -47,7 +47,7 @@ def _parse_theme_from_filename(stem: str) -> str:
 
 
 def _list_drive_images(theme_filter: str | None = None, category: str | None = None) -> list[dict]:
-    from config import OUTPUT_DIR, GENERATED_MEMES_DIR
+    from config import OUTPUT_DIR, GENERATED_MEMES_DIR, BACKGROUNDS_DIR
     bg_dir = output_dir()  # backgrounds_generated/
 
     # Classify files in backgrounds_generated/ by filename pattern.
@@ -59,6 +59,15 @@ def _list_drive_images(theme_filter: str | None = None, category: str | None = N
             bg_files[f] = "background"
         else:
             bg_files[f] = "meme"
+
+    # Scan assets/backgrounds/{character}/ directories for pre-existing images
+    if BACKGROUNDS_DIR.exists():
+        for char_dir in BACKGROUNDS_DIR.iterdir():
+            if not char_dir.is_dir():
+                continue
+            for f in char_dir.glob("*.png"):
+                if f not in bg_files and _is_background_filename(f.name):
+                    bg_files[f] = "background"
 
     # Memes (compostos com frase) — from dedicated memes/ directory
     meme_files = {}
@@ -115,7 +124,8 @@ def images_by_theme(theme_key: str, current_user=Depends(get_current_user)):
 @router.get("/drive/images/{filename}", summary="Serve imagem PNG")
 def get_image(filename: str):
     validate_filename(filename)
-    from config import OUTPUT_DIR, GENERATED_MEMES_DIR
+    from config import OUTPUT_DIR, GENERATED_MEMES_DIR, BACKGROUNDS_DIR
+    # Check output dirs first, then scan assets/backgrounds/{character}/
     for directory in [output_dir(), OUTPUT_DIR, GENERATED_MEMES_DIR]:
         path = directory / filename
         if path.exists():
@@ -123,6 +133,17 @@ def get_image(filename: str):
                 str(path), media_type="image/png", filename=filename,
                 headers={"Cache-Control": "no-cache, must-revalidate"},
             )
+    # Fallback: search in character background directories
+    if BACKGROUNDS_DIR.exists():
+        for char_dir in BACKGROUNDS_DIR.iterdir():
+            if not char_dir.is_dir():
+                continue
+            path = char_dir / filename
+            if path.exists():
+                return FileResponse(
+                    str(path), media_type="image/png", filename=filename,
+                    headers={"Cache-Control": "no-cache, must-revalidate"},
+                )
     raise HTTPException(status_code=404, detail=f"Imagem '{filename}' nao encontrada")
 
 
@@ -130,11 +151,16 @@ def get_image(filename: str):
 def download_image(filename: str, current_user=Depends(get_current_user)):
     """Serve imagem com watermark aplicada dinamicamente para download."""
     validate_filename(filename)
-    from config import OUTPUT_DIR, GENERATED_MEMES_DIR
+    from config import OUTPUT_DIR, GENERATED_MEMES_DIR, BACKGROUNDS_DIR
     from src.image_maker import stamp_watermark
     from fastapi.responses import Response
 
-    for directory in [output_dir(), OUTPUT_DIR, GENERATED_MEMES_DIR]:
+    search_dirs = [output_dir(), OUTPUT_DIR, GENERATED_MEMES_DIR]
+    # Also search character background directories
+    if BACKGROUNDS_DIR.exists():
+        search_dirs.extend(d for d in BACKGROUNDS_DIR.iterdir() if d.is_dir())
+
+    for directory in search_dirs:
         path = directory / filename
         if path.exists():
             img_bytes = stamp_watermark(str(path))

@@ -1,7 +1,8 @@
-"""LLM cinematic video prompt generation per style.
+"""Video prompt generation for product ads.
 
-Per D-10: LLM generates cinematic prompt automatically including shot type,
-camera movement, lighting, aesthetic, and negative prompt.
+Generates prompts that describe:
+1. What the product looks like (so the video model understands the image)
+2. What motion/camera action to apply
 """
 
 import asyncio
@@ -12,35 +13,6 @@ from src.product_studio.config import NEGATIVE_PROMPTS
 
 logger = logging.getLogger("clip-flow.ads.prompt_builder")
 
-_STYLE_INSTRUCTIONS = {
-    "cinematic": (
-        "Style: CINEMATIC. Use orbital or dolly camera movement. "
-        "Dramatic rim lighting with shallow depth of field. "
-        "Single product hero shot, slow motion feel. "
-        "Anamorphic lens flare, moody color grading."
-    ),
-    "narrated": (
-        "Style: NARRATED. Quick cuts between close-ups and wide shots. "
-        "Dynamic camera movement with rack focus transitions. "
-        "Bright, editorial lighting. Multiple angles showing product details "
-        "and usage context. Energetic pacing."
-    ),
-    "lifestyle": (
-        "Style: LIFESTYLE. Tracking or POV camera following product in use. "
-        "Natural, soft lighting with warm tones. "
-        "Contextual environment showing real-world usage. "
-        "Smooth steadicam feel, authentic and aspirational."
-    ),
-}
-
-_SYSTEM_PROMPT = (
-    "You are a professional video director specializing in product ad cinematography. "
-    "Generate a single motion prompt for an AI video generation model. "
-    "The prompt must describe: camera movement, lighting, subject action, "
-    "aesthetic mood, and composition. "
-    "Output ONLY the prompt text, no explanations or formatting."
-)
-
 
 async def build_video_prompt(
     product_description: str,
@@ -49,40 +21,60 @@ async def build_video_prompt(
     video_model: str,
     tone: str,
 ) -> str:
-    """Generate a cinematic video prompt via Gemini for the given style.
+    """Generate a video motion prompt via Gemini.
 
-    Returns the prompt string ready for Kie.ai video generation,
-    with negative prompt appended.
+    Returns a clean prompt (2-4 sentences) describing product + motion.
     """
-    style_instruction = _STYLE_INSTRUCTIONS.get(style, _STYLE_INSTRUCTIONS["cinematic"])
-
-    user_message = (
-        f"Product: {product_description}\n"
-        f"Scene: {scene_description}\n"
-        f"Video model: {video_model}\n"
-        f"Tone: {tone}\n\n"
-        f"{style_instruction}\n\n"
-        "Generate the motion prompt for this product video ad. "
-        "Include specific camera movement, lighting setup, and product interaction."
-    )
-
     client = _get_client()
     from google.genai import types
 
     response = await asyncio.to_thread(
         client.models.generate_content,
         model="gemini-2.5-flash",
-        contents=user_message,
+        contents=(
+            f"Product: {product_description}\n"
+            f"Background: {scene_description}\n"
+            f"Style: {style}, Tone: {tone}\n\n"
+            "Write a VIDEO MOTION prompt in 2-3 sentences.\n"
+            "Sentence 1: Describe the product appearance in detail (colors, shape, material, texture).\n"
+            "Sentence 2: Describe camera movement (orbital, dolly, tracking, etc).\n"
+            "Sentence 3 (optional): Describe lighting and atmosphere.\n"
+            "NO humans, hands, or body parts. Product is the only subject."
+        ),
         config=types.GenerateContentConfig(
-            system_instruction=_SYSTEM_PROMPT,
-            max_output_tokens=300,
-            temperature=0.8,
+            system_instruction=(
+                "You write video motion prompts for AI image-to-video models. "
+                "Be specific about the product appearance so the model understands what's in the image. "
+                "Output ONLY the prompt text. No quotes, no labels, no formatting."
+            ),
+            max_output_tokens=1500,
+            temperature=0.5,
         ),
     )
 
     prompt = _extract_text(response).strip()
-    negative = NEGATIVE_PROMPTS.get(style, NEGATIVE_PROMPTS["cinematic"])
-    full_prompt = f"{prompt}\n\nNegative: {negative}"
+    # Clean up formatting
+    prompt = prompt.replace("\n\n", " ").replace("\n", " ").strip()
+    if prompt.startswith('"') and prompt.endswith('"'):
+        prompt = prompt[1:-1]
 
-    logger.info("Video prompt built for style=%s, model=%s (%d chars)", style, video_model, len(full_prompt))
-    return full_prompt
+    # Ensure ends with period
+    if not prompt.endswith("."):
+        last_period = prompt.rfind(".")
+        if last_period > 50:
+            prompt = prompt[:last_period + 1]
+        else:
+            prompt += "."
+
+    # Safety cap at 2200 chars (below Kling 3.0's 2500 limit, the strictest model)
+    if len(prompt) > 2200:
+        cut = prompt[:2200].rfind(".")
+        prompt = prompt[:cut + 1] if cut > 200 else prompt[:2200]
+
+    logger.info("Video prompt (%d chars): %s", len(prompt), prompt[:150])
+    return prompt
+
+
+def get_negative_prompt(style: str) -> str:
+    """Get the negative prompt for a given style."""
+    return NEGATIVE_PROMPTS.get(style, NEGATIVE_PROMPTS["cinematic"])

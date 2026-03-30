@@ -28,6 +28,7 @@ from config import (
 from src.api.deps import get_current_user, db_session
 from src.api.models import (
     VideoGenerateRequest,
+    VideoFromImageRequest,
     VideoBatchRequest,
     VideoStatusResponse,
     VideoBudgetResponse,
@@ -36,7 +37,7 @@ from src.api.models import (
     LegendRequest,
     LegendBatchRequest,
 )
-from src.database.models import ContentPackage, Theme
+from src.database.models import ContentPackage, PipelineRun, Theme
 
 logger = logging.getLogger("clip-flow.api.video")
 
@@ -522,6 +523,121 @@ async def generate_video(
         video_path=pkg.video_path,
         video_source=pkg.video_source,
         video_metadata=pkg.video_metadata,
+    )
+
+
+@router.post("/from-image", summary="Generate video directly from a drive image")
+async def generate_video_from_image(
+    req: VideoFromImageRequest,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(db_session),
+):
+    """Generate video from a background image without composing a meme first.
+
+    Auto-creates a pipeline_run + content_package marked as approved,
+    then triggers video generation in background.
+    """
+    _check_video_enabled()
+
+    if req.duration < 1 or req.duration > 15:
+        raise HTTPException(status_code=400, detail="Duration must be between 1 and 15 seconds")
+
+    # Resolve the image file on disk
+    from config import GENERATED_BACKGROUNDS_DIR, OUTPUT_DIR, GENERATED_MEMES_DIR, BACKGROUNDS_DIR
+    from src.api.deps import validate_filename
+
+    validate_filename(req.filename)
+
+    image_path = None
+    found_char_slug = None
+    for directory in [GENERATED_BACKGROUNDS_DIR, OUTPUT_DIR, GENERATED_MEMES_DIR]:
+        candidate = directory / req.filename
+        if candidate.exists():
+            image_path = str(candidate)
+            break
+    if not image_path and BACKGROUNDS_DIR.exists():
+        for char_dir in BACKGROUNDS_DIR.iterdir():
+            if not char_dir.is_dir():
+                continue
+            candidate = char_dir / req.filename
+            if candidate.exists():
+                image_path = str(candidate)
+                found_char_slug = char_dir.name
+                break
+    if not image_path:
+        raise HTTPException(status_code=404, detail=f"Image '{req.filename}' not found on disk")
+
+    # Resolve character_id from slug or default to user's first character
+    from src.database.models import Character
+    character_id = None
+    if found_char_slug:
+        char_result = await session.execute(
+            select(Character).where(Character.slug == found_char_slug, Character.user_id == current_user.id)
+        )
+        char = char_result.scalar_one_or_none()
+        if char:
+            character_id = char.id
+    if not character_id:
+        char_result = await session.execute(
+            select(Character).where(Character.user_id == current_user.id).limit(1)
+        )
+        char = char_result.scalar_one_or_none()
+        if char:
+            character_id = char.id
+    if not character_id:
+        raise HTTPException(status_code=400, detail="No character found for this user")
+
+    # Check budget
+    await _check_budget(session, current_user.id, req.duration)
+
+    # Create a minimal pipeline_run for the content package FK
+    import uuid
+    run = PipelineRun(
+        run_id=uuid.uuid4().hex[:16],
+        character_id=character_id,
+        status="done",
+        mode="video_direct",
+        requested_count=1,
+    )
+    session.add(run)
+    await session.flush()
+
+    # Create content package pointing to the image
+    pkg = ContentPackage(
+        pipeline_run_id=run.id,
+        character_id=character_id,
+        phrase="",
+        topic="video_direct",
+        source="drive",
+        image_path=image_path,
+        background_path=image_path,
+        background_source="drive",
+        approval_status="approved",
+        video_status="generating",
+    )
+    session.add(pkg)
+    await session.flush()
+    await session.commit()
+
+    # Trigger video generation in background
+    background_tasks.add_task(
+        _generate_video_task,
+        content_package_id=pkg.id,
+        duration=req.duration,
+        character_ids=req.character_ids,
+        user_id=current_user.id,
+        custom_prompt=req.custom_prompt,
+        model=req.model,
+    )
+
+    return VideoStatusResponse(
+        content_package_id=pkg.id,
+        video_status="generating",
+        video_task_id=None,
+        video_path=None,
+        video_source=None,
+        video_metadata=None,
     )
 
 

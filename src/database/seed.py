@@ -15,7 +15,7 @@ import yaml
 
 from config import BASE_DIR
 from src.database.session import get_session_factory, init_db
-from src.database.models import Character, CharacterRef, Theme, User
+from src.database.models import Character, CharacterRef, GeneratedImage, Theme, User
 
 
 CHARACTERS_DIR = BASE_DIR / "characters"
@@ -95,7 +95,7 @@ def _parse_character_yaml(data: dict) -> dict:
     }
 
 
-async def seed_characters(session):
+async def seed_characters(session, admin_user_id: int):
     """Migra characters YAML para o banco."""
     from sqlalchemy import select
 
@@ -123,6 +123,7 @@ async def seed_characters(session):
             continue
 
         char_data = _parse_character_yaml(data)
+        char_data["user_id"] = admin_user_id
         character = Character(**char_data)
         session.add(character)
         await session.flush()
@@ -259,8 +260,8 @@ async def seed_themes(session):
             print(f"  [OK] {count} temas migrados para '{slug}'.")
 
 
-async def seed_admin_user(session):
-    """Cria admin user se ADMIN_EMAIL e ADMIN_PASSWORD estiverem no env."""
+async def seed_admin_user(session) -> int | None:
+    """Cria admin user se ADMIN_EMAIL e ADMIN_PASSWORD estiverem no env. Retorna user.id."""
     from sqlalchemy import select
 
     admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
@@ -268,14 +269,15 @@ async def seed_admin_user(session):
 
     if not admin_email or not admin_password:
         print("  [SKIP] ADMIN_EMAIL ou ADMIN_PASSWORD nao definidos no env.")
-        return
+        return None
 
     existing = await session.execute(
         select(User).where(User.email == admin_email)
     )
-    if existing.scalar_one_or_none():
-        print(f"  [SKIP] Admin '{admin_email}' ja existe no banco.")
-        return
+    user = existing.scalar_one_or_none()
+    if user:
+        print(f"  [SKIP] Admin '{admin_email}' ja existe no banco (id={user.id}).")
+        return user.id
 
     hashed = bcrypt.hashpw(admin_password.encode("utf-8"), bcrypt.gensalt())
     user = User(
@@ -287,6 +289,72 @@ async def seed_admin_user(session):
     session.add(user)
     await session.flush()
     print(f"  [OK] Admin '{admin_email}' criado (id={user.id}).")
+    return user.id
+
+
+async def seed_generated_images(session, character_map: dict[str, int]):
+    """Registra imagens existentes em assets/backgrounds/ na tabela generated_images."""
+    import re
+    from sqlalchemy import select
+
+    bg_re = re.compile(r"^(api|bg|mago|single|gemini|lote)_.+\d{8,}.*\.png$")
+    backgrounds_dir = BASE_DIR / "assets" / "backgrounds"
+    if not backgrounds_dir.exists():
+        print("  Nenhum diretorio assets/backgrounds/ encontrado.")
+        return
+
+    total = 0
+    for char_dir in sorted(backgrounds_dir.iterdir()):
+        if not char_dir.is_dir():
+            continue
+
+        slug = char_dir.name
+        character_id = character_map.get(slug)
+
+        count = 0
+        for img_file in sorted(char_dir.glob("*.png")):
+            if not bg_re.match(img_file.name):
+                continue
+
+            # Skip if already seeded
+            existing = await session.execute(
+                select(GeneratedImage).where(GeneratedImage.filename == img_file.name)
+            )
+            if existing.scalar_one_or_none():
+                continue
+
+            # Parse theme from filename
+            parts = img_file.stem.split("_")
+            theme = parts[1] if len(parts) >= 3 and parts[0] in ("api", "mago", "single", "gemini") else "unknown"
+            if parts[0] == "lote" and len(parts) >= 4:
+                theme = parts[2]
+
+            # Detect source from prefix
+            source = "gemini" if parts[0] in ("gemini", "api", "bg", "lote", "single") else "comfyui"
+
+            stat = img_file.stat()
+            gi = GeneratedImage(
+                character_id=character_id,
+                filename=img_file.name,
+                file_path=str(img_file.relative_to(BASE_DIR)),
+                image_type="background",
+                source=source,
+                file_size_bytes=stat.st_size,
+                theme_key=theme,
+                image_metadata={},
+            )
+            session.add(gi)
+            count += 1
+
+        if count > 0:
+            await session.flush()
+            total += count
+            print(f"  [OK] {count} imagens registradas para '{slug}'.")
+
+    if total == 0:
+        print("  [SKIP] Nenhuma imagem nova para registrar.")
+    else:
+        print(f"  [OK] Total: {total} imagens registradas no banco.")
 
 
 async def run_seed():
@@ -298,25 +366,37 @@ async def run_seed():
     db_dir.mkdir(exist_ok=True)
 
     # Cria tabelas
-    print("[1/4] Criando tabelas...")
+    print("[1/5] Criando tabelas...")
     await init_db()
     print("  [OK] Tabelas criadas.\n")
 
     factory = get_session_factory()
     async with factory() as session:
+        # Seed admin user PRIMEIRO (characters precisam de user_id)
+        print("[2/5] Verificando admin user...")
+        admin_id = await seed_admin_user(session)
+        print()
+
+        if not admin_id:
+            print("  ERRO: Sem admin user — defina ADMIN_EMAIL e ADMIN_PASSWORD no .env")
+            return
+
         # Migra characters + refs
-        print("[2/4] Migrando characters e refs...")
-        await seed_characters(session)
+        print("[3/5] Migrando characters e refs...")
+        await seed_characters(session, admin_id)
         print()
 
         # Migra themes
-        print("[3/4] Migrando themes...")
+        print("[4/5] Migrando themes...")
         await seed_themes(session)
         print()
 
-        # Seed admin user
-        print("[4/4] Verificando admin user...")
-        await seed_admin_user(session)
+        # Registra imagens existentes no disco na tabela generated_images
+        print("[5/5] Registrando imagens existentes...")
+        from sqlalchemy import select
+        chars = await session.execute(select(Character))
+        character_map = {c.slug: c.id for c in chars.scalars().all()}
+        await seed_generated_images(session, character_map)
         print()
 
         await session.commit()

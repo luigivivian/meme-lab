@@ -83,29 +83,55 @@ class ProductAdPipeline:
     # ------------------------------------------------------------------
 
     async def run_step_scene(
-        self, product_image_path: str, scene_prompt: str, job_dir: str
+        self, product_image_path: str, scene_prompt: str, job_dir: str,
+        scene_mode: str = "compose",
     ) -> str:
-        """Step 2: rembg bg removal + Gemini scene composition.
+        """Step 2: Scene preparation.
 
-        Args:
-            product_image_path: Path to original product photo.
-            scene_prompt: Scene description for composition.
-            job_dir: Job working directory.
+        Modes:
+            "raw"     — Use original image as-is (no processing)
+            "cutout"  — Remove background only (transparent PNG saved as JPG on white)
+            "compose" — Remove bg + Gemini scene composition (default)
 
         Returns:
-            Path to composed scene image.
+            Path to scene image.
         """
         from src.product_studio.bg_remover import remove_background
-        from src.product_studio.scene_composer import compose_scene
 
         cutout_path = os.path.join(job_dir, "cutout.png")
         scene_path = os.path.join(job_dir, "scene.jpg")
 
-        # rembg is CPU-bound, run in thread
-        await asyncio.to_thread(remove_background, product_image_path, cutout_path)
-        await compose_scene(cutout_path, scene_prompt, scene_path)
+        if scene_mode == "raw":
+            # Just copy original image
+            import shutil
+            shutil.copy2(product_image_path, scene_path)
+            logger.info("Step scene complete (raw): %s", scene_path)
+            return scene_path
 
-        logger.info("Step scene complete: %s", scene_path)
+        # Remove background
+        await asyncio.to_thread(remove_background, product_image_path, cutout_path)
+
+        if scene_mode == "cutout":
+            # Place cutout on white background
+            from PIL import Image as PILImage
+            cutout = PILImage.open(cutout_path)
+            bg = PILImage.new("RGB", (1080, 1920), (255, 255, 255))
+            # Center product in lower 2/3
+            cw, ch = cutout.size
+            scale = min(900 / cw, 1200 / ch)
+            new_size = (int(cw * scale), int(ch * scale))
+            cutout_resized = cutout.resize(new_size, PILImage.LANCZOS)
+            x = (1080 - new_size[0]) // 2
+            y = 500 + (1200 - new_size[1]) // 2
+            bg.paste(cutout_resized, (x, y), cutout_resized if cutout_resized.mode == "RGBA" else None)
+            bg.save(scene_path, "JPEG", quality=95)
+            logger.info("Step scene complete (cutout on white): %s", scene_path)
+            return scene_path
+
+        # Compose mode — Gemini scene generation
+        from src.product_studio.scene_composer import compose_scene
+        await compose_scene(cutout_path, scene_prompt, scene_path)
+        logger.info("Step scene complete (composed): %s", scene_path)
         return scene_path
 
     # ------------------------------------------------------------------
@@ -173,30 +199,38 @@ class ProductAdPipeline:
         """
         from src.video_gen.gcs_uploader import GCSUploader
         from src.video_gen.kie_client import KieSora2Client
+        from src.product_studio.prompt_builder import get_negative_prompt
 
         uploader = GCSUploader()
         client = KieSora2Client()
         scene_count = STYLE_SCENE_COUNT.get(style, 1)
         duration_range = STYLE_DURATION.get(style, (10, 15))
         duration = duration_range[0]
+        neg_prompt = get_negative_prompt(style)
 
         if scene_count <= 1:
-            # Single-shot: one clip
-            public_url = uploader.upload_image(scene_image_path)
+            # Single-shot: one clip with fallback models
+            import uuid as _uuid
+            gcs_name = f"video-inputs/{_uuid.uuid4().hex[:12]}_{Path(scene_image_path).name}"
+            public_url = uploader.upload_image(scene_image_path, remote_name=gcs_name)
+
+            # Single attempt — no automatic fallback (each attempt costs credits)
             result = await client.generate_video(
                 image_url=public_url,
                 prompt=prompt,
                 duration=duration,
                 output_dir=job_dir,
                 model=video_model,
+                negative_prompt=neg_prompt,
             )
             if not result or not result.local_path:
-                raise RuntimeError("Video generation failed (no result)")
-            logger.info("Step video complete (single-shot): %s", result.local_path)
+                raise RuntimeError(f"Video generation failed with model {video_model} — no result returned")
+            logger.info("Step video complete (model=%s): %s", video_model, result.local_path)
             return result.local_path
 
         # Multi-scene: generate N clips with varying prompts
-        public_url = uploader.upload_image(scene_image_path)
+        gcs_name_multi = f"video-inputs/{_uuid.uuid4().hex[:12]}_{Path(scene_image_path).name}"
+        public_url = uploader.upload_image(scene_image_path, remote_name=gcs_name_multi)
         video_paths = []
         for i in range(scene_count):
             scene_prompt = f"Scene {i + 1}/{scene_count}: {prompt}"
@@ -206,6 +240,7 @@ class ProductAdPipeline:
                 duration=duration,
                 output_dir=job_dir,
                 model=video_model,
+                negative_prompt=neg_prompt,
             )
             if result and result.local_path:
                 video_paths.append(result.local_path)

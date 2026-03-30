@@ -40,7 +40,7 @@ export function StepAnalysis({ stepState, onApprove, onRegenerate, onUpdate }: P
     );
   }
 
-  if (stepState.status === "failed") {
+  if (stepState.status === "error") {
     return (
       <Card>
         <CardContent className="space-y-4 py-6">

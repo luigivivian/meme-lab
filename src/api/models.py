@@ -250,6 +250,15 @@ class VideoGenerateRequest(BaseModel):
     model: str = ""  # Kie.ai model ID (empty = use VIDEO_MODEL default from config)
 
 
+class VideoFromImageRequest(BaseModel):
+    """Request to generate video directly from a drive image (no compose needed)."""
+    filename: str  # Image filename from drive
+    duration: int = 10
+    character_ids: list[str] = []
+    custom_prompt: str = ""
+    model: str = ""
+
+
 class VideoBatchRequest(BaseModel):
     """Request to generate videos for multiple content packages."""
     content_package_ids: list[int]

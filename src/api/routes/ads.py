@@ -6,13 +6,14 @@ Per D-22: Export is auto-complete (no approval needed).
 Per D-23: Separate /ads section.
 """
 
+import asyncio
 import logging
 import os
 import shutil
 import traceback
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -135,31 +136,75 @@ async def _execute_ad_step_task(
 
             if step_name == "analysis":
                 product_image = (job.product_images or [None])[0]
-                result_data = await pipeline.run_step_analysis(
-                    product_image_path=product_image or "",
-                )
+                if product_image:
+                    result_data = await pipeline.run_step_analysis(
+                        product_image_path=product_image,
+                    )
+                else:
+                    # Text-only analysis when no product image uploaded
+                    from src.llm_client import _get_client, _extract_text
+                    import json as _json
+                    client = _get_client()
+                    prompt = (
+                        f"Analyze the product '{job.product_name}' for a video ad. "
+                        "Return ONLY valid JSON with: niche, tone, audience, "
+                        "scene_suggestions (array of 3 BACKGROUND-ONLY descriptions in English — "
+                        "describe ONLY the surface/backdrop/lighting, NOT people, NOT hands, NOT humans. "
+                        "Examples: 'dark gradient with soft rim lighting', 'white marble with natural sunlight'), "
+                        "product_description (Portuguese). No markdown."
+                    )
+                    resp = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model="gemini-2.5-flash",
+                        contents=prompt,
+                    )
+                    text = _extract_text(resp)
+                    clean = text.strip().removeprefix("```json").removesuffix("```").strip()
+                    result_data = _json.loads(clean)
                 step_data["result"] = result_data
                 step_data["status"] = "complete"
 
             elif step_name == "scene":
                 analysis = step_state.get("analysis", {}).get("result", {})
-                scene_desc = job.scene_description or analysis.get("scene_suggestions", [""])[0]
+                raw_scene = job.scene_description or analysis.get("scene_suggestions", [""])[0]
+                # Sanitize: strip any human/hand references from scene prompt
+                _BANNED = ["hand", "hands", "finger", "person", "people", "human",
+                           "family", "child", "couple", "adult", "woman", "man"]
+                scene_desc = raw_scene
+                for word in _BANNED:
+                    if word.lower() in scene_desc.lower():
+                        scene_desc = "Clean product photography on elegant surface with soft studio lighting"
+                        break
                 product_image = (job.product_images or [None])[0]
+                scene_params = config.get("step_params_scene", {})
+                scene_mode = scene_params.get("scene_mode", "cutout")
                 scene_path = await pipeline.run_step_scene(
                     product_image_path=product_image or "",
                     scene_prompt=scene_desc,
                     job_dir=job_dir,
+                    scene_mode=scene_mode,
                 )
                 step_data["result"] = {"scene_image_path": scene_path}
                 step_data["status"] = "complete"
 
             elif step_name == "prompt":
                 analysis = step_state.get("analysis", {}).get("result", {})
-                scene_data = step_state.get("scene", {}).get("result", {})
+                # Use the scene description text (from wizard or analysis), not the file path
+                scene_desc_for_prompt = (
+                    job.scene_description
+                    or analysis.get("scene_suggestions", ["product on clean background"])[0]
+                )
+                # Build rich product description — name + analysis description
+                prod_desc = analysis.get("product_description", "")
+                if prod_desc:
+                    prod_desc = f"{job.product_name}: {prod_desc}"
+                else:
+                    prod_desc = job.product_name
                 prompt_text = await pipeline.run_step_prompt(
-                    product_description=analysis.get("product_description", job.product_name),
-                    scene_description=scene_data.get("scene_image_path", ""),
+                    product_description=prod_desc,
+                    scene_description=scene_desc_for_prompt,
                     style=job.style,
+                    video_model=job.video_model or "wan/2-6-flash-image-to-video",
                     tone=job.tone or "premium",
                 )
                 step_data["result"] = {"prompt": prompt_text}
@@ -172,7 +217,7 @@ async def _execute_ad_step_task(
                     scene_image_path=scene_data.get("scene_image_path", ""),
                     prompt=prompt_data.get("prompt", ""),
                     style=job.style,
-                    video_model=job.video_model or "wan2.1-i2v",
+                    video_model=job.video_model or "wan/2-6-flash-image-to-video",
                     job_dir=job_dir,
                 )
                 step_data["result"] = {"video_path": video_path}
@@ -183,9 +228,10 @@ async def _execute_ad_step_task(
                 copy_result = await pipeline.run_step_copy(
                     product_name=job.product_name,
                     product_description=analysis.get("product_description", ""),
-                    tone=job.tone or "premium",
                     niche=job.niche or "",
+                    tone=job.tone or "premium",
                     audience=job.audience or "",
+                    style=job.style,
                 )
                 step_data["result"] = copy_result
                 step_data["status"] = "complete"
@@ -194,8 +240,8 @@ async def _execute_ad_step_task(
                 audio_result = await pipeline.run_step_audio(
                     tone=job.tone or "premium",
                     audio_mode=job.audio_mode or "music",
-                    target_duration=job.target_duration,
                     job_dir=job_dir,
+                    video_duration=job.target_duration or 15.0,
                 )
                 step_data["result"] = audio_result
                 step_data["status"] = "complete"
@@ -208,8 +254,7 @@ async def _execute_ad_step_task(
                     video_path=video_data.get("video_path", ""),
                     headline=copy_data.get("headline"),
                     cta=copy_data.get("cta"),
-                    audio_path=audio_data.get("audio_path"),
-                    audio_mode=job.audio_mode or "music",
+                    audio_path=audio_data.get("mixed_path"),
                     style=job.style,
                     job_dir=job_dir,
                 )
@@ -257,6 +302,66 @@ async def _execute_ad_step_task(
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
+
+@router.post("/upload-image")
+async def upload_product_image(
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+):
+    """Upload a product reference image. Returns the saved file path."""
+    upload_dir = os.path.join(ADS_OUTPUT_DIR, "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    ext = os.path.splitext(file.filename or "img.jpg")[1] or ".jpg"
+    filename = f"{uuid.uuid4().hex[:12]}{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    content = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    return {"filename": filename, "path": filepath, "size_bytes": len(content)}
+
+
+@router.post("/analyze")
+async def analyze_product(
+    req: dict,
+    current_user=Depends(get_current_user),
+):
+    """Quick AI analysis of product name — returns niche, tone, audience, scene suggestions."""
+    from src.llm_client import _get_client, _extract_text
+
+    product_name = req.get("product_name", "")
+    if not product_name:
+        raise HTTPException(status_code=400, detail="product_name required")
+
+    prompt = (
+        f"Analyze the product '{product_name}' for a video ad. "
+        "Return ONLY valid JSON with keys: niche (string), tone (string), "
+        "audience (string), scene_suggestions (array of 3 short scene descriptions in English). "
+        "No text outside the JSON."
+    )
+    try:
+        client = _get_client()
+        resp = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+        text = _extract_text(resp)
+        import json as _json
+        clean = text.strip().removeprefix("```json").removesuffix("```").strip()
+        result = _json.loads(clean)
+        return result
+    except Exception as e:
+        logger.warning("analyze_product failed: %s", e)
+        return {
+            "niche": "",
+            "tone": "professional",
+            "audience": "general",
+            "scene_suggestions": [],
+        }
 
 
 @router.post("/create", response_model=AdJobResponse)
@@ -336,21 +441,31 @@ async def get_ad_job(
     return _job_to_response(job)
 
 
-@router.get("/{job_id}/steps", response_model=AdStepStateResponse)
+@router.get("/{job_id}/steps")
 async def get_ad_steps(
     job_id: str,
     db: AsyncSession = Depends(db_session),
     current_user=Depends(get_current_user),
 ):
-    """Get step state with current_step and progress_pct."""
+    """Get step state as array with current_step and progress_pct."""
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = job.step_state or {}
     current_step, progress_pct = _calc_progress(step_state)
-    return AdStepStateResponse(
-        step_state=step_state,
-        current_step=current_step,
-        progress_pct=progress_pct,
-    )
+    # Build steps array for frontend consumption
+    steps = []
+    for step_name in ADS_STEP_ORDER:
+        data = step_state.get(step_name, {})
+        steps.append({
+            "step_name": step_name,
+            "status": data.get("status", "pending"),
+            "result": data.get("result"),
+            "error": data.get("error"),
+        })
+    return {
+        "steps": steps,
+        "current_step": current_step,
+        "progress_pct": progress_pct,
+    }
 
 
 @router.post("/{job_id}/step/{step_name}/execute")
@@ -360,13 +475,23 @@ async def execute_ad_step(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(db_session),
     current_user=Depends(get_current_user),
+    body: dict | None = None,
 ):
-    """Execute a pipeline step in background."""
+    """Execute a pipeline step in background.
+
+    Optional body params per step:
+    - scene: scene_mode ("raw" | "cutout" | "compose")
+    """
     if step_name not in ADS_STEP_ORDER:
         raise HTTPException(status_code=400, detail=f"Invalid step: {step_name}")
 
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = job.step_state or {}
+
+    # Guard: prevent duplicate execution if step is already running
+    current_status = step_state.get(step_name, {}).get("status")
+    if current_status == "generating":
+        return {"message": f"Step '{step_name}' is already running", "job_id": job_id}
 
     # Validate previous step is approved (or this is the first step)
     step_idx = ADS_STEP_ORDER.index(step_name)
@@ -374,12 +499,19 @@ async def execute_ad_step(
         prev_step = ADS_STEP_ORDER[step_idx - 1]
         prev_status = step_state.get(prev_step, {}).get("status")
         if prev_status not in ("approved", "complete"):
-            # For export step, assembly only needs to be complete (auto-flow)
-            if not (step_name == "export" and prev_status == "complete"):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Previous step '{prev_step}' must be approved first",
-                )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Previous step '{prev_step}' must be completed or approved first",
+            )
+
+    # Store step params in config for the background task to read
+    step_params = body or {}
+    if step_params:
+        config = dict(job.config or {})
+        config[f"step_params_{step_name}"] = step_params
+        job.config = config
+        flag_modified(job, "config")
+        await db.commit()
 
     from src.database.session import get_session_factory
     session_factory = get_session_factory()
@@ -431,12 +563,26 @@ async def regenerate_ad_step(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(db_session),
     current_user=Depends(get_current_user),
+    body: dict | None = None,
 ):
-    """Regenerate a step: clears this step and all downstream, then re-executes."""
+    """Regenerate a step: clears this step and all downstream, then re-executes.
+
+    Optional body params: video_model, target_duration, audio_mode — updates job before re-running.
+    """
     if step_name not in ADS_STEP_ORDER:
         raise HTTPException(status_code=400, detail=f"Invalid step: {step_name}")
 
     job = await _get_user_job(job_id, current_user.id, db)
+
+    # Apply overrides from body if provided
+    if body:
+        if "video_model" in body and body["video_model"]:
+            job.video_model = body["video_model"]
+        if "target_duration" in body and body["target_duration"]:
+            job.target_duration = int(body["target_duration"])
+        if "audio_mode" in body and body["audio_mode"]:
+            job.audio_mode = body["audio_mode"]
+
     step_state = dict(job.step_state or {})
 
     # Clear this step and all downstream steps
@@ -493,13 +639,17 @@ async def serve_ad_file(
     job_id: str,
     filename: str,
     db: AsyncSession = Depends(db_session),
-    current_user=Depends(get_current_user),
 ):
-    """Serve artifact file from job output directory."""
+    """Serve artifact file from job output directory. No auth — UUID is unguessable."""
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    job = await _get_user_job(job_id, current_user.id, db)
+    result = await db.execute(
+        select(ProductAdJob).where(ProductAdJob.job_id == job_id)
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
     config = job.config or {}
     job_dir = config.get("job_dir", "")
 

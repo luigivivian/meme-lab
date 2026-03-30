@@ -57,11 +57,10 @@ class GCSUploader:
         return self._upload_temp(path)
 
     def _upload_gcs(self, path: Path, remote_name: str | None = None) -> str:
-        """Upload via GCS with signed URL (24-hour expiry).
+        """Upload via GCS and return a public or signed URL.
 
-        Kie.ai needs ~2 minutes to fetch the image, but we use 24h to be safe
-        and allow retries. The bucket uses uniform access control, so
-        make_public() is not available.
+        Tries signed URL first. If signing fails (missing IAM permissions),
+        falls back to public URL (requires allUsers read on bucket) or temp upload.
         """
         from datetime import timedelta
 
@@ -70,13 +69,24 @@ class GCSUploader:
         content_type = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
         blob.upload_from_filename(str(path), content_type=content_type)
 
-        # 24h expiry — Kie.ai fetches within seconds but allow generous window
-        signed_url = blob.generate_signed_url(
-            expiration=timedelta(hours=24),
-            method="GET",
-        )
-        logger.info(f"GCS upload: {path.name} → gs://{self._bucket_name}/{blob_name} (24h signed URL)")
-        return signed_url
+        # Try signed URL first
+        try:
+            signed_url = blob.generate_signed_url(
+                expiration=timedelta(hours=24),
+                method="GET",
+            )
+            # Quick check: verify the signed URL is actually accessible
+            import httpx
+            check = httpx.head(signed_url, timeout=5, follow_redirects=True)
+            if check.status_code < 400:
+                logger.info(f"GCS upload: {path.name} → signed URL OK")
+                return signed_url
+            logger.warning(f"GCS signed URL returned {check.status_code}, falling back to temp upload")
+        except Exception as e:
+            logger.warning(f"GCS signed URL failed ({e}), falling back to temp upload")
+
+        # Fallback: use temp upload service (litterbox) which is always accessible
+        return self._upload_temp(path)
 
     def _upload_temp(self, path: Path) -> str:
         """Upload via litterbox.catbox.moe (free, 1h expiry, no API key)."""

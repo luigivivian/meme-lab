@@ -20,8 +20,20 @@ const FORMAT_LABELS: Record<string, string> = {
 };
 
 export function StepExport({ stepState, jobId }: Props) {
-  const result = stepState.result as { files?: Array<{ filename: string; format: string; size_mb?: number }> } | undefined;
-  const files = result?.files ?? [];
+  const result = stepState.result as { export_paths?: Record<string, string> | string[] } | undefined;
+  const raw = result?.export_paths;
+  // Normalize: could be dict {format: path} or list of paths
+  const files: Array<{ filename: string; format: string }> = [];
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [format, path] of Object.entries(raw)) {
+      files.push({ filename: String(path).split("/").pop()!, format });
+    }
+  } else if (Array.isArray(raw)) {
+    for (const path of raw) {
+      const name = String(path).split("/").pop()!;
+      files.push({ filename: name, format: name.includes("16x9") ? "16:9" : name.includes("1x1") ? "1:1" : "9:16" });
+    }
+  }
 
   if (stepState.status === "generating") {
     return (
@@ -34,7 +46,7 @@ export function StepExport({ stepState, jobId }: Props) {
     );
   }
 
-  if (stepState.status === "failed") {
+  if (stepState.status === "error") {
     return (
       <Card>
         <CardContent className="space-y-4 py-6">
@@ -64,9 +76,7 @@ export function StepExport({ stepState, jobId }: Props) {
               <div key={file.filename} className="flex items-center justify-between rounded-lg bg-secondary/50 p-3">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline">{FORMAT_LABELS[file.format] ?? file.format}</Badge>
-                  {file.size_mb && (
-                    <span className="text-xs text-muted-foreground">{file.size_mb.toFixed(1)} MB</span>
-                  )}
+                  <span className="text-xs text-muted-foreground">{file.filename}</span>
                 </div>
                 <a href={adFileUrl(jobId, file.filename)} download>
                   <Button variant="outline" size="sm">

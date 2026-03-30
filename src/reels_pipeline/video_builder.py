@@ -250,6 +250,97 @@ def _format_srt_time(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def _compute_scene_durations_from_srt(
+    srt_path: str, n_scenes: int, transition_duration: float = 0.3,
+) -> list[float]:
+    """Compute per-scene target durations from SRT timestamps.
+
+    Divides total audio duration (from SRT) equally among N scenes,
+    using SRT entry boundaries as split points when possible.
+    Adds transition overlap so clips cover xfade regions.
+
+    Returns list of durations in seconds, one per scene.
+    Returns empty list if SRT can't be parsed.
+    """
+    entries = []
+    with open(srt_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    blocks = re.split(r"\n\s*\n", content.strip())
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if len(lines) < 2:
+            continue
+        ts_match = re.match(
+            r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})",
+            lines[1].strip(),
+        )
+        if ts_match:
+            entries.append({
+                "start": _parse_srt_time(ts_match.group(1)),
+                "end": _parse_srt_time(ts_match.group(2)),
+            })
+
+    if not entries or n_scenes < 1:
+        return []
+
+    audio_end = entries[-1]["end"]
+
+    # Split audio into N equal time slices, then snap to nearest SRT boundary
+    slice_dur = audio_end / n_scenes
+    durations = []
+    for i in range(n_scenes):
+        scene_start = i * slice_dur
+        scene_end = (i + 1) * slice_dur if i < n_scenes - 1 else audio_end
+        dur = scene_end - scene_start + transition_duration
+        durations.append(max(dur, 1.0))
+
+    return durations
+
+
+def _trim_clips_to_durations(
+    clip_paths: list[str], durations: list[float],
+) -> list[str]:
+    """Trim clips to target durations, writing trimmed files alongside originals.
+
+    Returns list of trimmed clip paths.
+    """
+    # Clean previous trimmed files to avoid _trimmed_trimmed chains
+    seen_dirs = set()
+    for cp in clip_paths:
+        d = os.path.dirname(cp)
+        if d not in seen_dirs:
+            seen_dirs.add(d)
+            for f in os.listdir(d):
+                if "_trimmed" in f and f.endswith(".mp4"):
+                    os.remove(os.path.join(d, f))
+
+    trimmed = []
+    for clip_path, target_dur in zip(clip_paths, durations):
+        actual_dur = get_video_duration(clip_path)
+        base, ext = os.path.splitext(clip_path)
+        trimmed_path = f"{base}_trimmed{ext}"
+
+        # Always re-encode to normalize resolution, timebase, and fps
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", clip_path,
+                "-t", str(target_dur),
+                "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
+                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-r", "30", "-an", trimmed_path,
+            ],
+            capture_output=True, timeout=60,
+        )
+        if os.path.isfile(trimmed_path) and os.path.getsize(trimmed_path) > 0:
+            trimmed.append(trimmed_path)
+            if actual_dur > target_dur + 0.1:
+                logger.info(f"Trimmed {os.path.basename(clip_path)}: {actual_dur:.2f}s -> {target_dur:.2f}s")
+        else:
+            trimmed.append(clip_path)
+
+    return trimmed
+
+
 # ------------------------------------------------------------------
 # Video segmentation for >30s content
 # ------------------------------------------------------------------
@@ -520,6 +611,14 @@ def concat_clips_with_audio(
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
+    # Trim clips to match narration timing from SRT
+    scene_durs = _compute_scene_durations_from_srt(
+        srt_path, len(clip_paths), transition_duration,
+    )
+    if scene_durs and len(scene_durs) == len(clip_paths):
+        clip_paths = _trim_clips_to_durations(clip_paths, scene_durs)
+        logger.info(f"Clips trimmed to SRT narration timing ({len(clip_paths)} scenes)")
+
     if len(clip_paths) == 1:
         abs_srt = os.path.abspath(srt_path)
         fontsdir = os.path.abspath("assets/fonts")
@@ -589,9 +688,13 @@ def concat_clips_with_audio(
     ]
 
     logger.info(f"Concat {n} Hailuo clips with audio + subtitles")
+    logger.debug(f"FFmpeg cmd: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     if result.returncode != 0:
-        raise RuntimeError(f"Clip concat failed: {result.stderr[:1000]}")
+        # Strip FFmpeg banner to show actual error
+        stderr_lines = result.stderr.splitlines()
+        error_lines = [l for l in stderr_lines if not l.startswith(("  ", "ffmpeg version", "  built", "  configuration", "  lib"))]
+        raise RuntimeError(f"Clip concat failed: {''.join(error_lines[-20:])}")
 
     logger.info(f"Final video assembled: {output_path}")
     return output_path

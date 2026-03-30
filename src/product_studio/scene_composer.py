@@ -1,7 +1,9 @@
-"""Gemini Image scene composition — places product cutout into AI-generated scene.
+"""Scene composition — places product cutout onto clean background.
 
-Per D-06: Gemini Image inpainting for scene generation.
+Per D-06: Gemini Image for scene generation.
 Per D-07: product cutout + scene prompt -> composed image.
+
+RULE: The product is SACRED. Never modify it. Only change the background.
 """
 
 import asyncio
@@ -19,8 +21,9 @@ logger = logging.getLogger("clip-flow.ads.scene_composer")
 
 
 async def compose_scene(product_cutout_path: str, scene_prompt: str, output_path: str) -> str:
-    """Compose product cutout onto AI-generated scene via Gemini Image.
+    """Compose product cutout onto AI-generated background via Gemini Image.
 
+    The product must remain EXACTLY as-is. Only the background changes.
     Returns path to composed image (1080x1920 9:16).
     """
     client = _get_client()
@@ -31,12 +34,24 @@ async def compose_scene(product_cutout_path: str, scene_prompt: str, output_path
     contents = [
         types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
         (
-            f"Place this exact product into the following scene: {scene_prompt}. "
-            "Keep the product IDENTICAL - same shape, color, details, proportions. "
-            "Do not modify, distort, or recolor the product in any way. "
-            "Professional product photography, commercial advertising quality. "
-            "Vertical 9:16 composition (1080x1920). "
-            "Clean, well-lit scene with the product as the focal point."
+            f"Create a product advertisement photo. Background scene: {scene_prompt}. "
+            "\n\n"
+            "ABSOLUTE RULES — violating ANY of these makes the output unusable:\n"
+            "1. The product in the image must be PIXEL-PERFECT identical to the input photo. "
+            "Same shape, same color, same texture, same labels, same branding, same proportions. "
+            "Do NOT redesign, recolor, reshape, add to, or remove from the product.\n"
+            "2. Do NOT add any humans, hands, fingers, arms, or body parts.\n"
+            "3. Do NOT add any text, watermarks, logos, or overlays.\n"
+            "4. The product is the ONLY subject. No other objects compete for attention.\n"
+            "5. Background must be clean, professional, and subtle — it supports the product, "
+            "not distracts from it.\n"
+            "\n"
+            "COMPOSITION:\n"
+            "- Vertical 9:16 aspect ratio (1080x1920)\n"
+            "- Product centered in the lower 2/3 of the frame\n"
+            "- Top 1/3 is clean background (space for text overlay later)\n"
+            "- Professional product photography lighting\n"
+            "- Shallow depth of field on background, product in sharp focus\n"
         ),
     ]
 
@@ -77,7 +92,10 @@ async def analyze_product(image_path: str) -> dict:
             '- "niche": product category (e.g., "moda", "tech", "food", "beauty", "fitness")\n'
             '- "tone": recommended advertising tone (one of: "premium", "energetico", "divertido", "minimalista", "profissional", "natural")\n'
             '- "audience": target audience description in Portuguese\n'
-            '- "scene_suggestions": array of 3 scene descriptions in English for product placement\n'
+            '- "scene_suggestions": array of 3 BACKGROUND descriptions in English '
+            "(describe ONLY the background/surface/environment — NOT the product itself, "
+            "NOT hands, NOT people. Examples: 'white marble surface with soft shadows', "
+            "'dark gradient backdrop with rim lighting', 'wooden table with natural sunlight')\n"
             '- "product_description": brief product description in Portuguese\n'
             "Return ONLY valid JSON, no markdown."
         ),

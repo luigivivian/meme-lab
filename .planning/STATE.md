@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Phase complete — ready for verification
-stopped_at: Phase 421 context gathered
-last_updated: "2026-03-29T20:30:50.965Z"
+stopped_at: Completed quick-260330-ie5
+last_updated: "2026-03-30T16:22:49.832Z"
 progress:
-  total_phases: 16
-  completed_phases: 7
-  total_plans: 20
-  completed_plans: 20
+  total_phases: 17
+  completed_phases: 8
+  total_plans: 27
+  completed_plans: 27
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** Pipeline compoe e publica memes automaticamente — simples, rapido, sem depender de APIs caras de geracao de imagem
-**Current focus:** Phase 999.6 — reels-pipeline-v2
+**Current focus:** Phase 421 — product-studio-ai-video-ads-generator
 
 ## Current Position
 
-Phase: 999.6 (reels-pipeline-v2) — EXECUTING
-Plan: 3 of 3
+Phase: 421 (product-studio-ai-video-ads-generator) — EXECUTING
+Plan: 7 of 7
 
 ## Performance Metrics
 
@@ -82,6 +82,14 @@ Plan: 3 of 3
 | Phase 999.6 P02 | 2min | 1 tasks | 3 files |
 | Phase 999.6 P01 | 2min | 2 tasks | 4 files |
 | Phase 999.6 P03 | 1min | 2 tasks | 5 files |
+| Phase 421 P01 | 3min | 2 tasks | 6 files |
+| Phase 421 P02 | 2min | 2 tasks | 4 files |
+| Phase 421 P03 | 2min | 2 tasks | 2 files |
+| Phase 421 P04 | 2min | 1 tasks | 1 files |
+| Phase 421 P05 | 2min | 2 tasks | 2 files |
+| Phase 421 P06 | 3min | 2 tasks | 6 files |
+| Phase 421 P07 | 5min | 2 tasks | 13 files |
+| Phase quick-260330-ie5 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -160,6 +168,14 @@ Recent decisions affecting current work:
 - [Phase 999.6]: n_imagens defaults to 5 when image_paths=None (text-only script gen mode)
 - [Phase 999.6]: Per-cena image gen falls back to generic gen when no script available in step_state
 - [Phase 999.6]: Button labels reflect next action (Gerar Roteiro, Gerar Imagens, Aprovar e Gerar Narracao) for clearer UX
+- [Phase 421]: Migration 020 chains from 018 (latest numbered); Float for cost columns matching ReelsJob; Config follows reels_pipeline pattern
+- [Phase 421]: compose_scene uses gemini-2.5-flash-image for scene composition; analyze_product uses gemini-2.5-flash text model for JSON analysis
+- [Phase 421]: prompt_builder appends NEGATIVE_PROMPTS per style after LLM-generated motion prompt; copy_generator uses response_mime_type=application/json
+- [Phase 421]: KieMusicClient uses same Bearer token auth and BASE_URL as KieSora2Client (no shared base class)
+- [Phase 421]: GCS upload_image before Kie.ai create_task (public URL required); estimate_cost returns BRL breakdown per D-19
+- [Phase 421]: Ads router mirrors reels.py pattern exactly (background tasks, flag_modified, get_session_factory)
+- [Phase 421]: Manual collapsible sections in wizard (no Accordion component); client-side cost estimate by style; AI analysis via /ads/analyze pre-fill
+- [Phase 421]: AdStepper uses horizontal scrollable layout for 8 steps; StepExport has no approve button per D-22 auto-complete; Ad API types created inline due to worktree isolation
 
 ### Pending Todos
 
@@ -171,8 +187,15 @@ None.
 - Cloudflare R2 CDN setup required before Phase 14 testing
 - `api_usage.date` column DateTime vs Date ambiguity — resolve during Phase 16 planning
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260330-ie5 | Enhance ads wizard scene step with customizable presets for backgrounds cameras lighting organized by product categories editable scene suggestions product description and manual prompt editing | 2026-03-30 | 9e02cdc | [260330-ie5-enhance-ads-wizard-scene-step-with-custo](./quick/260330-ie5-enhance-ads-wizard-scene-step-with-custo/) |
+
 ## Session Continuity
 
-Last session: 2026-03-29T20:30:50.955Z
-Stopped at: Phase 421 context gathered
-Resume file: .planning/phases/421-product-studio-ai-video-ads-generator/421-CONTEXT.md
+Last activity: 2026-03-30 - Completed quick task 260330-ie5: Enhance ads wizard presets by niche
+Last session: 2026-03-30T16:22:44.832Z
+Stopped at: Completed quick-260330-ie5
+Resume file: None

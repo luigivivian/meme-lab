@@ -15,7 +15,7 @@ ADS_USD_TO_BRL = float(os.getenv("ADS_USD_TO_BRL", "5.75"))
 ADS_REMBG_MODEL = os.getenv("ADS_REMBG_MODEL", "u2net")
 
 # Video defaults
-ADS_DEFAULT_VIDEO_MODEL = os.getenv("ADS_DEFAULT_VIDEO_MODEL", "wan2.1-i2v")
+ADS_DEFAULT_VIDEO_MODEL = os.getenv("ADS_DEFAULT_VIDEO_MODEL", "wan/2-6-flash-image-to-video")
 ADS_DEFAULT_STYLE = os.getenv("ADS_DEFAULT_STYLE", "cinematic")
 
 # Master format (per D-17)
@@ -65,4 +65,4 @@ STYLE_AUDIO_DEFAULTS = {"cinematic": "music", "narrated": "narrated", "lifestyle
 STYLE_DURATION = {"cinematic": (8, 15), "narrated": (15, 30), "lifestyle": (15, 30)}
 
 # Style -> default video model (per D-08)
-STYLE_VIDEO_MODEL = {"cinematic": "wan2.1-i2v", "narrated": "wan2.1-i2v", "lifestyle": "kling2.1-i2v"}
+STYLE_VIDEO_MODEL = {"cinematic": "wan/2-6-image-to-video", "narrated": "wan/2-6-flash-image-to-video", "lifestyle": "kling/v2-1-standard"}

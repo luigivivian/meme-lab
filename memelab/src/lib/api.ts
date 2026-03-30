@@ -1580,61 +1580,9 @@ export async function editStep(jobId: string, step: string, payload: StepEditPay
 }
 
 export function reelFileUrl(jobId: string, filename: string): string {
-  return `/api/reels/${jobId}/file/${encodeURIComponent(filename)}`;
-}
-
-// --- Product Ads (Phase 421) ---
-
-export interface AdJob {
-  id: string;
-  product_name: string;
-  style: string;
-  status: string;
-  current_step: string;
-  formats: string[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AdStepData {
-  step_name: string;
-  status: "pending" | "generating" | "completed" | "approved" | "failed";
-  result?: Record<string, unknown>;
-  error?: string;
-}
-
-export interface AdStepsResponse {
-  job_id: string;
-  current_step: string;
-  steps: AdStepData[];
-}
-
-export async function getAdJobs() {
-  return request<AdJob[]>("/ads/jobs");
-}
-
-export async function getAdJob(jobId: string) {
-  return request<AdJob>(`/ads/jobs/${jobId}`);
-}
-
-export async function getAdSteps(jobId: string) {
-  return request<AdStepsResponse>(`/ads/jobs/${jobId}/steps`);
-}
-
-export async function executeAdStep(jobId: string, stepName: string) {
-  return request<{ status: string }>(`/ads/jobs/${jobId}/step/${stepName}`, { method: "POST" });
-}
-
-export async function approveAdStep(jobId: string, stepName: string) {
-  return request<{ step: string; approved: boolean }>(`/ads/jobs/${jobId}/approve/${stepName}`, { method: "POST" });
-}
-
-export async function regenerateAdStep(jobId: string, stepName: string) {
-  return request<{ status: string }>(`/ads/jobs/${jobId}/regenerate/${stepName}`, { method: "POST" });
-}
-
-export function adFileUrl(jobId: string, filename: string): string {
-  return `/api/ads/${jobId}/file/${encodeURIComponent(filename)}`;
+  // Encode each path segment individually — slashes must stay literal for FastAPI {filename:path}
+  const encoded = filename.split("/").map(encodeURIComponent).join("/");
+  return `/api/reels/${jobId}/file/${encoded}`;
 }
 
 // --- Content Export ---
@@ -1645,14 +1593,10 @@ export const exportContentPack = (packageId: number) =>
 
 export interface AdJob {
   job_id: string;
-  status: "draft" | "generating" | "complete" | "failed";
-  style: "cinematic" | "narrated" | "lifestyle";
+  status: string;
+  style: string;
   product_name: string;
-  video_model: string;
-  audio_mode: "mute" | "music" | "narrated" | "ambient";
   step_state: Record<string, { status: string; result?: unknown }> | null;
-  current_step: string | null;
-  progress_pct: number;
   cost_brl: number | null;
   outputs: Record<string, string> | null;
   created_at: string;
@@ -1661,6 +1605,7 @@ export interface AdJob {
 
 export interface AdCreateRequest {
   product_name: string;
+  product_image_url?: string;
   style: "cinematic" | "narrated" | "lifestyle";
   video_model?: string;
   audio_mode?: "mute" | "music" | "narrated" | "ambient";
@@ -1674,9 +1619,9 @@ export interface AdCreateRequest {
 }
 
 export interface AdCostEstimate {
-  video_brl: number;
-  audio_brl: number;
-  image_brl: number;
+  video_cost_brl: number;
+  audio_cost_brl: number;
+  image_cost_brl: number;
   total_brl: number;
 }
 
@@ -1688,6 +1633,29 @@ export interface AdAnalysisResult {
   product_description: string;
 }
 
+export async function uploadAdImage(file: File): Promise<{ filename: string; path: string; size_bytes: number }> {
+  const token =
+    typeof window !== "undefined"
+      ? (localStorage.getItem("access_token") ?? sessionStorage.getItem("access_token"))
+      : null;
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${BASE}/ads/upload-image`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function analyzeProduct(productName: string): Promise<AdAnalysisResult> {
+  return request<AdAnalysisResult>("/ads/analyze", {
+    method: "POST",
+    body: JSON.stringify({ product_name: productName }),
+  });
+}
+
 export async function createAdJob(data: AdCreateRequest): Promise<AdJob> {
   return request<AdJob>("/ads/create", {
     method: "POST",
@@ -1695,31 +1663,52 @@ export async function createAdJob(data: AdCreateRequest): Promise<AdJob> {
   });
 }
 
-export const fetchAdJobs = () => request<AdJob[]>("/ads/jobs");
+export const getAdJobs = () => request<AdJob[]>("/ads/jobs");
 
-export const fetchAdJob = (jobId: string) => request<AdJob>(`/ads/${jobId}`);
+export const getAdJob = (jobId: string) => request<AdJob>(`/ads/${jobId}`);
 
-export const fetchAdSteps = (jobId: string) =>
-  request<{ step_state: Record<string, unknown>; current_step: string; progress_pct: number }>(
+export const getAdSteps = (jobId: string) =>
+  request<{ steps: AdStepData[]; current_step: string; progress_pct: number }>(
     `/ads/${jobId}/steps`
   );
 
-export async function executeAdStep(jobId: string, stepName: string) {
-  return request<{ status: string }>(`/ads/${jobId}/step/${stepName}`, { method: "POST" });
+export async function executeAdStep(jobId: string, stepName: string, params?: Record<string, unknown>) {
+  return request<{ status: string }>(`/ads/${jobId}/step/${stepName}/execute`, {
+    method: "POST",
+    body: params ? JSON.stringify(params) : undefined,
+  });
 }
 
 export async function approveAdStep(jobId: string, stepName: string) {
-  return request<{ step: string; approved: boolean }>(`/ads/${jobId}/approve/${stepName}`, {
+  return request<{ step: string; approved: boolean }>(`/ads/${jobId}/step/${stepName}/approve`, {
     method: "POST",
   });
 }
 
-export async function regenerateAdStep(jobId: string, stepName: string) {
-  return request<{ status: string }>(`/ads/${jobId}/regenerate/${stepName}`, { method: "POST" });
+export async function regenerateAdStep(
+  jobId: string,
+  stepName: string,
+  overrides?: { video_model?: string; target_duration?: string; audio_mode?: string },
+) {
+  return request<{ status: string }>(`/ads/${jobId}/step/${stepName}/regenerate`, {
+    method: "POST",
+    body: overrides ? JSON.stringify(overrides) : undefined,
+  });
 }
 
-export const fetchAdCostEstimate = (jobId: string) =>
+export const getAdCostEstimate = (jobId: string) =>
   request<AdCostEstimate>(`/ads/${jobId}/cost-estimate`);
+
+export function adFileUrl(jobId: string, filename: string): string {
+  return `/api/ads/${jobId}/file/${encodeURIComponent(filename)}`;
+}
+
+export interface AdStepData {
+  step_name: string;
+  status: "pending" | "generating" | "complete" | "approved" | "error";
+  result?: Record<string, unknown>;
+  error?: string;
+}
 
 export async function deleteAdJob(jobId: string) {
   return request<void>(`/ads/${jobId}`, { method: "DELETE" });

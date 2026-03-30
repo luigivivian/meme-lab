@@ -115,6 +115,147 @@ class KieSora2Client:
         }
         self._timeout = httpx.Timeout(30.0, read=120.0)
 
+    # ── Payload builders per model format ─────────────────────────────
+
+    def _build_payload(
+        self,
+        input_format: str,
+        model: str,
+        image_url: str,
+        prompt: str,
+        duration: int,
+        negative_prompt: str = "",
+        character_ids: list[str] | None = None,
+        aspect_ratio: str = "9:16",
+    ) -> dict:
+        """Build Kie.ai createTask payload per model format.
+
+        Verified against official docs at docs.kie.ai/market/* (2026-03).
+
+        Key differences per model:
+        - Image field: image_url (str) vs image_urls (array) vs input_urls (array)
+        - Duration: string for most, INTEGER for seedance 1.5
+        - Sora uses n_frames instead of duration
+        - Only Kling v2.x supports negative_prompt field
+        - Kling 3.0 requires aspect_ratio, multi_shots, sound
+        """
+        dur = str(duration)
+
+        # ── Hailuo 2.3 Standard/Pro ──────────────────────────────
+        # Docs: image_url (singular), duration "6"/"10", resolution "768P"/"1080P"
+        # Note: 10s + 1080P is not supported (use 768P for 10s)
+        if input_format == "hailuo":
+            res = "768P" if duration >= 10 else "1080P"
+            return {"model": model, "input": {
+                "prompt": prompt,
+                "image_url": image_url,
+                "duration": dur,
+                "resolution": res,
+            }}
+
+        # ── Wan 2.6 ─────────────────────────────────────────────
+        # Docs: image_urls (array max 1), duration "5"/"10"/"15", resolution "720p"/"1080p"
+        if input_format == "wan":
+            return {"model": model, "input": {
+                "prompt": prompt,
+                "image_urls": [image_url],
+                "duration": dur,
+                "resolution": "1080p",
+            }}
+
+        # ── Wan 2.6 Flash ───────────────────────────────────────
+        # Docs: image_urls (array max 1), audio (bool, required), duration "5"/"10"/"15"
+        if input_format == "wan_flash":
+            return {"model": model, "input": {
+                "prompt": prompt,
+                "image_urls": [image_url],
+                "duration": dur,
+                "resolution": "1080p",
+                "audio": False,
+            }}
+
+        # ── Bytedance V1 Pro Fast / V1 Lite ─────────────────────
+        # Docs: image_url (singular), duration "5"/"10", resolution "720p"/"1080p"
+        if input_format == "bytedance":
+            return {"model": model, "input": {
+                "prompt": prompt,
+                "image_url": image_url,
+                "duration": dur,
+                "resolution": "720p",
+            }}
+
+        # ── Bytedance Seedance 1.5 Pro ──────────────────────────
+        # Docs: input_urls (array 0-2), duration INTEGER (4/8/12, NOT string),
+        #       aspect_ratio "1:1"/"4:3"/"3:4"/"16:9"/"9:16"/"21:9", resolution "720p"/"1080p"
+        if input_format == "seedance":
+            sd_dur = min(int(duration), 12)
+            sd_ar = aspect_ratio if aspect_ratio in ("1:1", "4:3", "3:4", "16:9", "9:16", "21:9") else "9:16"
+            return {"model": model, "input": {
+                "prompt": prompt,
+                "input_urls": [image_url],
+                "aspect_ratio": sd_ar,
+                "duration": sd_dur,  # INTEGER, not string
+                "resolution": "720p",
+            }}
+
+        # ── Kling v2.1 / v2.5 ─���────────────────────────────────
+        # Docs: image_url (singular), duration "5"/"10", negative_prompt (max 500),
+        #       cfg_scale 0-1 (default 0.5)
+        if input_format == "kling_v2":
+            return {"model": model, "input": {
+                "prompt": prompt,
+                "image_url": image_url,
+                "duration": dur,
+                "negative_prompt": negative_prompt or "text, watermark, blurry, low quality, distorted, human hands",
+                "cfg_scale": 0.5,
+            }}
+
+        # ── Kling 3.0 ──────────────────────────────────────────
+        # Docs: image_urls (array max 2), duration "3"-"15", mode "std"/"pro",
+        #       aspect_ratio "16:9"/"9:16"/"1:1" (optional if image provided),
+        #       multi_shots (bool, required), sound (bool, required),
+        #       multi_prompt (array, required when multi_shots=true)
+        if input_format == "kling_v3":
+            # Normalize aspect_ratio — Kling only accepts "16:9", "9:16", "1:1"
+            ar = aspect_ratio if aspect_ratio in ("16:9", "9:16", "1:1") else "9:16"
+            return {"model": model, "input": {
+                "prompt": prompt,
+                "image_urls": [image_url],
+                "duration": dur,
+                "mode": "pro",
+                "aspect_ratio": ar,
+                "sound": False,
+                "multi_shots": False,
+            }}
+
+        # ── Grok Imagine ────────────────────────────────────────
+        # Docs: image_urls (array max 7), mode "normal"/"fun"/"spicy",
+        #       duration "6"/"10", resolution "480p"/"720p", aspect_ratio "2:3"/"3:2"/"1:1"/"16:9"/"9:16"
+        if input_format == "grok":
+            grok_ar = aspect_ratio if aspect_ratio in ("2:3", "3:2", "1:1", "16:9", "9:16") else "9:16"
+            return {"model": model, "input": {
+                "prompt": prompt,
+                "image_urls": [image_url],
+                "duration": dur,
+                "resolution": "720p",
+                "mode": "normal",
+                "aspect_ratio": grok_ar,
+            }}
+
+        # ── Sora 2 (default) ────────────────────────────────────
+        # Docs: image_urls (array max 1), n_frames "10"/"15" (NOT duration),
+        #       upload_method "s3"/"oss" (required), aspect_ratio "portrait"/"landscape"
+        ar = "portrait" if aspect_ratio in ("9:16", "3:4", "2:3") else "landscape"
+        return {"model": model, "input": {
+            "prompt": prompt,
+            "image_urls": [image_url],
+            "aspect_ratio": ar,
+            "n_frames": dur,
+            "remove_watermark": True,
+            "upload_method": "s3",
+            "character_id_list": character_ids or [],
+        }}
+
     # ── Task creation ───────────────────────────────────────────────────
 
     async def create_task(
@@ -125,6 +266,7 @@ class KieSora2Client:
         character_ids: list[str] | None = None,
         aspect_ratio: str = "portrait",
         model: str | None = None,
+        negative_prompt: str = "",
     ) -> str:
         """Submit an image-to-video generation task.
 
@@ -132,6 +274,7 @@ class KieSora2Client:
             image_url: Publicly accessible image URL (JPEG/PNG/WebP, max 10MB).
             prompt: Motion/animation description (max 10,000 chars).
             duration: Video length in seconds (10 or 15).
+            negative_prompt: Things to avoid in the video (only used by models that support it).
             character_ids: Kie.ai character IDs for visual consistency (max 5).
             aspect_ratio: "portrait" (4:5) or "landscape" (16:9).
 
@@ -170,66 +313,20 @@ class KieSora2Client:
         if valid_durations:
             duration = min(valid_durations, key=lambda d: abs(d - duration))
 
-        # Build payload per input format — each verified against Kie.ai API
-        if input_format == "hailuo":
-            # image_url (singular), duration "6"/"10", resolution "768P"
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "image_url": image_url,
-                "duration": str(duration), "resolution": "768P",
-            }}
-        elif input_format == "wan":
-            # image_urls (array), duration "5"/"10"/"15"
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "image_urls": [image_url],
-                "duration": str(duration), "resolution": "720p",
-            }}
-        elif input_format == "wan_flash":
-            # image_urls (array), duration, audio required (boolean)
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "image_urls": [image_url],
-                "duration": str(duration), "resolution": "720p", "audio": False,
-            }}
-        elif input_format == "bytedance":
-            # image_url (singular), duration "5"/"10"
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "image_url": image_url,
-                "duration": str(duration), "resolution": "720p",
-            }}
-        elif input_format == "seedance":
-            # input_urls (array), aspect_ratio required, duration "4"/"8"/"12"
-            sd_dur = str(min(duration, 12))  # seedance: 4/8/12
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "input_urls": [image_url],
-                "aspect_ratio": "9:16", "duration": sd_dur,
-            }}
-        elif input_format == "kling_v2":
-            # image_url (singular), mode "std"/"pro", negative_prompt required
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "image_url": image_url,
-                "duration": str(duration), "mode": "std", "negative_prompt": "",
-            }}
-        elif input_format == "kling_v3":
-            # input_urls (array), multi_shots + multi_prompt required, sound boolean
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "input_urls": [image_url],
-                "duration": str(duration), "mode": "std", "sound": False,
-                "multi_shots": False, "multi_prompt": [{"prompt": prompt}],
-            }}
-        elif input_format == "grok":
-            # image_urls (array), mode "normal"/"fun"/"spicy", duration "6"/"10"
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "image_urls": [image_url],
-                "duration": str(duration), "resolution": "720p",
-                "mode": "normal", "aspect_ratio": "9:16",
-            }}
-        else:
-            # Sora 2 — image_urls (array), n_frames, aspect_ratio "portrait"
-            payload = {"model": resolved_model, "input": {
-                "prompt": prompt, "image_urls": [image_url],
-                "aspect_ratio": "portrait", "n_frames": str(duration),
-                "remove_watermark": True, "upload_method": "s3",
-                "character_id_list": character_ids or [],
-            }}
+        # Build payload per input format.
+        # Each format has specific field names and types verified against Kie.ai API.
+        # Key differences: image field name (image_url vs image_urls vs input_urls),
+        # duration type (string), negative_prompt support, and extra required fields.
+        payload = self._build_payload(
+            input_format=input_format,
+            model=resolved_model,
+            image_url=image_url,
+            prompt=prompt,
+            duration=duration,
+            negative_prompt=negative_prompt,
+            character_ids=character_ids,
+            aspect_ratio=aspect_ratio,
+        )
 
         logger.info(
             "Creating video task: model=%s duration=%ds format=%s",
@@ -442,6 +539,7 @@ class KieSora2Client:
         character_ids: list[str] | None = None,
         output_dir: str | None = None,
         model: str | None = None,
+        negative_prompt: str = "",
     ) -> VideoGenerationResult | None:
         """Full pipeline: create task -> poll -> download video.
 
@@ -463,6 +561,7 @@ class KieSora2Client:
                 duration=duration,
                 character_ids=character_ids,
                 model=model,
+                negative_prompt=negative_prompt,
             )
         except (KieAPIError, httpx.HTTPError) as e:
             logger.error("Failed to create video task: %s", e)

@@ -357,10 +357,10 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 421-01-PLAN.md — Foundation: rembg install, DB migration (product_ad_jobs), config.py, models.py
-- [ ] 421-02-PLAN.md — Scene modules: bg_remover, scene_composer (Gemini Vision + Image), prompt_builder, copy_generator
-- [ ] 421-03-PLAN.md — Audio & export modules: KieMusicClient (Suno via Kie.ai), format_exporter (blur pad + drawtext + amix)
-- [ ] 421-04-PLAN.md — Pipeline orchestrator: ProductAdPipeline with 8 step methods
-- [ ] 421-05-PLAN.md — API routes: ads.py (10 endpoints) + app.py wiring
-- [ ] 421-06-PLAN.md — Frontend: API client, SWR hooks, wizard page (/ads/new), jobs listing (/ads)
+- [x] 421-01-PLAN.md — Foundation: rembg install, DB migration (product_ad_jobs), config.py, models.py
+- [x] 421-02-PLAN.md — Scene modules: bg_remover, scene_composer (Gemini Vision + Image), prompt_builder, copy_generator
+- [x] 421-03-PLAN.md — Audio & export modules: KieMusicClient (Suno via Kie.ai), format_exporter (blur pad + drawtext + amix)
+- [x] 421-04-PLAN.md — Pipeline orchestrator: ProductAdPipeline with 8 step methods
+- [x] 421-05-PLAN.md — API routes: ads.py (10 endpoints) + app.py wiring
+- [x] 421-06-PLAN.md — Frontend: API client, SWR hooks, wizard page (/ads/new), jobs listing (/ads)
 - [ ] 421-07-PLAN.md — Frontend: stepper UI (8 step components), job detail page (/ads/[jobId]), sidebar nav

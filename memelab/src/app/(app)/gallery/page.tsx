@@ -22,6 +22,7 @@ import {
   generateSingle,
   refineImage,
   generateVideo,
+  generateVideoFromImage,
   deleteVideo,
   imageDownloadUrl,
   videoFileUrl,
@@ -103,6 +104,14 @@ export default function GalleryPage() {
   const [videoGenerating, setVideoGenerating] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoSuccess, setVideoSuccess] = useState(false);
+  // Video from image (no compose)
+  const [videoImageFilename, setVideoImageFilename] = useState<string | null>(null);
+  const [videoImageDuration, setVideoImageDuration] = useState<number>(10);
+  const [videoImagePrompt, setVideoImagePrompt] = useState("");
+  const [videoImageModel, setVideoImageModel] = useState("");
+  const [videoImageGenerating, setVideoImageGenerating] = useState(false);
+  const [videoImageError, setVideoImageError] = useState<string | null>(null);
+
   const { data: budgetData } = useVideoBudget();
   const { data: modelsData } = useVideoModels();
   const { data: pollingStatus } = useVideoStatus(videoTarget?.id ?? null, videoGenerating);
@@ -361,15 +370,15 @@ export default function GalleryPage() {
                   </span>
                 )}
               </div>
-              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition-all duration-200 group-hover:opacity-100">
-                <div className="flex w-full items-center justify-between p-3">
+              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-all duration-200 group-hover:opacity-100">
+                <div className="w-full p-3 space-y-2">
                   <div className="min-w-0">
                     <p className="truncate text-xs text-white/80">{img.filename}</p>
                     <p className="text-[10px] text-white/50">{img.theme} | {img.size_kb.toFixed(0)}kb</p>
                   </div>
-                  <div className="flex gap-1 shrink-0">
+                  <div className="grid grid-cols-2 gap-1">
                     <a href={imageDownloadUrl(img.filename)} onClick={(e) => e.stopPropagation()}>
-                      <Button size="sm" variant="secondary" className="h-7 text-xs">
+                      <Button size="sm" variant="secondary" className="w-full h-7 text-xs">
                         <Download className="mr-1 h-3 w-3" /> Baixar
                       </Button>
                     </a>
@@ -390,6 +399,22 @@ export default function GalleryPage() {
                           onClick={(e) => { e.stopPropagation(); setSelectedImage(img.filename); }}
                         >
                           <Wand2 className="mr-1 h-3 w-3" /> Compor
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setVideoImageFilename(img.filename);
+                            setVideoImageDuration(10);
+                            setVideoImagePrompt("");
+                            setVideoImageModel("");
+                            setVideoImageError(null);
+                            setVideoImageGenerating(false);
+                          }}
+                        >
+                          <Video className="mr-1 h-3 w-3" /> Video
                         </Button>
                       </>
                     )}
@@ -955,7 +980,153 @@ export default function GalleryPage() {
         </Card>
       )}
 
-      {/* Video Generation Dialog */}
+      {/* Video from Image Dialog (no compose needed) */}
+      <Dialog
+        open={!!videoImageFilename}
+        onOpenChange={() => { if (!videoImageGenerating) { setVideoImageFilename(null); setVideoImageError(null); } }}
+      >
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Video className="h-4 w-4 text-primary" />
+              Gerar Video da Imagem
+            </DialogTitle>
+          </DialogHeader>
+          {videoImageFilename && (
+            <div className="space-y-4 overflow-y-auto pr-1">
+              <div className="w-full aspect-[3/4] overflow-hidden rounded-lg bg-secondary">
+                <img src={imageUrl(videoImageFilename)} alt={videoImageFilename} className="h-full w-full object-cover" />
+              </div>
+              {budgetData && (
+                <div className="flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Orcamento hoje</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-medium tabular-nums">${budgetData.remaining_usd.toFixed(2)} restante</span>
+                    <span className="text-[10px] text-muted-foreground ml-1">(~{budgetData.videos_remaining_estimate} videos)</span>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Como animar? (opcional)</label>
+                <Textarea
+                  placeholder="Ex: mago mexendo no cajado com particulas magicas flutuando..."
+                  value={videoImagePrompt}
+                  onChange={(e) => setVideoImagePrompt(e.target.value)}
+                  rows={2}
+                  disabled={videoImageGenerating}
+                  className="text-xs"
+                />
+              </div>
+              {/* Model selector */}
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Modelo</label>
+                <div className="max-h-[240px] overflow-y-auto space-y-1 pr-1">
+                  {modelsData?.models.map((m) => {
+                    const selected = videoImageModel === m.id || (!videoImageModel && m.is_default);
+                    const speedDots = "\u26A1".repeat(m.speed);
+                    const cheapest = Math.min(...Object.values(m.prices_brl));
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setVideoImageModel(m.id);
+                          if (!m.durations.includes(videoImageDuration)) setVideoImageDuration(m.durations[0]);
+                        }}
+                        disabled={videoImageGenerating}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
+                          selected
+                            ? "bg-primary/15 border border-primary/40 text-foreground"
+                            : "bg-secondary/50 border border-transparent text-muted-foreground hover:bg-secondary/80"
+                        }`}
+                      >
+                        <div className="text-left min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">{m.name}</span>
+                            <span className="text-[9px] opacity-50">{m.resolution}</span>
+                          </div>
+                          <p className="text-[10px] opacity-60 truncate">{speedDots} {m.notes}</p>
+                        </div>
+                        <span className="text-[10px] tabular-nums ml-2 flex-shrink-0 text-right">
+                          <span className="text-emerald-400">R$ {cheapest.toFixed(2)}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Duration selector */}
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Duracao</label>
+                <div className="flex gap-2">
+                  {(() => {
+                    const sel = modelsData?.models.find((m) => m.id === (videoImageModel || modelsData?.default));
+                    const durations = sel?.durations ?? [5, 10];
+                    const prices = sel?.prices_brl ?? {};
+                    return durations.map((d) => {
+                      const price = prices[String(d)];
+                      return (
+                        <Button
+                          key={d}
+                          variant={videoImageDuration === d ? "default" : "outline"}
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setVideoImageDuration(d)}
+                          disabled={videoImageGenerating}
+                        >
+                          {d}s {price != null && <span className="ml-1 opacity-70">R$ {price.toFixed(2)}</span>}
+                        </Button>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+              <Button
+                onClick={async () => {
+                  if (!videoImageFilename) return;
+                  setVideoImageGenerating(true);
+                  setVideoImageError(null);
+                  try {
+                    await generateVideoFromImage({
+                      filename: videoImageFilename,
+                      duration: videoImageDuration,
+                      custom_prompt: videoImagePrompt || undefined,
+                      model: videoImageModel || undefined,
+                    });
+                    setVideoImageFilename(null);
+                    setVideoImageGenerating(false);
+                    router.push("/jobs");
+                  } catch (err) {
+                    setVideoImageGenerating(false);
+                    setVideoImageError(err instanceof Error ? err.message : "Erro ao gerar video");
+                  }
+                }}
+                disabled={videoImageGenerating}
+                className={`w-full gap-2 ${videoImageGenerating ? "pulse-glow" : ""}`}
+              >
+                {videoImageGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                {videoImageGenerating ? "Gerando video..." : "Gerar Video"}
+              </Button>
+              {videoImageGenerating && (
+                <div className="space-y-2 animate-fade-in">
+                  <IndeterminateProgress />
+                  <p className="text-xs text-muted-foreground text-center">Processando via Kie.ai Sora 2 (30-120s)...</p>
+                </div>
+              )}
+              {videoImageError && (
+                <div className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-2 animate-fade-in">
+                  <div className="h-2 w-2 rounded-full bg-destructive" />
+                  <p className="text-sm text-destructive">{videoImageError}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Video Generation Dialog (from content package) */}
       <Dialog
         open={!!videoTarget}
         onOpenChange={() => { if (!videoGenerating) { setVideoTarget(null); setVideoError(null); setVideoSuccess(false); } }}

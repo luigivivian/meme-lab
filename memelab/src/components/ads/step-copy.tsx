@@ -34,7 +34,7 @@ export function StepCopy({ stepState, onApprove, onRegenerate }: Props) {
     );
   }
 
-  if (stepState.status === "failed") {
+  if (stepState.status === "error") {
     return (
       <Card>
         <CardContent className="space-y-4 py-6">

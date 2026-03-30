@@ -76,6 +76,7 @@ async def transcribe_to_srt(
         srt_text = "\n".join(lines)
 
     srt_text = _normalize_srt_timestamps(srt_text)
+    srt_text = _validate_srt_timestamps(srt_text)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(srt_text)
@@ -118,6 +119,98 @@ def _normalize_srt_timestamps(srt_text: str) -> str:
         fix_timestamp,
         srt_text,
     )
+
+
+def _srt_ts_to_seconds(ts: str) -> float:
+    """Parse SRT timestamp 'HH:MM:SS,mmm' to seconds."""
+    m = re.match(r"(\d{2}):(\d{2}):(\d{2}),(\d{3})", ts.strip())
+    if not m:
+        return 0.0
+    h, mi, s, ms = m.groups()
+    return int(h) * 3600 + int(mi) * 60 + int(s) + int(ms) / 1000.0
+
+
+def _seconds_to_srt_ts(seconds: float) -> str:
+    """Format seconds to SRT timestamp 'HH:MM:SS,mmm'."""
+    if seconds < 0:
+        seconds = 0.0
+    h = int(seconds // 3600)
+    mi = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    ms = int(round((seconds - int(seconds)) * 1000))
+    return f"{h:02d}:{mi:02d}:{s:02d},{ms:03d}"
+
+
+def _validate_srt_timestamps(srt_text: str) -> str:
+    """Fix temporally inconsistent SRT timestamps from Gemini.
+
+    Gemini occasionally returns correctly-formatted but wrong-value
+    timestamps (e.g. 00:06:21,795 instead of 00:00:08,795). This
+    causes subtitle entries to overlap, stacking on screen.
+
+    Fixes applied:
+    1. If an entry's end time exceeds the next entry's start time,
+       cap it to the next entry's start (minus a small gap).
+    2. If an entry's end time is before its start time, set end = start + 2s.
+    """
+    blocks = srt_text.strip().split("\n\n")
+    parsed = []
+
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if len(lines) < 3:
+            parsed.append({"raw": block, "start": None, "end": None, "lines": lines})
+            continue
+        ts_match = re.match(
+            r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})",
+            lines[1].strip(),
+        )
+        if not ts_match:
+            parsed.append({"raw": block, "start": None, "end": None, "lines": lines})
+            continue
+        start_s = _srt_ts_to_seconds(ts_match.group(1))
+        end_s = _srt_ts_to_seconds(ts_match.group(2))
+        parsed.append({
+            "raw": block, "start": start_s, "end": end_s,
+            "lines": lines, "ts_line_idx": 1,
+        })
+
+    modified = False
+    for i, entry in enumerate(parsed):
+        if entry["start"] is None:
+            continue
+
+        start_s = entry["start"]
+        end_s = entry["end"]
+        original_end = end_s
+
+        # Fix inverted timestamps
+        if end_s <= start_s:
+            end_s = start_s + 2.0
+
+        # Cap end time to next entry's start (with 50ms gap)
+        if i + 1 < len(parsed) and parsed[i + 1]["start"] is not None:
+            next_start = parsed[i + 1]["start"]
+            if end_s > next_start:
+                end_s = max(next_start - 0.05, start_s + 0.1)
+
+        if end_s != original_end:
+            lines = entry["lines"]
+            lines[1] = f"{_seconds_to_srt_ts(start_s)} --> {_seconds_to_srt_ts(end_s)}"
+            entry["end"] = end_s
+            modified = True
+
+    if not modified:
+        return srt_text
+
+    # Rebuild SRT text
+    result_blocks = []
+    for entry in parsed:
+        result_blocks.append("\n".join(entry["lines"]))
+
+    result = "\n\n".join(result_blocks)
+    logger.info("SRT timestamps validated and corrected")
+    return result
 
 
 def estimate_transcription_cost(audio_duration_seconds: float) -> float:
