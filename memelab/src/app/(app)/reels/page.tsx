@@ -77,6 +77,7 @@ function GenerationForm() {
   const [niche, setNiche] = useState("lifestyle");
   const [preset, setPreset] = useState("clean");
   const [showAjustes, setShowAjustes] = useState(false);
+  const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submittingInteractive, setSubmittingInteractive] = useState(false);
@@ -100,6 +101,7 @@ function GenerationForm() {
         tone,
         target_duration: parseInt(duration),
         niche,
+        platforms,
         ...(characterId === "none"
           ? { no_character: true }
           : characterId !== "auto"
@@ -129,6 +131,7 @@ function GenerationForm() {
       const res = await createInteractiveReel({
         tema: tema.trim(),
         target_duration: parseInt(duration),
+        platforms,
         ...(characterId === "none"
           ? { no_character: true }
           : characterId !== "auto"
@@ -229,6 +232,37 @@ function GenerationForm() {
               onChange={(e) => setTema(e.target.value)}
               rows={3}
             />
+
+            {/* Platform checkboxes */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Plataformas</label>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { id: "instagram", label: "Instagram" },
+                  { id: "youtube_shorts", label: "YouTube Shorts" },
+                  { id: "tiktok", label: "TikTok" },
+                  { id: "facebook", label: "Facebook" },
+                ].map((p) => (
+                  <label key={p.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={platforms.includes(p.id)}
+                      disabled={p.id === "instagram"}
+                      onChange={(e) => {
+                        if (p.id === "instagram") return;
+                        setPlatforms((prev) =>
+                          e.target.checked
+                            ? [...prev, p.id]
+                            : prev.filter((x) => x !== p.id)
+                        );
+                      }}
+                      className="accent-purple-500 h-3.5 w-3.5"
+                    />
+                    <span className={p.id === "instagram" ? "text-muted-foreground" : ""}>{p.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
 
             {/* Collapsible settings */}
             <button
@@ -421,6 +455,16 @@ function JobHistory() {
 
                 {job.status === "failed" && job.error_message && (
                   <p className="text-xs text-red-400 line-clamp-2">{job.error_message}</p>
+                )}
+
+                {job.platforms && job.platforms.length > 1 && (
+                  <div className="flex gap-1">
+                    {job.platforms.map((p: string) => (
+                      <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
+                        {p === "youtube_shorts" ? "YT" : p === "instagram" ? "IG" : p === "tiktok" ? "TT" : "FB"}
+                      </span>
+                    ))}
+                  </div>
                 )}
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
