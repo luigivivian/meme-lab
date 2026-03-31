@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Phase complete — ready for verification
-stopped_at: Completed quick-260330-tgu plan
-last_updated: "2026-03-31T00:24:18.480Z"
-last_activity: "2026-03-30 - Completed quick task 260330-ie5: Enhance ads wizard presets by niche"
+stopped_at: Completed 999.8-G-asset-reuse plan
+last_updated: "2026-03-31T06:59:03.547Z"
+last_activity: "2026-03-31 - Completed quick task 260330-tgu: Enhance theme button for reels"
 progress:
   total_phases: 17
   completed_phases: 8
   total_plans: 27
-  completed_plans: 27
+  completed_plans: 28
 ---
 
 # Project State
@@ -179,6 +179,7 @@ Recent decisions affecting current work:
 - [Phase 421]: Manual collapsible sections in wizard (no Accordion component); client-side cost estimate by style; AI analysis via /ads/analyze pre-fill
 - [Phase 421]: AdStepper uses horizontal scrollable layout for 8 steps; StepExport has no approve button per D-22 auto-complete; Ad API types created inline due to worktree isolation
 - [Phase quick-260330-tgu]: Niche selector replaces plain text input; enhance sends PT-BR niche label to Gemini
+- [Phase 999.8-G]: Pure Python cosine similarity (no numpy) for asset reuse; Gemini text-embedding-004 for 768-dim embeddings; threshold 0.85 for conservative match
 
 ### Pending Todos
 
@@ -200,6 +201,6 @@ None.
 ## Session Continuity
 
 Last activity: 2026-03-31 - Completed quick task 260330-tgu: Enhance theme button for reels
-Last session: 2026-03-31T00:24:18.475Z
-Stopped at: Completed quick-260330-tgu plan
+Last session: 2026-03-31T06:59:03.538Z
+Stopped at: Completed 999.8-G-asset-reuse plan
 Resume file: None
