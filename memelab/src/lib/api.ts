@@ -1520,6 +1520,29 @@ export async function getReelsPresets() {
   return request<ReelsPresets>("/reels/config/presets");
 }
 
+// --- Enhance Theme Cache (Phase 999.8-A) ---
+
+export interface EnhanceThemeResponse {
+  suggestions: string[];
+  cached: boolean;
+}
+
+export async function enhanceReelTheme(nicheId: string, subTheme = "") {
+  const params = new URLSearchParams({ niche_id: nicheId });
+  if (subTheme) params.set("sub_theme", subTheme);
+  return request<EnhanceThemeResponse>(`/reels/enhance-theme?${params}`, {
+    method: "POST",
+  });
+}
+
+export async function clearEnhanceCache(nicheId: string, subTheme = "") {
+  const params = new URLSearchParams({ niche_id: nicheId });
+  if (subTheme) params.set("sub_theme", subTheme);
+  return request<{ cleared: boolean }>(`/reels/enhance-theme/cache?${params}`, {
+    method: "DELETE",
+  });
+}
+
 // --- Interactive Reels (Phase 999.5) ---
 
 export interface StepState {

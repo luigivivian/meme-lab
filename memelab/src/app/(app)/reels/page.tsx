@@ -15,6 +15,8 @@ import {
   ExternalLink,
   Wand2,
   ArrowRight,
+  RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,8 @@ import {
   generateReel,
   createInteractiveReel,
   saveReelsConfig,
+  enhanceReelTheme,
+  clearEnhanceCache,
   type ReelGenerateRequest,
   type ReelJob,
   type ReelsConfig,
@@ -81,6 +85,9 @@ function GenerationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submittingInteractive, setSubmittingInteractive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isCached, setIsCached] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const { data: presets } = useReelsPresets();
   const { data: characters } = useCharacters();
@@ -89,6 +96,33 @@ function GenerationForm() {
   const isComplete = jobStatus?.status === "complete";
   const isFailed = jobStatus?.status === "failed";
   const isGenerating = activeJobId && !isComplete && !isFailed;
+
+  async function handleSuggestThemes() {
+    setLoadingSuggestions(true);
+    try {
+      const res = await enhanceReelTheme(niche, tema.trim());
+      setSuggestions(res.suggestions);
+      setIsCached(res.cached);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao sugerir temas");
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }
+
+  async function handleRefreshSuggestions() {
+    setLoadingSuggestions(true);
+    try {
+      await clearEnhanceCache(niche, tema.trim());
+      const res = await enhanceReelTheme(niche, tema.trim());
+      setSuggestions(res.suggestions);
+      setIsCached(res.cached);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao atualizar sugestoes");
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }
 
   async function handleGenerate() {
     if (!tema.trim()) return;
@@ -229,6 +263,53 @@ function GenerationForm() {
               onChange={(e) => setTema(e.target.value)}
               rows={3}
             />
+
+            {/* Suggest themes */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSuggestThemes}
+                disabled={loadingSuggestions}
+                className="text-purple-400 hover:text-purple-300"
+              >
+                {loadingSuggestions ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Sugerir Temas
+              </Button>
+              {isCached && (
+                <span className="text-xs text-muted-foreground">(em cache)</span>
+              )}
+              {suggestions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleRefreshSuggestions}
+                  disabled={loadingSuggestions}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  title="Gerar novas sugestoes"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingSuggestions ? "animate-spin" : ""}`} />
+                </button>
+              )}
+            </div>
+
+            {suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className="text-xs px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
+                    onClick={() => setTema(s)}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Collapsible settings */}
             <button
