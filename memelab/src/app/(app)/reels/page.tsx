@@ -30,7 +30,7 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
-import { useReelJobs, useReelStatus, useReelsConfig, useReelsPresets } from "@/hooks/use-reels";
+import { useReelJobs, useReelStatus, useReelsConfig, useReelsPresets, useReelsModels } from "@/hooks/use-reels";
 import { useCharacters } from "@/hooks/use-api";
 import {
   generateReel,
@@ -661,6 +661,7 @@ function JobHistory() {
 
 function ConfigPanel() {
   const { data: configs } = useReelsConfig();
+  const { data: modelsData } = useReelsModels();
   const config = configs?.[0];
 
   const [ttsVoice, setTtsVoice] = useState(config?.tts_voice ?? "nova");
@@ -669,9 +670,12 @@ function ConfigPanel() {
   const [transitionType, setTransitionType] = useState(config?.transition_type ?? "fade");
   const [transitionDuration, setTransitionDuration] = useState(String(config?.transition_duration ?? 0.3));
   const [subtitleFontSize, setSubtitleFontSize] = useState(String(config?.subtitle_font_size ?? 52));
+  const [videoModel, setVideoModel] = useState(config?.video_model ?? "hailuo/2-3-image-to-video-standard");
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const models = modelsData?.models ?? {};
 
   async function handleSave() {
     setSaving(true);
@@ -684,6 +688,7 @@ function ConfigPanel() {
         transition_type: transitionType,
         transition_duration: parseFloat(transitionDuration),
         subtitle_font_size: parseInt(subtitleFontSize),
+        video_model: videoModel,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -806,6 +811,31 @@ function ConfigPanel() {
                 className="w-full accent-purple-500"
               />
             </div>
+          </div>
+
+          {/* Video Model Selector */}
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Modelo de Video (Kie.ai)</label>
+            <Select value={videoModel} onValueChange={setVideoModel}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(models).map(([id, info]) => (
+                  <SelectItem key={id} value={id}>
+                    {info.label} - R${info.price_brl.toFixed(2)}/cena ({info.resolution})
+                  </SelectItem>
+                ))}
+                {Object.keys(models).length === 0 && (
+                  <SelectItem value="hailuo/2-3-image-to-video-standard">
+                    Hailuo 2.3 Standard - R$0.86/cena (720p)
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {models[videoModel] && (
+              <p className="text-xs text-muted-foreground">
+                Duracoes: {models[videoModel].durations.join("s, ")}s
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

@@ -50,6 +50,20 @@ REELS_AVAILABLE_TRANSITIONS = [
     "pixelize", "diagtl", "diagtr",
 ]
 
+# Default video model for Kie.ai
+REELS_VIDEO_MODEL = os.getenv("REELS_VIDEO_MODEL", "hailuo/2-3-image-to-video-standard")
+
+# Available Kie.ai video models for reels (label, price per scene in BRL, durations, resolution)
+REELS_AVAILABLE_MODELS = {
+    "hailuo/2-3-image-to-video-standard": {"label": "Hailuo 2.3 Standard", "price_brl": 0.86, "durations": [6, 10], "resolution": "720p"},
+    "hailuo/2-3-image-to-video-pro": {"label": "Hailuo 2.3 Pro", "price_brl": 0.86, "durations": [6, 10], "resolution": "1080p"},
+    "wan/2-6-flash-image-to-video": {"label": "Wan 2.6 Flash", "price_brl": 1.05, "durations": [5, 10, 15], "resolution": "720p"},
+    "wan/2-6-image-to-video": {"label": "Wan 2.6", "price_brl": 1.83, "durations": [5, 10, 15], "resolution": "720p"},
+    "kling/v2-1-standard": {"label": "Kling v2.1", "price_brl": 1.44, "durations": [5, 10], "resolution": "720p"},
+    "bytedance/seedance-1.5-pro": {"label": "Seedance 1.5 Pro", "price_brl": 2.62, "durations": [4, 8, 12], "resolution": "1080p"},
+    "kling-3.0/video": {"label": "Kling 3.0", "price_brl": 2.10, "durations": [3, 5, 10, 15], "resolution": "1080p"},
+}
+
 # Output
 REELS_OUTPUT_DIR = os.getenv("REELS_OUTPUT_DIR", "output/reels")
 

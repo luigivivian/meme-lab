@@ -406,19 +406,24 @@ class ReelsPipeline:
 
         return video_path
 
-    async def run_step_video_hailuo(
+    async def run_step_video_hailuo(self, *args, **kwargs) -> str:
+        """Backward-compatible alias for run_step_video_kie."""
+        return await self.run_step_video_kie(*args, **kwargs)
+
+    async def run_step_video_kie(
         self,
         image_paths: list[str],
         audio_path: str,
         srt_path: str,
         job_dir: str,
         script: dict | None = None,
+        on_scene_update: Callable[[list[dict]], None] | None = None,
     ) -> str:
-        """Step 6 v2: Generate per-scene Hailuo video clips, concatenate with audio + subtitles.
+        """Step 6 v2: Generate per-scene Kie.ai video clips with retry, concatenate with audio + subtitles.
 
-        Per REELV2-03: Uses Kie.ai Hailuo 2.3 Standard for image-to-video per scene.
-        Polls all tasks in parallel. Falls back to static image clip on failure.
-        Final assembly via FFmpeg xfade + audio + SRT subtitles.
+        Uses user-selected model from config (defaults to Hailuo 2.3 Standard).
+        Retry logic: attempt 1 (full prompt), attempt 2 (simplified prompt), attempt 3 (static fallback).
+        Per-scene status tracked via on_scene_update callback.
 
         Args:
             image_paths: Paths to per-scene images (1 per cena).
@@ -426,6 +431,7 @@ class ReelsPipeline:
             srt_path: Path to SRT subtitles.
             job_dir: Job working directory.
             script: Script dict with cenas (for motion prompt context).
+            on_scene_update: Callback(scenes_list) called after each scene status change.
 
         Returns:
             Path to final video file.
@@ -436,6 +442,7 @@ class ReelsPipeline:
         from src.video_gen.kie_client import KieSora2Client
         from src.video_gen.gcs_uploader import GCSUploader
         from src.reels_pipeline.video_builder import concat_clips_with_audio
+        from src.reels_pipeline.config import REELS_VIDEO_MODEL
 
         kie = KieSora2Client()
         gcs = GCSUploader()
@@ -443,9 +450,28 @@ class ReelsPipeline:
         clips_dir = os.path.join(job_dir, "clips")
         os.makedirs(clips_dir, exist_ok=True)
 
-        hailuo_model = "hailuo/2-3-image-to-video-standard"
+        video_model = self.config.get("video_model") or REELS_VIDEO_MODEL
         target_duration = self.config.get("target_duration", 30)
         n = len(image_paths)
+
+        # Initialize per-scene status tracking
+        scenes: list[dict] = []
+
+        def _update_scene(idx: int, updates: dict):
+            while len(scenes) <= idx:
+                scenes.append({"index": len(scenes), "status": "pending"})
+            scenes[idx].update(updates)
+            if on_scene_update:
+                on_scene_update(scenes)
+
+        def _make_static(img_path: str, clip_path: str, duration: int):
+            subprocess.run([
+                "ffmpeg", "-y", "-loop", "1", "-t", str(duration),
+                "-i", img_path,
+                "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+                clip_path,
+            ], capture_output=True, timeout=60)
 
         # Phase 1: Upload images to GCS and build scene-aware motion prompts
         tasks_info = []
@@ -463,74 +489,73 @@ class ReelsPipeline:
                 "index": i, "url": public_url, "motion": motion,
                 "img_path": img_path, "duration": clip_duration,
             })
+            _update_scene(i, {
+                "status": "uploading", "prompt": motion,
+                "img_path": img_path, "duration": clip_duration,
+            })
             logger.info(f"Scene {i}: {clip_duration}s clip, prompt: {motion[:60]}...")
 
-        # Phase 2: Create all Hailuo tasks (per-scene duration: 6s or 10s)
-        task_ids = []
-        for info in tasks_info:
-            try:
-                task_id = await kie.create_task(
-                    image_url=info["url"],
-                    prompt=info["motion"],
-                    duration=info["duration"],
-                    model=hailuo_model,
-                )
-                task_ids.append({
-                    "index": info["index"], "task_id": task_id,
-                    "img_path": info["img_path"], "duration": info["duration"],
-                })
-                logger.info(f"Scene {info['index']}: Hailuo {info['duration']}s task: {task_id}")
-            except Exception as e:
-                logger.error(f"Scene {info['index']}: failed to create Hailuo task: {e}")
-                task_ids.append({
-                    "index": info["index"], "task_id": None,
-                    "img_path": info["img_path"], "duration": info["duration"],
-                })
-
-        # Phase 3: Poll all tasks in parallel
-        async def poll_and_download(entry):
-            idx = entry["index"]
-            tid = entry["task_id"]
-            img_path = entry["img_path"]
-            clip_dur = entry["duration"]
+        # Phase 2+3: Create tasks, poll, retry on failure
+        async def process_scene(info: dict) -> str:
+            idx = info["index"]
+            img_path = info["img_path"]
+            clip_dur = info["duration"]
+            prompt = info["motion"]
             clip_path = os.path.join(clips_dir, f"clip_{idx:02d}.mp4")
 
-            if tid is None:
-                logger.warning(f"Scene {idx}: no task, using {clip_dur}s static fallback")
-                subprocess.run([
-                    "ffmpeg", "-y", "-loop", "1", "-t", str(clip_dur),
-                    "-i", img_path,
-                    "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
-                    clip_path,
-                ], capture_output=True, timeout=60)
-                return clip_path
-
-            try:
-                result = await kie.poll_until_complete(tid)
-                if result and result.video_url:
-                    await kie.download_video(result.video_url, clip_path)
-                    logger.info(f"Scene {idx}: Hailuo clip downloaded")
+            for attempt in range(3):
+                if attempt == 2:
+                    # Third attempt: static fallback
+                    logger.warning(f"Scene {idx}: all retries failed, using static fallback")
+                    _make_static(img_path, clip_path, clip_dur)
+                    _update_scene(idx, {
+                        "status": "static_fallback", "clip_path": clip_path,
+                        "error": "All Kie.ai attempts failed, using static image",
+                    })
                     return clip_path
-            except Exception as e:
-                logger.error(f"Scene {idx}: Hailuo poll/download failed: {e}")
 
-            # Fallback: static image using per-scene duration
-            logger.warning(f"Scene {idx}: Hailuo failed, using static fallback")
-            subprocess.run([
-                "ffmpeg", "-y", "-loop", "1", "-t", str(clip_dur),
-                "-i", img_path,
-                "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
-                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
-                clip_path,
-            ], capture_output=True, timeout=60)
+                current_prompt = prompt
+                if attempt == 1:
+                    # Simplified prompt on second attempt
+                    current_prompt = prompt[:500].rsplit(".", 1)[0] + "."
+                    logger.info(f"Scene {idx}: retry with simplified prompt ({len(current_prompt)} chars)")
+
+                _update_scene(idx, {"status": "generating", "task_id": None, "error": None})
+
+                try:
+                    task_id = await kie.create_task(
+                        image_url=info["url"],
+                        prompt=current_prompt,
+                        duration=clip_dur,
+                        model=video_model,
+                    )
+                    _update_scene(idx, {"task_id": task_id})
+                    logger.info(f"Scene {idx}: Kie.ai {clip_dur}s task: {task_id} (model={video_model}, attempt={attempt+1})")
+
+                    result = await kie.poll_until_complete(task_id)
+                    if result and result.video_url:
+                        await kie.download_video(result.video_url, clip_path)
+                        logger.info(f"Scene {idx}: clip downloaded (attempt {attempt+1})")
+                        _update_scene(idx, {"status": "success", "clip_path": clip_path})
+                        return clip_path
+                    else:
+                        raise RuntimeError("No video URL in result")
+
+                except Exception as e:
+                    error_msg = str(e)[:300]
+                    logger.error(f"Scene {idx}: attempt {attempt+1} failed: {error_msg}")
+                    _update_scene(idx, {"status": "failed", "error": error_msg})
+
+            # Should not reach here, but safety fallback
+            _make_static(img_path, clip_path, clip_dur)
+            _update_scene(idx, {"status": "static_fallback", "clip_path": clip_path})
             return clip_path
 
-        clip_paths_raw = await aio.gather(*[poll_and_download(e) for e in task_ids])
+        clip_paths_raw = await aio.gather(*[process_scene(info) for info in tasks_info])
         clip_paths = [p for p in clip_paths_raw if p and os.path.isfile(p)]
 
         if not clip_paths:
-            raise RuntimeError("No video clips generated (all Hailuo tasks failed)")
+            raise RuntimeError("No video clips generated (all Kie.ai tasks failed)")
 
         # Phase 4: Concat clips with audio + subtitles
         video_path = os.path.join(job_dir, "final.mp4")
@@ -543,8 +568,59 @@ class ReelsPipeline:
             transition_type=self.config.get("transition_type", "fade"),
         )
 
-        logger.info(f"Hailuo reel assembled: {video_path} from {len(clip_paths)} clips")
+        logger.info(f"Kie.ai reel assembled: {video_path} from {len(clip_paths)} clips")
         return video_path
+
+    async def retry_single_scene(
+        self,
+        job_dir: str,
+        scene_index: int,
+        image_path: str,
+        image_url: str,
+        prompt: str,
+        duration: int,
+    ) -> dict:
+        """Retry a single scene with optional custom prompt.
+
+        Returns dict with scene status fields (status, clip_path, task_id, error).
+        """
+        import subprocess
+        from src.video_gen.kie_client import KieSora2Client
+        from src.reels_pipeline.config import REELS_VIDEO_MODEL
+
+        kie = KieSora2Client()
+        video_model = self.config.get("video_model") or REELS_VIDEO_MODEL
+        clips_dir = os.path.join(job_dir, "clips")
+        os.makedirs(clips_dir, exist_ok=True)
+        clip_path = os.path.join(clips_dir, f"clip_{scene_index:02d}.mp4")
+
+        try:
+            task_id = await kie.create_task(
+                image_url=image_url,
+                prompt=prompt,
+                duration=duration,
+                model=video_model,
+            )
+            logger.info(f"Retry scene {scene_index}: task={task_id} model={video_model}")
+
+            result = await kie.poll_until_complete(task_id)
+            if result and result.video_url:
+                await kie.download_video(result.video_url, clip_path)
+                return {
+                    "index": scene_index, "status": "success",
+                    "task_id": task_id, "clip_path": clip_path,
+                    "prompt": prompt, "error": None,
+                }
+            raise RuntimeError("No video URL in result")
+
+        except Exception as e:
+            error_msg = str(e)[:300]
+            logger.error(f"Retry scene {scene_index} failed: {error_msg}")
+            return {
+                "index": scene_index, "status": "failed",
+                "task_id": None, "clip_path": "",
+                "prompt": prompt, "error": error_msg,
+            }
 
     # ------------------------------------------------------------------
     # Full pipeline (backward compatible)

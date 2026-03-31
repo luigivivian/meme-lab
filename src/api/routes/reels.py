@@ -227,12 +227,29 @@ async def _execute_step_task(
                 audio_path = step_state.get("tts", {}).get("path", "")
                 srt_path = step_state.get("srt", {}).get("path", "")
                 script_json = step_state.get("script", {}).get("json", {})
-                video_path = await pipeline.run_step_video_hailuo(
+
+                # Per-scene status callback for real-time UI updates
+                async def _scene_update(scenes_list):
+                    step_state["video"]["scenes"] = scenes_list
+                    job.step_state = step_state
+                    flag_modified(job, "step_state")
+                    await session.commit()
+
+                def on_scene_update(scenes_list):
+                    import asyncio
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(_scene_update(scenes_list))
+                    except RuntimeError:
+                        pass
+
+                video_path = await pipeline.run_step_video_kie(
                     image_paths=image_paths,
                     audio_path=audio_path,
                     srt_path=srt_path,
                     job_dir=job_dir,
                     script=script_json,
+                    on_scene_update=on_scene_update,
                 )
                 step_data["path"] = video_path
                 step_data["status"] = "complete"
@@ -409,6 +426,7 @@ async def generate_reel(
                 "subtitle_font_size": config.subtitle_font_size,
                 "subtitle_color": config.subtitle_color,
                 "logo_enabled": config.logo_enabled,
+                "video_model": config.video_model,
             }
 
     # Resolve character_id: explicit id > slug > auto-detect > none
@@ -518,6 +536,18 @@ async def create_interactive_reel(
         character_id = None
 
     step_state = _init_step_state(req.tema)
+
+    # Load config to persist video_model in step_state for downstream steps
+    if req.config_id:
+        cfg_result = await db.execute(
+            select(ReelsConfig).where(
+                ReelsConfig.id == req.config_id,
+                ReelsConfig.user_id == current_user.id,
+            )
+        )
+        cfg = cfg_result.scalar_one_or_none()
+        if cfg:
+            step_state["config"] = {"video_model": cfg.video_model}
 
     # Create job_dir immediately so all subsequent steps can use it
     from src.reels_pipeline.main import ReelsPipeline
@@ -640,6 +670,7 @@ async def execute_step(
                 "transition_duration": cfg.transition_duration,
                 "subtitle_font_size": cfg.subtitle_font_size,
                 "subtitle_color": cfg.subtitle_color,
+                "video_model": cfg.video_model,
             }
 
     # Mark step as generating
@@ -866,6 +897,172 @@ async def edit_step(
     return {"step": step_name, "status": "edited", "step_state": step_state}
 
 
+@router.post("/{job_id}/retry-scene/{scene_index}", summary="Retry a single failed scene")
+async def retry_scene(
+    job_id: str,
+    scene_index: int,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+    prompt: str | None = None,
+):
+    """Re-run Kie.ai for a single scene. Accepts optional custom prompt in query param.
+
+    If all scenes have clips after retry, auto-reassembles the final video.
+    """
+    from src.database.session import get_session_factory
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+    video_data = step_state.get("video", {})
+    scenes = video_data.get("scenes", [])
+
+    if scene_index < 0 or scene_index >= len(scenes):
+        raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
+
+    scene = scenes[scene_index]
+    if scene.get("status") not in ("failed", "static_fallback"):
+        raise HTTPException(status_code=400, detail="Scene is not in a retryable state")
+
+    # Mark scene as generating
+    scene["status"] = "generating"
+    scene["error"] = None
+    scenes[scene_index] = scene
+    video_data["scenes"] = scenes
+    step_state["video"] = video_data
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
+    # Build config_override
+    config_override = {}
+    if job.config_id:
+        cfg_result = await db.execute(
+            select(ReelsConfig).where(
+                ReelsConfig.id == job.config_id,
+                ReelsConfig.user_id == current_user.id,
+            )
+        )
+        cfg = cfg_result.scalar_one_or_none()
+        if cfg:
+            config_override = {"video_model": cfg.video_model}
+
+    session_factory = get_session_factory()
+    background_tasks.add_task(
+        _retry_scene_task, job_id, scene_index, prompt, config_override, session_factory
+    )
+
+    return {"scene_index": scene_index, "status": "generating"}
+
+
+async def _retry_scene_task(
+    job_id: str,
+    scene_index: int,
+    custom_prompt: str | None,
+    config_override: dict,
+    session_factory,
+):
+    """Background task: retry a single scene via Kie.ai."""
+    from src.reels_pipeline.main import ReelsPipeline
+    from src.reels_pipeline.video_builder import concat_clips_with_audio
+
+    async with session_factory() as session:
+        try:
+            result = await session.execute(
+                select(ReelsJob).where(ReelsJob.job_id == job_id)
+            )
+            job = result.scalar_one_or_none()
+            if not job:
+                return
+
+            step_state = dict(job.step_state or {})
+            video_data = step_state.get("video", {})
+            scenes = video_data.get("scenes", [])
+            if scene_index >= len(scenes):
+                return
+
+            scene = scenes[scene_index]
+            job_dir = step_state.get("prompt", {}).get("job_dir", "")
+
+            # Determine prompt and image URL
+            retry_prompt = custom_prompt or scene.get("prompt", "")
+            img_path = scene.get("img_path", "")
+            duration = scene.get("duration", 6)
+
+            # Upload image to GCS for retry
+            from src.video_gen.gcs_uploader import GCSUploader
+            gcs = GCSUploader()
+            gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{scene_index}_retry.jpg"
+            image_url = gcs.upload_image(img_path, gcs_key)
+
+            pipeline = ReelsPipeline(config_override=config_override)
+            retry_result = await pipeline.retry_single_scene(
+                job_dir=job_dir,
+                scene_index=scene_index,
+                image_path=img_path,
+                image_url=image_url,
+                prompt=retry_prompt,
+                duration=duration,
+            )
+
+            # Update scene in step_state
+            scenes[scene_index] = {**scene, **retry_result}
+            video_data["scenes"] = scenes
+            step_state["video"] = video_data
+
+            # Check if all scenes now have clips — auto-reassemble
+            all_have_clips = all(
+                s.get("status") in ("success", "static_fallback")
+                for s in scenes
+            )
+            if all_have_clips:
+                clips_dir = os.path.join(job_dir, "clips")
+                clip_paths = []
+                for s in scenes:
+                    cp = s.get("clip_path", "")
+                    if cp and os.path.isfile(cp):
+                        clip_paths.append(cp)
+                    else:
+                        # Fallback to expected path
+                        expected = os.path.join(clips_dir, f"clip_{s['index']:02d}.mp4")
+                        if os.path.isfile(expected):
+                            clip_paths.append(expected)
+
+                if clip_paths:
+                    audio_path = step_state.get("tts", {}).get("path", "")
+                    srt_path = step_state.get("srt", {}).get("path", "")
+                    video_path = os.path.join(job_dir, "final.mp4")
+                    concat_clips_with_audio(
+                        clip_paths=clip_paths,
+                        audio_path=audio_path,
+                        srt_path=srt_path,
+                        output_path=video_path,
+                        transition_duration=0.3,
+                    )
+                    video_data["path"] = video_path
+                    job.video_path = video_path
+                    logger.info(f"Auto-reassembled video after retry: {video_path}")
+
+            job.step_state = step_state
+            flag_modified(job, "step_state")
+            await session.commit()
+
+        except Exception as e:
+            logger.error(f"Retry scene {scene_index} for job {job_id} failed: {e}")
+            try:
+                step_state = dict(job.step_state or {})
+                scenes = step_state.get("video", {}).get("scenes", [])
+                if scene_index < len(scenes):
+                    scenes[scene_index]["status"] = "failed"
+                    scenes[scene_index]["error"] = str(e)[:300]
+                    step_state["video"]["scenes"] = scenes
+                    job.step_state = step_state
+                    flag_modified(job, "step_state")
+                    await session.commit()
+            except Exception:
+                pass
+
+
 @router.get("/{job_id}/file/{filename:path}", summary="Serve artifact files for preview")
 async def serve_artifact_file(
     job_id: str,
@@ -1008,6 +1205,7 @@ async def get_reels_configs(
             subtitle_color=c.subtitle_color,
             logo_enabled=c.logo_enabled,
             preset=c.preset,
+            video_model=c.video_model,
         )
         for c in configs
     ]
@@ -1042,6 +1240,7 @@ async def upsert_reels_config(
             "image_duration", "transition_type", "transition_duration",
             "bg_music_enabled", "bg_music_volume", "subtitle_position",
             "subtitle_font_size", "subtitle_color", "logo_enabled", "preset",
+            "video_model",
         ]:
             val = getattr(req, field_name, None)
             if val is not None:
@@ -1108,6 +1307,7 @@ async def upsert_reels_config(
         subtitle_color=config.subtitle_color,
         logo_enabled=config.logo_enabled,
         preset=config.preset,
+        video_model=config.video_model,
     )
 
 
@@ -1256,3 +1456,10 @@ async def clear_enhance_cache(
         await db.delete(cached)
         await db.commit()
     return {"cleared": True}
+
+
+@router.get("/config/models", summary="List available Kie.ai video models")
+async def list_video_models():
+    """Return available video models for reels with label, price, durations, resolution."""
+    from src.reels_pipeline.config import REELS_AVAILABLE_MODELS
+    return {"models": REELS_AVAILABLE_MODELS}

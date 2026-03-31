@@ -1485,6 +1485,18 @@ export interface ReelsConfig {
   transition_duration: number;
   subtitle_font_size: number;
   preset?: string;
+  video_model?: string;
+}
+
+export interface ReelsModelInfo {
+  label: string;
+  price_brl: number;
+  durations: number[];
+  resolution: string;
+}
+
+export interface ReelsModels {
+  models: Record<string, ReelsModelInfo>;
 }
 
 export interface ReelsPresets {
@@ -1545,6 +1557,17 @@ export async function clearEnhanceCache(nicheId: string, subTheme = "") {
   });
 }
 
+export async function getReelsModels() {
+  return request<ReelsModels>("/reels/config/models");
+}
+
+export async function retryScene(jobId: string, sceneIndex: number, prompt?: string) {
+  const params = prompt ? `?prompt=${encodeURIComponent(prompt)}` : "";
+  return request<{ scene_index: number; status: string }>(
+    `/reels/${jobId}/retry-scene/${sceneIndex}${params}`, { method: "POST" }
+  );
+}
+
 // --- Interactive Reels (Phase 999.5) ---
 
 export interface StepState {
@@ -1555,7 +1578,18 @@ export interface StepState {
   script?: { json: Record<string, unknown>; approved: boolean; status?: string };
   tts?: { path: string; approved: boolean; status?: string };
   srt?: { path: string; approved: boolean; status?: string };
-  video?: { path: string; approved: boolean; status?: string };
+  video?: { path: string; approved: boolean; status?: string; scenes?: SceneStatus[] };
+}
+
+export interface SceneStatus {
+  index: number;
+  status: "pending" | "uploading" | "generating" | "success" | "failed" | "static_fallback";
+  task_id?: string;
+  clip_path?: string;
+  img_path?: string;
+  prompt?: string;
+  duration?: number;
+  error?: string;
 }
 
 export interface StepEditPayload {

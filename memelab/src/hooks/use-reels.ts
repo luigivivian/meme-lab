@@ -25,6 +25,10 @@ export function useReelsPresets() {
   return useSWR("reels-presets", () => api.getReelsPresets());
 }
 
+export function useReelsModels() {
+  return useSWR("reels-models", () => api.getReelsModels());
+}
+
 export function useStepState(jobId: string | null) {
   return useSWR(
     jobId ? `reel-step-state-${jobId}` : null,
