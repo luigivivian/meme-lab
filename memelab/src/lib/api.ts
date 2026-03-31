@@ -1453,6 +1453,7 @@ export interface ReelGenerateRequest {
   niche?: string;
   keywords?: string[];
   platforms?: string[];
+  language?: string;
 }
 
 export interface ReelJob {
@@ -1606,6 +1607,7 @@ export interface InteractiveReelRequest {
   config_id?: number;
   target_duration?: number;
   platforms?: string[];
+  language?: string;
 }
 
 export interface PlatformOutput {

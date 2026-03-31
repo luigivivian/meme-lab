@@ -706,6 +706,7 @@ class ReelsJob(TimestampMixin, Base):
 
     # Input
     tema: Mapped[str] = mapped_column(String(500), nullable=False)
+    language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, default="pt-BR", server_default="pt-BR")
 
     # Status tracking
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default="queued")

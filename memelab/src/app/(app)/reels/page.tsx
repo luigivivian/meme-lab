@@ -80,6 +80,8 @@ function GenerationForm() {
   const [duration, setDuration] = useState("30");
   const [selectedNiche, setSelectedNiche] = useState("");
   const [selectedSubTheme, setSelectedSubTheme] = useState("");
+  const [niche, setNiche] = useState("lifestyle");
+  const [language, setLanguage] = useState("pt-BR");
   const [preset, setPreset] = useState("clean");
   const [showAjustes, setShowAjustes] = useState(false);
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
@@ -139,6 +141,7 @@ function GenerationForm() {
         target_duration: parseInt(duration),
         niche: nicheLabel || "lifestyle",
         platforms,
+        language,
         ...(characterId === "none"
           ? { no_character: true }
           : characterId !== "auto"
@@ -169,6 +172,7 @@ function GenerationForm() {
         tema: tema.trim(),
         target_duration: parseInt(duration),
         platforms,
+        language,
         ...(characterId === "none"
           ? { no_character: true }
           : characterId !== "auto"
@@ -458,6 +462,18 @@ function GenerationForm() {
 
             {showAjustes && (
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Idioma</label>
+                  <Select value={language} onValueChange={setLanguage}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pt-BR">Portugues (BR)</SelectItem>
+                      <SelectItem value="en-US">English (US)</SelectItem>
+                      <SelectItem value="es-ES">Espanol</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">Tom</label>
                   <Select value={tone} onValueChange={setTone}>

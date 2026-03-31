@@ -41,6 +41,7 @@ class ReelGenerateRequest(BaseModel):
     niche: str = Field(default="lifestyle", description="Content niche")
     keywords: list[str] = Field(default_factory=list, description="Additional keywords")
     platforms: list[str] = Field(default_factory=lambda: ["instagram"], description="Target platforms")
+    language: str = Field(default="pt-BR", description="Language for script/TTS/subtitles: pt-BR, en-US, es-ES")
 
 
 class ReelStatusResponse(BaseModel):
@@ -101,6 +102,7 @@ class ReelCreateInteractiveRequest(BaseModel):
     config_id: Optional[int] = None
     target_duration: int = 30
     platforms: list[str] = Field(default_factory=lambda: ["instagram"], description="Target platforms")
+    language: str = "pt-BR"
 
 
 class ReelsConfigRequest(BaseModel):
