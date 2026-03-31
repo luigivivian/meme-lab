@@ -441,7 +441,7 @@ class ReelsPipeline:
 
         from src.video_gen.kie_client import KieSora2Client
         from src.video_gen.gcs_uploader import GCSUploader
-        from src.reels_pipeline.video_builder import concat_clips_with_audio
+        from src.reels_pipeline.video_builder import concat_clips_with_audio, _validate_video_duration
         from src.reels_pipeline.config import REELS_VIDEO_MODEL
 
         kie = KieSora2Client()
@@ -566,9 +566,14 @@ class ReelsPipeline:
             output_path=video_path,
             transition_duration=self.config.get("transition_duration", 0.3),
             transition_type=self.config.get("transition_type", "fade"),
+            script_json=script,
         )
 
-        logger.info(f"Kie.ai reel assembled: {video_path} from {len(clip_paths)} clips")
+        # Validate final video duration
+        expected_dur = sum(c.get("duracao_segundos", 5) for c in cenas) if cenas else 30
+        validation = _validate_video_duration(video_path, expected_dur)
+        logger.info(f"Kie.ai reel assembled: {video_path} from {len(clip_paths)} clips "
+                     f"(drift={validation.get('drift', '?')}s)")
         return video_path
 
     async def retry_single_scene(

@@ -282,6 +282,108 @@ def get_video_duration(video_path: str) -> float:
     return float(result.stdout.strip())
 
 
+def _align_srt_to_scenes(
+    srt_path: str,
+    scene_durations: list[float],
+    script_json: dict,
+) -> str:
+    """Align SRT subtitle entries to scene time windows.
+
+    Maps each SRT entry to its corresponding scene based on timestamp overlap
+    with computed scene time windows. Writes an aligned SRT file alongside
+    the original.
+    """
+    with open(srt_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    blocks = content.strip().split("\n\n")
+
+    windows: list[tuple[float, float]] = []
+    t = 0.0
+    for dur in scene_durations:
+        windows.append((t, t + dur))
+        t += dur
+
+    aligned_blocks = []
+    idx = 1
+
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if len(lines) < 3:
+            continue
+        ts_line = lines[1]
+        parts = ts_line.split(" --> ")
+        if len(parts) != 2:
+            continue
+        entry_start = _parse_srt_time(parts[0])
+        entry_end = _parse_srt_time(parts[1])
+        entry_mid = (entry_start + entry_end) / 2.0
+        text = "\n".join(lines[2:])
+
+        best_scene = 0
+        for si, (ws, we) in enumerate(windows):
+            if ws <= entry_mid < we:
+                best_scene = si
+                break
+        else:
+            if entry_mid >= windows[-1][1]:
+                best_scene = len(windows) - 1
+
+        ws, we = windows[best_scene]
+        clamped_start = max(entry_start, ws)
+        clamped_end = min(entry_end, we)
+        if clamped_end <= clamped_start:
+            clamped_end = clamped_start + 0.1
+
+        aligned_blocks.append(
+            f"{idx}\n{_format_srt_time(clamped_start)} --> {_format_srt_time(clamped_end)}\n{text}"
+        )
+        idx += 1
+
+    aligned_path = srt_path.replace(".srt", "_aligned.srt")
+    with open(aligned_path, "w", encoding="utf-8") as f:
+        f.write("\n\n".join(aligned_blocks) + "\n" if aligned_blocks else "")
+
+    logger.info(f"SRT aligned to {len(scene_durations)} scenes: {aligned_path}")
+    return aligned_path
+
+
+def _validate_video_duration(
+    output_path: str,
+    expected_duration: float,
+    tolerance: float = 2.0,
+) -> dict:
+    """Validate final video duration against expected value using ffprobe."""
+    try:
+        actual = get_video_duration(output_path)
+    except RuntimeError as e:
+        logger.error(f"Duration validation failed (ffprobe error): {e}")
+        return {
+            "actual_duration": 0.0,
+            "expected_duration": expected_duration,
+            "drift": expected_duration,
+            "valid": False,
+            "error": str(e),
+        }
+
+    drift = abs(actual - expected_duration)
+    valid = drift <= tolerance
+
+    level = logging.WARNING if not valid else logging.INFO
+    logger.log(
+        level,
+        f"Duration check: actual={actual:.2f}s expected={expected_duration:.2f}s "
+        f"drift={drift:.2f}s {'OK' if valid else 'EXCEEDED TOLERANCE'}",
+    )
+
+    return {
+        "actual_duration": round(actual, 3),
+        "expected_duration": round(expected_duration, 3),
+        "drift": round(drift, 3),
+        "valid": valid,
+    }
+
+
 # ------------------------------------------------------------------
 # SRT timestamp helpers
 # ------------------------------------------------------------------
@@ -603,7 +705,7 @@ def concat_segments(
 
     for i in range(1, n):
         # offset = sum of durations so far minus accumulated transitions
-        offset = sum(durations[:i]) - i * transition_duration
+        offset = round(sum(durations[:i]) - i * transition_duration, 3)
         offset = max(offset, 0)
         out = f"v{i}" if i < n - 1 else "vout"
         xfade_filters.append(
@@ -649,6 +751,7 @@ def concat_clips_with_audio(
     output_path: str,
     transition_duration: float = 0.3,
     transition_type: str = "fade",
+    script_json: dict | None = None,
 ) -> str:
     """Concatenate Hailuo video clips, overlay audio and subtitles.
 
@@ -662,6 +765,7 @@ def concat_clips_with_audio(
         output_path: Path for final output MP4.
         transition_duration: Duration of xfade between clips.
         transition_type: FFmpeg xfade transition name (fade, dissolve, etc).
+        script_json: Optional script dict for proportional scene duration and SRT alignment.
 
     Returns:
         output_path on success.
@@ -671,13 +775,20 @@ def concat_clips_with_audio(
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
-    # Trim clips to match narration timing from SRT
-    scene_durs = _compute_scene_durations_from_srt(
-        srt_path, len(clip_paths), transition_duration,
-    )
+    # Trim clips to match narration timing — proportional if script available
+    if script_json:
+        total_dur = get_video_duration(audio_path) if os.path.exists(audio_path) else 30.0
+        scene_durs = compute_scene_durations_from_script(script_json, total_dur, len(clip_paths))
+        # Align SRT to computed scene windows
+        srt_path = _align_srt_to_scenes(srt_path, scene_durs, script_json)
+        logger.info(f"Using proportional durations from script ({len(scene_durs)} scenes)")
+    else:
+        scene_durs = _compute_scene_durations_from_srt(
+            srt_path, len(clip_paths), transition_duration,
+        )
     if scene_durs and len(scene_durs) == len(clip_paths):
         clip_paths = _trim_clips_to_durations(clip_paths, scene_durs)
-        logger.info(f"Clips trimmed to SRT narration timing ({len(clip_paths)} scenes)")
+        logger.info(f"Clips trimmed to narration timing ({len(clip_paths)} scenes)")
 
     if len(clip_paths) == 1:
         abs_srt = os.path.abspath(srt_path)
@@ -716,7 +827,7 @@ def concat_clips_with_audio(
     xfade_filters = []
     prev = "0:v"
     for i in range(1, n):
-        offset = sum(durations[:i]) - i * transition_duration
+        offset = round(sum(durations[:i]) - i * transition_duration, 3)
         offset = max(offset, 0)
         out = f"v{i}" if i < n - 1 else "vconcat"
         xfade_filters.append(
