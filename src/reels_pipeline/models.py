@@ -40,6 +40,7 @@ class ReelGenerateRequest(BaseModel):
     target_duration: int = Field(default=30, description="Target duration in seconds: 15/30/60")
     niche: str = Field(default="lifestyle", description="Content niche")
     keywords: list[str] = Field(default_factory=list, description="Additional keywords")
+    language: str = Field(default="pt-BR", description="Language for script/TTS/subtitles: pt-BR, en-US, es-ES")
 
 
 class ReelStatusResponse(BaseModel):
@@ -98,6 +99,7 @@ class ReelCreateInteractiveRequest(BaseModel):
     no_character: bool = False
     config_id: Optional[int] = None
     target_duration: int = 30
+    language: str = "pt-BR"
 
 
 class ReelsConfigRequest(BaseModel):

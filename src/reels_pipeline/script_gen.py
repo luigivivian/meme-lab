@@ -44,8 +44,9 @@ ROTEIRO_SCHEMA = {
     ],
 }
 
-# System prompt template for roteirista (per CONTEXT.md D-03)
-_SYSTEM_PROMPT = """Voce e um roteirista especialista em conteudo viral para Instagram Reels no Brasil.
+# Language-specific system prompt templates
+_SYSTEM_PROMPTS = {
+    "pt-BR": """Voce e um roteirista especialista em conteudo viral para Instagram Reels no Brasil.
 
 Regras:
 - Gancho forte nos primeiros 3 segundos para prender a atencao
@@ -65,7 +66,76 @@ Crie um roteiro que:
 2. Distribua a narracao entre as cenas de forma natural
 3. Crie um gancho irresistivel
 4. Termine com CTA forte
-5. Gere hashtags relevantes e caption completo para o Instagram"""
+5. Gere hashtags relevantes e caption completo para o Instagram""",
+
+    "en-US": """You are an expert scriptwriter for viral Instagram Reels content.
+
+Rules:
+- Strong hook in the first 3 seconds to grab attention
+- Each scene should be 3-6 seconds long
+- Narration per scene: max 15 words
+- legenda_overlay for each scene: detailed visual description of the setting (15-30 words, e.g. 'old wizard meditating on mountaintop with fog at sunrise'). This will be used as a prompt to generate the scene image
+- Clear and direct final CTA
+- Casual {tom} tone
+- Target duration: {duracao}s
+- Niche: {nicho}
+- Keywords: {keywords}
+- Default CTA: {cta}
+
+{image_instruction}
+Create a script that:
+1. {cena_instruction}
+2. Distributes narration naturally across scenes
+3. Creates an irresistible hook
+4. Ends with a strong CTA
+5. Generates relevant hashtags and a complete Instagram caption""",
+
+    "es-ES": """Eres un guionista experto en contenido viral para Instagram Reels.
+
+Reglas:
+- Gancho fuerte en los primeros 3 segundos para captar la atencion
+- Cada escena debe durar entre 3-6 segundos
+- Narracion por escena: maximo 15 palabras
+- legenda_overlay de cada escena: descripcion visual detallada del escenario (15-30 palabras, ej: 'mago anciano meditando en la cima de una montana con niebla al amanecer'). Se usara como prompt para generar la imagen de la escena
+- CTA final claro y directo
+- Lenguaje coloquial, tono {tom}
+- Duracion objetivo: {duracao}s
+- Nicho: {nicho}
+- Keywords: {keywords}
+- CTA predeterminado: {cta}
+
+{image_instruction}
+Crea un guion que:
+1. {cena_instruction}
+2. Distribuya la narracion entre las escenas de forma natural
+3. Cree un gancho irresistible
+4. Termine con un CTA fuerte
+5. Genere hashtags relevantes y un caption completo para Instagram""",
+}
+
+# Fallback for unsupported languages: use English template with language instruction
+_SYSTEM_PROMPT_FALLBACK = """You are an expert scriptwriter for viral Instagram Reels content.
+IMPORTANT: Write ALL narration, captions, hashtags, and CTA in {language}.
+
+Rules:
+- Strong hook in the first 3 seconds to grab attention
+- Each scene should be 3-6 seconds long
+- Narration per scene: max 15 words
+- legenda_overlay for each scene: detailed visual description of the setting (15-30 words). This will be used as a prompt to generate the scene image. Write legenda_overlay in English regardless of output language.
+- Clear and direct final CTA
+- Casual {tom} tone
+- Target duration: {duracao}s
+- Niche: {nicho}
+- Keywords: {keywords}
+- Default CTA: {cta}
+
+{image_instruction}
+Create a script that:
+1. {cena_instruction}
+2. Distributes narration naturally across scenes
+3. Creates an irresistible hook
+4. Ends with a strong CTA
+5. Generates relevant hashtags and a complete Instagram caption"""
 
 
 async def generate_script(
@@ -116,27 +186,62 @@ async def generate_script(
 
     if image_paths:
         n_imagens = len(image_paths)
-        image_instruction = f"Voce recebera {n_imagens} imagens que serao usadas no Reel."
-        cena_instruction = f"Use cada imagem em ordem (imagem_index 0 a {n_imagens - 1})"
+        if language.startswith("pt"):
+            image_instruction = f"Voce recebera {n_imagens} imagens que serao usadas no Reel."
+            cena_instruction = f"Use cada imagem em ordem (imagem_index 0 a {n_imagens - 1})"
+        elif language.startswith("es"):
+            image_instruction = f"Recibiras {n_imagens} imagenes que se usaran en el Reel."
+            cena_instruction = f"Usa cada imagen en orden (imagem_index 0 a {n_imagens - 1})"
+        else:
+            image_instruction = f"You will receive {n_imagens} images to use in the Reel."
+            cena_instruction = f"Use each image in order (imagem_index 0 to {n_imagens - 1})"
     else:
         # Dynamic: duration drives scene count (~1 cena per 4-6s of content)
         min_cenas = max(3, duracao // 6)
         max_cenas = max(5, duracao // 4)
-        image_instruction = (
-            f"Cada cena gerara uma imagem. Crie entre {min_cenas} e {max_cenas} cenas "
-            f"para cobrir o tema em ~{duracao}s."
-        )
-        cena_instruction = "Uma cena por momento-chave do roteiro (imagem_index sequencial a partir de 0)"
+        if language.startswith("pt"):
+            image_instruction = (
+                f"Cada cena gerara uma imagem. Crie entre {min_cenas} e {max_cenas} cenas "
+                f"para cobrir o tema em ~{duracao}s."
+            )
+            cena_instruction = "Uma cena por momento-chave do roteiro (imagem_index sequencial a partir de 0)"
+        elif language.startswith("es"):
+            image_instruction = (
+                f"Cada escena generara una imagen. Crea entre {min_cenas} y {max_cenas} escenas "
+                f"para cubrir el tema en ~{duracao}s."
+            )
+            cena_instruction = "Una escena por momento clave del guion (imagem_index secuencial desde 0)"
+        else:
+            image_instruction = (
+                f"Each scene will generate an image. Create between {min_cenas} and {max_cenas} scenes "
+                f"to cover the topic in ~{duracao}s."
+            )
+            cena_instruction = "One scene per key moment in the script (imagem_index sequential from 0)"
 
-    system_prompt = _SYSTEM_PROMPT.format(
-        tom=tom,
-        duracao=duracao,
-        nicho=nicho,
-        keywords=keywords or "nenhuma",
-        cta=cta,
-        image_instruction=image_instruction,
-        cena_instruction=cena_instruction,
-    ) + character_section
+    # Select language-appropriate system prompt template
+    prompt_template = _SYSTEM_PROMPTS.get(language)
+    if prompt_template:
+        system_prompt = prompt_template.format(
+            tom=tom,
+            duracao=duracao,
+            nicho=nicho,
+            keywords=keywords or ("nenhuma" if language.startswith("pt") else "none"),
+            cta=cta,
+            image_instruction=image_instruction,
+            cena_instruction=cena_instruction,
+        )
+    else:
+        system_prompt = _SYSTEM_PROMPT_FALLBACK.format(
+            language=language,
+            tom=tom,
+            duracao=duracao,
+            nicho=nicho,
+            keywords=keywords or "none",
+            cta=cta,
+            image_instruction=image_instruction,
+            cena_instruction=cena_instruction,
+        )
+    system_prompt += character_section
 
     # Build content parts
     parts = []

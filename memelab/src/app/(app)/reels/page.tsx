@@ -75,6 +75,7 @@ function GenerationForm() {
   const [tone, setTone] = useState("inspiracional");
   const [duration, setDuration] = useState("30");
   const [niche, setNiche] = useState("lifestyle");
+  const [language, setLanguage] = useState("pt-BR");
   const [preset, setPreset] = useState("clean");
   const [showAjustes, setShowAjustes] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -100,6 +101,7 @@ function GenerationForm() {
         tone,
         target_duration: parseInt(duration),
         niche,
+        language,
         ...(characterId === "none"
           ? { no_character: true }
           : characterId !== "auto"
@@ -129,6 +131,7 @@ function GenerationForm() {
       const res = await createInteractiveReel({
         tema: tema.trim(),
         target_duration: parseInt(duration),
+        language,
         ...(characterId === "none"
           ? { no_character: true }
           : characterId !== "auto"
@@ -242,6 +245,18 @@ function GenerationForm() {
 
             {showAjustes && (
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Idioma</label>
+                  <Select value={language} onValueChange={setLanguage}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pt-BR">Portugues (BR)</SelectItem>
+                      <SelectItem value="en-US">English (US)</SelectItem>
+                      <SelectItem value="es-ES">Espanol</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">Tom</label>
                   <Select value={tone} onValueChange={setTone}>

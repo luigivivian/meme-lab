@@ -1452,6 +1452,7 @@ export interface ReelGenerateRequest {
   target_duration?: number;
   niche?: string;
   keywords?: string[];
+  language?: string;
 }
 
 export interface ReelJob {
@@ -1546,6 +1547,7 @@ export interface InteractiveReelRequest {
   no_character?: boolean;
   config_id?: number;
   target_duration?: number;
+  language?: string;
 }
 
 export async function createInteractiveReel(req: InteractiveReelRequest) {

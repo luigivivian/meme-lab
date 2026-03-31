@@ -140,6 +140,10 @@ async def _execute_step_task(
             flag_modified(job, "step_state")
             await session.commit()
 
+            # Inject job-level language into config for pipeline steps
+            if job.language:
+                config_override["script_language"] = job.language
+
             pipeline = ReelsPipeline(config_override=config_override)
             job_dir = step_state.get("prompt", {}).get("job_dir", "")
 
@@ -416,6 +420,10 @@ async def generate_reel(
     # Update request character_id for pipeline
     req.character_id = character_id
 
+    # Thread language into config_override for pipeline
+    language = req.language or config_override.get("script_language", "pt-BR")
+    config_override["script_language"] = language
+
     # Create job in DB
     job = ReelsJob(
         job_id=job_id,
@@ -423,6 +431,7 @@ async def generate_reel(
         character_id=character_id,
         config_id=req.config_id,
         tema=req.tema,
+        language=language,
         status="queued",
     )
     db.add(job)
@@ -496,6 +505,7 @@ async def create_interactive_reel(
         character_id=character_id,
         config_id=req.config_id,
         tema=req.tema,
+        language=req.language,
         status="interactive",
         step_state=step_state,
     )
