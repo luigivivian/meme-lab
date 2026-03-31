@@ -174,13 +174,15 @@ async def _execute_step_task(
                             bool(script_json.get("cenas")),
                             len(script_json.get("cenas", [])))
                 if script_json and script_json.get("cenas"):
-                    # v2: per-cena image generation using script context
-                    paths = await pipeline.run_step_images_per_cena(
+                    # v2: per-cena image generation using script context + asset reuse
+                    paths, reuse_info = await pipeline.run_step_images_per_cena(
                         script=script_json,
                         character_id=job.character_id,
                         job_dir=job_dir,
                         images_dir=os.path.join(job_dir, "images") if job_dir else "",
+                        user_id=job.user_id,
                     )
+                    step_data["reuse_info"] = {str(k): v for k, v in reuse_info.items()}
                 else:
                     # Fallback: generic image generation (no script available)
                     paths = await pipeline.run_step_images(
@@ -232,15 +234,28 @@ async def _execute_step_task(
                 srt_path = step_state.get("srt", {}).get("path", "")
                 script_json = step_state.get("script", {}).get("json", {})
 
-                # Per-scene status callback for real-time UI updates
+                # Per-scene status callback — uses independent session to avoid
+                # concurrent commit on the parent session (which is mid-transaction)
+                _scene_lock = asyncio.Lock()
+
                 async def _scene_update(scenes_list):
-                    step_state["video"]["scenes"] = scenes_list
-                    job.step_state = step_state
-                    flag_modified(job, "step_state")
-                    await session.commit()
+                    from src.database.session import get_session_factory
+                    async with _scene_lock:
+                        try:
+                            sf = get_session_factory()
+                            async with sf() as s:
+                                result = await s.execute(
+                                    select(ReelsJob).where(ReelsJob.job_id == job_id)
+                                )
+                                j = result.scalar_one_or_none()
+                                if j and j.step_state:
+                                    j.step_state["video"]["scenes"] = scenes_list
+                                    flag_modified(j, "step_state")
+                                    await s.commit()
+                        except Exception as e:
+                            logger.warning("Scene update commit failed (non-fatal): %s", e)
 
                 def on_scene_update(scenes_list):
-                    import asyncio
                     try:
                         loop = asyncio.get_running_loop()
                         loop.create_task(_scene_update(scenes_list))
@@ -254,6 +269,8 @@ async def _execute_step_task(
                     job_dir=job_dir,
                     script=script_json,
                     on_scene_update=on_scene_update,
+                    user_id=job.user_id,
+                    character_id=job.character_id,
                 )
                 step_data["path"] = video_path
                 step_data["status"] = "complete"
@@ -905,6 +922,171 @@ async def edit_step(
     await db.commit()
 
     return {"step": step_name, "status": "edited", "step_state": step_state}
+
+
+@router.post("/{job_id}/regenerate-image/{scene_index}", summary="Regenerate a single scene image")
+async def regenerate_single_image(
+    job_id: str,
+    scene_index: int,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Force-regenerate a single scene image (bypass cache). Runs in background."""
+    from src.database.session import get_session_factory
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+    images_data = step_state.get("images", {})
+    paths = images_data.get("paths", [])
+
+    if scene_index < 0 or scene_index >= len(paths):
+        raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
+
+    session_factory = get_session_factory()
+    background_tasks.add_task(
+        _regenerate_single_image_task, job_id, scene_index, session_factory
+    )
+
+    return {"scene_index": scene_index, "status": "generating"}
+
+
+async def _regenerate_single_image_task(
+    job_id: str,
+    scene_index: int,
+    session_factory,
+):
+    """Background task: regenerate a single scene image via Gemini, register as new asset."""
+    from src.reels_pipeline.image_gen import generate_reel_images_per_cena
+
+    async with session_factory() as session:
+        try:
+            result = await session.execute(
+                select(ReelsJob).where(ReelsJob.job_id == job_id)
+            )
+            job = result.scalar_one_or_none()
+            if not job:
+                return
+
+            step_state = dict(job.step_state or {})
+            job_dir = step_state.get("prompt", {}).get("job_dir", "")
+            images_dir = os.path.join(job_dir, "images") if job_dir else ""
+            script_json = step_state.get("script", {}).get("json", {})
+            cenas = script_json.get("cenas", [])
+
+            if scene_index >= len(cenas):
+                logger.error("Regenerate image: scene_index %d >= cenas count %d", scene_index, len(cenas))
+                return
+
+            # Generate single cena image
+            single_cena = cenas[scene_index]
+            new_paths = await generate_reel_images_per_cena(
+                cenas=[single_cena],
+                character_id=job.character_id,
+                output_dir=images_dir,
+            )
+
+            if new_paths:
+                import shutil
+                target_path = os.path.join(images_dir, f"cena_{scene_index:02d}.jpg")
+                if new_paths[0] != target_path and os.path.isfile(new_paths[0]):
+                    shutil.copy2(new_paths[0], target_path)
+
+                # Update paths in step_state
+                images_data = step_state.get("images", {})
+                paths = list(images_data.get("paths", []))
+                if scene_index < len(paths):
+                    paths[scene_index] = target_path
+                images_data["paths"] = paths
+
+                # Update reuse_info
+                reuse_info = images_data.get("reuse_info", {})
+                reuse_info[str(scene_index)] = {"reused": False}
+                images_data["reuse_info"] = reuse_info
+
+                step_state["images"] = images_data
+                job.step_state = step_state
+                flag_modified(job, "step_state")
+
+                # Register as new asset
+                try:
+                    from src.reels_pipeline.asset_registry import register_asset, generate_embedding
+                    desc = f"{single_cena.get('legenda_overlay', '')} {single_cena.get('narracao', '')}".strip()
+                    if desc:
+                        emb = await generate_embedding(desc)
+                        await register_asset(
+                            user_id=job.user_id,
+                            character_id=job.character_id,
+                            asset_type="image",
+                            description=desc,
+                            file_path=target_path,
+                            embedding=emb,
+                            model_used="gemini",
+                        )
+                except Exception as reg_err:
+                    logger.warning("Asset registration failed for regenerated image %d: %s", scene_index, reg_err)
+
+                await session.commit()
+                logger.info("Regenerated image %d for job %s", scene_index, job_id)
+
+        except Exception as e:
+            logger.error("Regenerate image %d for job %s failed: %s", scene_index, job_id, e)
+
+
+@router.post("/{job_id}/regenerate-scene-video/{scene_index}", summary="Regenerate a single scene video")
+async def regenerate_scene_video(
+    job_id: str,
+    scene_index: int,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+    prompt: str | None = None,
+):
+    """Force-regenerate a single scene video (no status restriction, allows re-doing reused scenes).
+
+    Unlike retry-scene, this works on scenes in any status including 'success'.
+    """
+    from src.database.session import get_session_factory
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+    video_data = step_state.get("video", {})
+    scenes = video_data.get("scenes", [])
+
+    if scene_index < 0 or scene_index >= len(scenes):
+        raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
+
+    # Mark scene as generating
+    scene = scenes[scene_index]
+    scene["status"] = "generating"
+    scene["error"] = None
+    scene.pop("reused", None)
+    scene.pop("source_asset_id", None)
+    scenes[scene_index] = scene
+    video_data["scenes"] = scenes
+    step_state["video"] = video_data
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
+    config_override = {}
+    if job.config_id:
+        cfg_result = await db.execute(
+            select(ReelsConfig).where(
+                ReelsConfig.id == job.config_id,
+                ReelsConfig.user_id == current_user.id,
+            )
+        )
+        cfg = cfg_result.scalar_one_or_none()
+        if cfg:
+            config_override = {"video_model": cfg.video_model}
+
+    session_factory = get_session_factory()
+    background_tasks.add_task(
+        _retry_scene_task, job_id, scene_index, prompt, config_override, session_factory
+    )
+
+    return {"scene_index": scene_index, "status": "generating"}
 
 
 @router.post("/{job_id}/retry-scene/{scene_index}", summary="Retry a single failed scene")
