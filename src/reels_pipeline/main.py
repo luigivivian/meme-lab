@@ -206,29 +206,107 @@ class ReelsPipeline:
         character_id: int | None,
         job_dir: str,
         images_dir: str,
-    ) -> list[str]:
+        user_id: int | None = None,
+        force_regenerate_indices: set[int] | None = None,
+    ) -> tuple[list[str], dict]:
         """Step 3 (v2): Generate per-cena images using script context. Per REELV2-02.
+
+        With asset reuse: checks registry for similar existing images before generating.
 
         Args:
             script: Approved script dict with cenas list.
             character_id: Optional character for consistent style.
             job_dir: Job working directory.
             images_dir: Directory for output images.
+            user_id: User ID for asset registry lookup (None = skip reuse).
+            force_regenerate_indices: Scene indices to force-regenerate (skip cache).
 
         Returns:
-            List of image file paths (1 per cena).
+            Tuple of (image_paths, reuse_info). reuse_info maps index -> {reused, source_asset_id}.
         """
+        import shutil
         from src.reels_pipeline.image_gen import generate_reel_images_per_cena
 
         cenas = script.get("cenas", [])
         if not cenas:
             raise ValueError("Script has no cenas for image generation")
 
-        return await generate_reel_images_per_cena(
-            cenas=cenas,
-            character_id=character_id,
-            output_dir=images_dir,
-        )
+        force_set = force_regenerate_indices or set()
+        reuse_info: dict[int, dict] = {}
+
+        # Try asset reuse per-cena before bulk generation
+        cenas_to_generate = []
+        cena_index_map = []  # maps position in cenas_to_generate -> original index
+
+        for i, cena in enumerate(cenas):
+            image_path = os.path.join(images_dir, f"cena_{i:02d}.jpg")
+            desc = f"{cena.get('legenda_overlay', '')} {cena.get('narracao', '')}".strip()
+
+            if user_id and i not in force_set and desc:
+                try:
+                    from src.reels_pipeline.asset_registry import find_similar_asset, increment_usage
+                    match, embedding = await find_similar_asset(user_id, character_id, "image", desc)
+                    if match and os.path.isfile(match.file_path):
+                        shutil.copy2(match.file_path, image_path)
+                        await increment_usage(match.id)
+                        reuse_info[i] = {"reused": True, "source_asset_id": match.id}
+                        logger.info(f"Image {i}: reused asset {match.id}")
+                        continue
+                    # Store embedding for registration after generation
+                    reuse_info[i] = {"reused": False, "_embedding": embedding, "_desc": desc}
+                except Exception as e:
+                    logger.warning(f"Asset lookup failed for cena {i}, generating fresh: {e}")
+                    reuse_info[i] = {"reused": False}
+
+            cenas_to_generate.append(cena)
+            cena_index_map.append(i)
+
+        # Generate only non-reused cenas
+        if cenas_to_generate:
+            generated_paths = await generate_reel_images_per_cena(
+                cenas=cenas_to_generate,
+                character_id=character_id,
+                output_dir=images_dir,
+            )
+            # Move generated images to their correct cena positions
+            for gen_idx, orig_idx in enumerate(cena_index_map):
+                if gen_idx < len(generated_paths):
+                    target_path = os.path.join(images_dir, f"cena_{orig_idx:02d}.jpg")
+                    if generated_paths[gen_idx] != target_path and os.path.isfile(generated_paths[gen_idx]):
+                        shutil.copy2(generated_paths[gen_idx], target_path)
+
+                    # Register new asset
+                    if user_id:
+                        try:
+                            from src.reels_pipeline.asset_registry import register_asset
+                            info = reuse_info.get(orig_idx, {})
+                            emb = info.get("_embedding")
+                            desc = info.get("_desc", "")
+                            if emb and desc:
+                                await register_asset(
+                                    user_id=user_id,
+                                    character_id=character_id,
+                                    asset_type="image",
+                                    description=desc,
+                                    file_path=target_path,
+                                    embedding=emb,
+                                    model_used="gemini",
+                                )
+                        except Exception as e:
+                            logger.warning(f"Asset registration failed for cena {orig_idx}: {e}")
+
+        # Build final ordered paths
+        all_paths = []
+        for i in range(len(cenas)):
+            p = os.path.join(images_dir, f"cena_{i:02d}.jpg")
+            all_paths.append(p)
+
+        # Clean internal keys from reuse_info
+        for k, v in reuse_info.items():
+            v.pop("_embedding", None)
+            v.pop("_desc", None)
+
+        return all_paths, reuse_info
 
     async def run_step_script(
         self,
@@ -418,6 +496,9 @@ class ReelsPipeline:
         job_dir: str,
         script: dict | None = None,
         on_scene_update: Callable[[list[dict]], None] | None = None,
+        user_id: int | None = None,
+        character_id: int | None = None,
+        force_regenerate_indices: set[int] | None = None,
     ) -> str:
         """Step 6 v2: Generate per-scene Kie.ai video clips with retry, concatenate with audio + subtitles.
 
@@ -495,6 +576,8 @@ class ReelsPipeline:
             })
             logger.info(f"Scene {i}: {clip_duration}s clip, prompt: {motion[:60]}...")
 
+        force_set = force_regenerate_indices or set()
+
         # Phase 2+3: Create tasks, poll, retry on failure
         async def process_scene(info: dict) -> str:
             idx = info["index"]
@@ -502,6 +585,24 @@ class ReelsPipeline:
             clip_dur = info["duration"]
             prompt = info["motion"]
             clip_path = os.path.join(clips_dir, f"clip_{idx:02d}.mp4")
+
+            # Asset reuse check for video clips
+            if user_id and idx not in force_set:
+                try:
+                    import shutil
+                    from src.reels_pipeline.asset_registry import find_similar_asset, increment_usage
+                    match, _emb = await find_similar_asset(user_id, character_id, "video", prompt)
+                    if match and os.path.isfile(match.file_path):
+                        shutil.copy2(match.file_path, clip_path)
+                        await increment_usage(match.id)
+                        _update_scene(idx, {
+                            "status": "success", "clip_path": clip_path,
+                            "reused": True, "source_asset_id": match.id,
+                        })
+                        logger.info(f"Scene {idx}: reused video asset {match.id}")
+                        return clip_path
+                except Exception as e:
+                    logger.warning(f"Video asset lookup failed for scene {idx}: {e}")
 
             for attempt in range(3):
                 if attempt == 2:
@@ -537,6 +638,24 @@ class ReelsPipeline:
                         await kie.download_video(result.video_url, clip_path)
                         logger.info(f"Scene {idx}: clip downloaded (attempt {attempt+1})")
                         _update_scene(idx, {"status": "success", "clip_path": clip_path})
+                        # Register new video asset
+                        if user_id:
+                            try:
+                                from src.reels_pipeline.asset_registry import register_asset, generate_embedding
+                                emb = await generate_embedding(prompt)
+                                await register_asset(
+                                    user_id=user_id,
+                                    character_id=character_id,
+                                    asset_type="video",
+                                    description=prompt,
+                                    file_path=clip_path,
+                                    embedding=emb,
+                                    model_used=video_model,
+                                    generation_prompt=current_prompt,
+                                    kie_task_id=task_id,
+                                )
+                            except Exception as reg_err:
+                                logger.warning(f"Video asset registration failed for scene {idx}: {reg_err}")
                         return clip_path
                     else:
                         raise RuntimeError("No video URL in result")
