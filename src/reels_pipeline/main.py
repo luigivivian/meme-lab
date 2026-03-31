@@ -431,7 +431,10 @@ class ReelsPipeline:
 
         from src.video_gen.kie_client import KieSora2Client
         from src.video_gen.gcs_uploader import GCSUploader
-        from src.reels_pipeline.video_builder import concat_clips_with_audio
+        from src.reels_pipeline.video_builder import (
+            concat_clips_with_audio,
+            _validate_video_duration,
+        )
 
         kie = KieSora2Client()
         gcs = GCSUploader()
@@ -536,7 +539,20 @@ class ReelsPipeline:
             srt_path=srt_path,
             output_path=video_path,
             transition_duration=0.3,
+            script_json=script,
         )
+
+        # Phase 5: Validate duration and log timing diagnostics
+        expected_dur = sum(
+            c.get("duracao_segundos", 0) for c in cenas
+        ) if cenas else 0.0
+        if expected_dur > 0:
+            timing = _validate_video_duration(video_path, expected_dur)
+            logger.info(
+                f"Timing diagnostics: actual={timing['actual_duration']}s "
+                f"expected={timing['expected_duration']}s "
+                f"drift={timing['drift']}s valid={timing['valid']}"
+            )
 
         logger.info(f"Hailuo reel assembled: {video_path} from {len(clip_paths)} clips")
         return video_path

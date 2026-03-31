@@ -33,6 +33,9 @@ from src.reels_pipeline.config import (
 
 logger = logging.getLogger("clip-flow.reels.video_builder")
 
+# Minimum scene duration to prevent degenerate short clips
+_MIN_SCENE_DURATION = 3.0
+
 
 def _build_sub_style() -> str:
     """Build ASS subtitle force_style string from config values."""
@@ -248,6 +251,176 @@ def _format_srt_time(seconds: float) -> str:
     s = int(seconds % 60)
     ms = int(round((seconds - int(seconds)) * 1000))
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def compute_scene_durations_from_script(
+    script_json: dict,
+    total_audio_duration: float,
+    n_scenes: int,
+) -> list[float]:
+    """Compute proportional scene durations weighted by narration character count.
+
+    Distributes total_audio_duration across scenes proportionally to their
+    narracao text length, with a minimum of _MIN_SCENE_DURATION per scene.
+
+    Args:
+        script_json: Script dict with 'cenas' list (each has 'narracao').
+        total_audio_duration: Total audio duration in seconds.
+        n_scenes: Number of scenes (may differ from len(cenas)).
+
+    Returns:
+        List of durations in seconds (one per scene).
+    """
+    cenas = script_json.get("cenas", [])
+    char_counts = []
+    for i in range(n_scenes):
+        if i < len(cenas):
+            char_counts.append(max(len(cenas[i].get("narracao", "")), 1))
+        else:
+            char_counts.append(1)
+
+    total_chars = sum(char_counts)
+    durations = [(c / total_chars) * total_audio_duration for c in char_counts]
+
+    # Enforce minimum duration: steal from longest scenes
+    for _ in range(n_scenes * 2):  # bounded iterations
+        under = [i for i, d in enumerate(durations) if d < _MIN_SCENE_DURATION]
+        if not under:
+            break
+        deficit = sum(_MIN_SCENE_DURATION - durations[i] for i in under)
+        over = [i for i in range(n_scenes) if i not in under and durations[i] > _MIN_SCENE_DURATION]
+        if not over:
+            break
+        steal_each = deficit / len(over)
+        for i in under:
+            durations[i] = _MIN_SCENE_DURATION
+        for i in over:
+            durations[i] -= steal_each
+
+    return durations
+
+
+def _align_srt_to_scenes(
+    srt_path: str,
+    scene_durations: list[float],
+    script_json: dict,
+) -> str:
+    """Align SRT subtitle entries to scene time windows.
+
+    Maps each SRT entry to its corresponding scene based on timestamp overlap
+    with computed scene time windows. Writes an aligned SRT file alongside
+    the original.
+
+    Args:
+        srt_path: Path to original SRT file.
+        scene_durations: Duration per scene in seconds.
+        script_json: Script dict (used for logging context).
+
+    Returns:
+        Path to the aligned SRT file.
+    """
+    with open(srt_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    blocks = content.strip().split("\n\n")
+
+    # Compute scene time windows: [(start, end), ...]
+    windows = []
+    t = 0.0
+    for dur in scene_durations:
+        windows.append((t, t + dur))
+        t += dur
+
+    aligned_blocks = []
+    idx = 1
+
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if len(lines) < 3:
+            continue
+        ts_line = lines[1]
+        parts = ts_line.split(" --> ")
+        if len(parts) != 2:
+            continue
+        entry_start = _parse_srt_time(parts[0])
+        entry_end = _parse_srt_time(parts[1])
+        entry_mid = (entry_start + entry_end) / 2.0
+        text = "\n".join(lines[2:])
+
+        # Find best-matching scene by midpoint overlap
+        best_scene = 0
+        for si, (ws, we) in enumerate(windows):
+            if ws <= entry_mid < we:
+                best_scene = si
+                break
+        else:
+            # If midpoint is past all windows, assign to last scene
+            if entry_mid >= windows[-1][1]:
+                best_scene = len(windows) - 1
+
+        # Clamp entry within its scene window
+        ws, we = windows[best_scene]
+        clamped_start = max(entry_start, ws)
+        clamped_end = min(entry_end, we)
+        if clamped_end <= clamped_start:
+            clamped_end = clamped_start + 0.1
+
+        aligned_blocks.append(
+            f"{idx}\n{_format_srt_time(clamped_start)} --> {_format_srt_time(clamped_end)}\n{text}"
+        )
+        idx += 1
+
+    aligned_path = srt_path.replace(".srt", "_aligned.srt")
+    with open(aligned_path, "w", encoding="utf-8") as f:
+        f.write("\n\n".join(aligned_blocks) + "\n" if aligned_blocks else "")
+
+    logger.info(f"SRT aligned to {len(scene_durations)} scenes: {aligned_path}")
+    return aligned_path
+
+
+def _validate_video_duration(
+    output_path: str,
+    expected_duration: float,
+    tolerance: float = 2.0,
+) -> dict:
+    """Validate final video duration against expected value using ffprobe.
+
+    Args:
+        output_path: Path to the output video file.
+        expected_duration: Expected duration in seconds.
+        tolerance: Acceptable drift in seconds (default 2s).
+
+    Returns:
+        Dict with actual_duration, expected_duration, drift, and valid flag.
+    """
+    try:
+        actual = get_video_duration(output_path)
+    except RuntimeError as e:
+        logger.error(f"Duration validation failed (ffprobe error): {e}")
+        return {
+            "actual_duration": 0.0,
+            "expected_duration": expected_duration,
+            "drift": expected_duration,
+            "valid": False,
+            "error": str(e),
+        }
+
+    drift = abs(actual - expected_duration)
+    valid = drift <= tolerance
+
+    level = logging.WARNING if not valid else logging.INFO
+    logger.log(
+        level,
+        f"Duration check: actual={actual:.2f}s expected={expected_duration:.2f}s "
+        f"drift={drift:.2f}s {'OK' if valid else 'EXCEEDED TOLERANCE'}",
+    )
+
+    return {
+        "actual_duration": round(actual, 3),
+        "expected_duration": round(expected_duration, 3),
+        "drift": round(drift, 3),
+        "valid": valid,
+    }
 
 
 # ------------------------------------------------------------------
@@ -499,11 +672,15 @@ def concat_clips_with_audio(
     srt_path: str,
     output_path: str,
     transition_duration: float = 0.3,
+    script_json: dict | None = None,
 ) -> str:
     """Concatenate Hailuo video clips, overlay audio and subtitles.
 
     Uses xfade for clip transitions, adds TTS audio and SRT subtitle overlay.
     Per REELV2-03: final assembly of Hailuo-generated scene clips.
+
+    When script_json is provided, computes proportional scene durations from
+    narration text and aligns SRT entries to scene boundaries before burning.
 
     Args:
         clip_paths: Paths to scene video clips (MP4).
@@ -511,6 +688,7 @@ def concat_clips_with_audio(
         srt_path: Path to SRT subtitle file.
         output_path: Path for final output MP4.
         transition_duration: Duration of xfade between clips.
+        script_json: Optional script dict for proportional duration + SRT alignment.
 
     Returns:
         output_path on success.
@@ -520,8 +698,20 @@ def concat_clips_with_audio(
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
+    # If script_json provided, align SRT to scene boundaries
+    effective_srt = srt_path
+    if script_json and len(clip_paths) > 1:
+        try:
+            audio_dur = get_video_duration(audio_path)
+            scene_durations = compute_scene_durations_from_script(
+                script_json, audio_dur, len(clip_paths)
+            )
+            effective_srt = _align_srt_to_scenes(srt_path, scene_durations, script_json)
+        except Exception as e:
+            logger.warning(f"SRT alignment failed, using original: {e}")
+
     if len(clip_paths) == 1:
-        abs_srt = os.path.abspath(srt_path)
+        abs_srt = os.path.abspath(effective_srt)
         fontsdir = os.path.abspath("assets/fonts")
         sub_style = _build_sub_style()
         subtitle_filter = (
@@ -552,13 +742,13 @@ def concat_clips_with_audio(
     audio_idx = len(clip_paths)
     cmd += ["-i", audio_path]
 
-    # xfade chain
+    # xfade chain with rounded offsets to avoid FFmpeg floating-point issues
     n = len(clip_paths)
     xfade_filters = []
     prev = "0:v"
     for i in range(1, n):
         offset = sum(durations[:i]) - i * transition_duration
-        offset = max(offset, 0)
+        offset = round(max(offset, 0), 3)
         out = f"v{i}" if i < n - 1 else "vconcat"
         xfade_filters.append(
             f"[{prev}][{i}:v]xfade=transition=fade:duration={transition_duration}:offset={offset}[{out}]"
@@ -566,7 +756,7 @@ def concat_clips_with_audio(
         prev = out
 
     # Subtitle overlay on concatenated video
-    abs_srt = os.path.abspath(srt_path)
+    abs_srt = os.path.abspath(effective_srt)
     fontsdir = os.path.abspath("assets/fonts")
     sub_style = _build_sub_style()
     sub_filter = (
