@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { regenerateStep, retryScene, reelFileUrl, getPlatformOutputs, type StepState, type SceneStatus, type PlatformOutput } from "@/lib/api";
+import { regenerateStep, retryScene, regenerateSceneVideo, reelFileUrl, getPlatformOutputs, type StepState, type SceneStatus, type PlatformOutput } from "@/lib/api";
 
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   pending: { color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30", label: "Pendente" },
@@ -44,12 +44,18 @@ function SceneCard({
 
   const cfg = STATUS_CONFIG[scene.status] ?? STATUS_CONFIG.pending;
   const isRetryable = scene.status === "failed" || scene.status === "static_fallback";
+  const isReused = scene.reused === true;
+  const canRegenerate = isRetryable || isReused;
   const imgSrc = scene.img_path ? reelFileUrl(jobId, scene.img_path) : "";
 
   async function handleRetry() {
     setRetrying(true);
     try {
-      await retryScene(jobId, scene.index, editPrompt || undefined);
+      if (isReused) {
+        await regenerateSceneVideo(jobId, scene.index, editPrompt || undefined);
+      } else {
+        await retryScene(jobId, scene.index, editPrompt || undefined);
+      }
       mutate();
     } finally {
       setRetrying(false);
@@ -80,11 +86,18 @@ function SceneCard({
             <Loader2 className="h-6 w-6 animate-spin text-white" />
           </div>
         )}
-        {scene.status === "success" && (
+        {scene.status === "success" && !isReused && (
           <div className="absolute top-2 right-2">
             <div className="rounded-full bg-emerald-500 p-1">
               <Check className="h-3 w-3 text-white" />
             </div>
+          </div>
+        )}
+        {isReused && scene.status === "success" && (
+          <div className="absolute top-2 left-2">
+            <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">
+              Reaproveitado
+            </Badge>
           </div>
         )}
       </div>
@@ -101,8 +114,8 @@ function SceneCard({
         </div>
       )}
 
-      {/* Retry controls */}
-      {isRetryable && (
+      {/* Retry / regenerate controls */}
+      {canRegenerate && (
         <div className="space-y-2">
           <button
             type="button"
@@ -134,7 +147,7 @@ function SceneCard({
             ) : (
               <RefreshCw className="mr-2 h-3 w-3" />
             )}
-            Tentar Novamente
+            {isReused ? "Gerar Novo Video" : "Tentar Novamente"}
           </Button>
         </div>
       )}

@@ -1569,13 +1569,31 @@ export async function retryScene(jobId: string, sceneIndex: number, prompt?: str
   );
 }
 
+export async function regenerateSingleImage(jobId: string, sceneIndex: number) {
+  return request<{ scene_index: number; status: string }>(
+    `/reels/${jobId}/regenerate-image/${sceneIndex}`, { method: "POST" }
+  );
+}
+
+export async function regenerateSceneVideo(jobId: string, sceneIndex: number, prompt?: string) {
+  const params = prompt ? `?prompt=${encodeURIComponent(prompt)}` : "";
+  return request<{ scene_index: number; status: string }>(
+    `/reels/${jobId}/regenerate-scene-video/${sceneIndex}${params}`, { method: "POST" }
+  );
+}
+
 // --- Interactive Reels (Phase 999.5) ---
+
+export interface ImageReuseInfo {
+  reused: boolean;
+  source_asset_id?: number;
+}
 
 export interface StepState {
   job_id: string;
   current_step: number;
   prompt?: { text: string; approved: boolean; job_dir?: string };
-  images?: { paths: string[]; approved: boolean; status?: string };
+  images?: { paths: string[]; approved: boolean; status?: string; reuse_info?: Record<string, ImageReuseInfo> };
   script?: { json: Record<string, unknown>; approved: boolean; status?: string };
   tts?: { path: string; approved: boolean; status?: string };
   srt?: { path: string; approved: boolean; status?: string };
@@ -1591,6 +1609,8 @@ export interface SceneStatus {
   prompt?: string;
   duration?: number;
   error?: string;
+  reused?: boolean;
+  source_asset_id?: number;
 }
 
 export interface StepEditPayload {
@@ -1664,67 +1684,6 @@ export function reelFileUrl(jobId: string, filename: string): string {
   // Encode each path segment individually — slashes must stay literal for FastAPI {filename:path}
   const encoded = filename.split("/").map(encodeURIComponent).join("/");
   return `/api/reels/${jobId}/file/${encoded}`;
-}
-
-export async function enhanceReelTheme(nicheId: string, subTheme: string): Promise<{ suggestions: string[] }> {
-  return request<{ suggestions: string[] }>("/reels/enhance-theme", {
-    method: "POST",
-    body: JSON.stringify({ niche_id: nicheId, sub_theme: subTheme }),
-  });
-}
-
-// --- Product Ads (Phase 421) ---
-
-export interface AdJob {
-  id: string;
-  product_name: string;
-  style: string;
-  status: string;
-  current_step: string;
-  formats: string[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AdStepData {
-  step_name: string;
-  status: "pending" | "generating" | "completed" | "approved" | "failed";
-  result?: Record<string, unknown>;
-  error?: string;
-}
-
-export interface AdStepsResponse {
-  job_id: string;
-  current_step: string;
-  steps: AdStepData[];
-}
-
-export async function getAdJobs() {
-  return request<AdJob[]>("/ads/jobs");
-}
-
-export async function getAdJob(jobId: string) {
-  return request<AdJob>(`/ads/jobs/${jobId}`);
-}
-
-export async function getAdSteps(jobId: string) {
-  return request<AdStepsResponse>(`/ads/jobs/${jobId}/steps`);
-}
-
-export async function executeAdStep(jobId: string, stepName: string) {
-  return request<{ status: string }>(`/ads/jobs/${jobId}/step/${stepName}`, { method: "POST" });
-}
-
-export async function approveAdStep(jobId: string, stepName: string) {
-  return request<{ step: string; approved: boolean }>(`/ads/jobs/${jobId}/approve/${stepName}`, { method: "POST" });
-}
-
-export async function regenerateAdStep(jobId: string, stepName: string) {
-  return request<{ status: string }>(`/ads/jobs/${jobId}/regenerate/${stepName}`, { method: "POST" });
-}
-
-export function adFileUrl(jobId: string, filename: string): string {
-  return `/api/ads/${jobId}/file/${encodeURIComponent(filename)}`;
 }
 
 // --- Content Export ---
