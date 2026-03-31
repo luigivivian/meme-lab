@@ -3,8 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Pipeline Simplification, Auto-Publicacao & Multi-Tenant
 status: Phase complete — ready for verification
-stopped_at: Completed quick-260330-ie5
-last_updated: "2026-03-30T16:22:49.832Z"
+stopped_at: Completed quick-260330-tgu plan
+last_updated: "2026-03-31T00:24:18.480Z"
+last_activity: "2026-03-30 - Completed quick task 260330-ie5: Enhance ads wizard presets by niche"
 progress:
   total_phases: 17
   completed_phases: 8
@@ -90,6 +91,7 @@ Plan: 7 of 7
 | Phase 421 P06 | 3min | 2 tasks | 6 files |
 | Phase 421 P07 | 5min | 2 tasks | 13 files |
 | Phase quick-260330-ie5 P01 | 3min | 2 tasks | 5 files |
+| Phase quick-260330-tgu P01 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -176,6 +178,7 @@ Recent decisions affecting current work:
 - [Phase 421]: Ads router mirrors reels.py pattern exactly (background tasks, flag_modified, get_session_factory)
 - [Phase 421]: Manual collapsible sections in wizard (no Accordion component); client-side cost estimate by style; AI analysis via /ads/analyze pre-fill
 - [Phase 421]: AdStepper uses horizontal scrollable layout for 8 steps; StepExport has no approve button per D-22 auto-complete; Ad API types created inline due to worktree isolation
+- [Phase quick-260330-tgu]: Niche selector replaces plain text input; enhance sends PT-BR niche label to Gemini
 
 ### Pending Todos
 
@@ -192,10 +195,11 @@ None.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260330-ie5 | Enhance ads wizard scene step with customizable presets for backgrounds cameras lighting organized by product categories editable scene suggestions product description and manual prompt editing | 2026-03-30 | 9e02cdc | [260330-ie5-enhance-ads-wizard-scene-step-with-custo](./quick/260330-ie5-enhance-ads-wizard-scene-step-with-custo/) |
+| 260330-tgu | Add Enhance Theme button to reels creation - AI-powered topic suggestions after sub-theme selection | 2026-03-31 | 073c33c | [260330-tgu-add-enhance-theme-button-to-reels-creati](./quick/260330-tgu-add-enhance-theme-button-to-reels-creati/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-30 - Completed quick task 260330-ie5: Enhance ads wizard presets by niche
-Last session: 2026-03-30T16:22:44.832Z
-Stopped at: Completed quick-260330-ie5
+Last activity: 2026-03-31 - Completed quick task 260330-tgu: Enhance theme button for reels
+Last session: 2026-03-31T00:24:18.475Z
+Stopped at: Completed quick-260330-tgu plan
 Resume file: None
