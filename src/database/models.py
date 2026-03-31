@@ -787,3 +787,26 @@ class ProductAdJob(TimestampMixin, Base):
         Index("idx_product_ad_jobs_status", "status"),
         Index("idx_product_ad_jobs_job_id", "job_id"),
     )
+
+
+# ============================================================
+# 18. enhance_theme_cache
+# ============================================================
+
+class EnhanceThemeCache(Base):
+    __tablename__ = "enhance_theme_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    niche_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    sub_theme: Mapped[str] = mapped_column(String(200), nullable=False)
+    suggestions: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    used_suggestions: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "niche_id", "sub_theme", name="uq_enhance_cache_user_niche_sub"),
+        Index("idx_enhance_cache_user_id", "user_id"),
+    )

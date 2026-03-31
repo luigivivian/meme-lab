@@ -80,6 +80,25 @@ PRESETS = {
 STEP_ORDER = ["prompt", "script", "images", "tts", "srt", "video"]
 
 
+async def _mark_tema_used(db: AsyncSession, user_id: int, tema: str):
+    """Check if tema matches any cached suggestion for this user; if so, add to used_suggestions."""
+    from src.database.models import EnhanceThemeCache
+
+    result = await db.execute(
+        select(EnhanceThemeCache).where(EnhanceThemeCache.user_id == user_id)
+    )
+    for cache_row in result.scalars().all():
+        suggestions = cache_row.suggestions or []
+        if tema in suggestions:
+            used = list(cache_row.used_suggestions or [])
+            if tema not in used:
+                used.append(tema)
+                cache_row.used_suggestions = used
+                flag_modified(cache_row, "used_suggestions")
+                await db.commit()
+            break
+
+
 def _init_step_state(tema: str) -> dict:
     """Create initial step_state for an interactive job."""
     return {
@@ -429,6 +448,9 @@ async def generate_reel(
     db.add(job)
     await db.commit()
 
+    # Mark tema as used in enhance cache (Phase 999.8-A)
+    await _mark_tema_used(db, current_user.id, req.tema)
+
     # Start background task
     session_factory = get_session_factory()
     background_tasks.add_task(
@@ -502,6 +524,9 @@ async def create_interactive_reel(
     )
     db.add(job)
     await db.commit()
+
+    # Mark tema as used in enhance cache (Phase 999.8-A)
+    await _mark_tema_used(db, current_user.id, req.tema)
 
     return {"job_id": job_id, "step_state": step_state}
 
@@ -1081,43 +1106,120 @@ async def list_presets():
     return {"presets": PRESETS}
 
 
-@router.post("/enhance-theme", summary="AI-powered theme suggestions")
+# ── Enhance Theme (Phase 999.8-A) ─────────────────────────────────────────
+
+ENHANCE_REELS_SYSTEM_PROMPT = """You are a Brazilian Instagram Reels content strategist.
+Given a niche and optional sub-theme, generate 8 specific, engaging reel topic suggestions in Portuguese (pt-BR).
+Each suggestion should be a concise topic/title (max 80 chars) that works well for short-form video.
+Return a JSON array of strings. Example: ["5 habitos matinais para produtividade","Como organizar sua rotina em 3 passos"]"""
+
+
+@router.post("/enhance-theme", summary="AI topic suggestions for reels (cached)")
 async def enhance_theme(
-    req: dict,
+    niche_id: str = Query(..., description="Niche identifier"),
+    sub_theme: str = Query("", description="Optional sub-theme"),
     current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
 ):
-    """Generate 5-8 viral/trending video topic suggestions for a given niche+sub-theme using Gemini."""
-    from src.llm_client import _get_client, _extract_text
+    """Generate AI topic suggestions for a niche, with 24h cache.
 
-    niche_id = req.get("niche_id", "")
-    sub_theme = req.get("sub_theme", "")
-    if not niche_id or not sub_theme:
-        raise HTTPException(status_code=400, detail="niche_id and sub_theme are required")
+    Returns cached suggestions (minus used ones) if available and fresh.
+    Otherwise calls Gemini and upserts cache row.
+    """
+    from datetime import datetime, timedelta, timezone
+    from src.database.models import EnhanceThemeCache
+    from src.llm_client import generate_json
+    import asyncio
 
-    prompt = (
-        f"Voce e um especialista em conteudo viral para Instagram Reels no Brasil.\n"
-        f"Nicho: {niche_id}\n"
-        f"Sub-tema: {sub_theme}\n\n"
-        "Gere de 5 a 8 sugestoes de titulos/temas especificos para videos curtos (Reels) "
-        "que tenham alto potencial de engajamento (saves, shares, comentarios).\n"
-        "Os titulos devem ser no estilo hook, curtos e impactantes, em portugues brasileiro.\n"
-        "Exemplos de estilo: '3 habitos para ter apos acordar', '5 dicas para ser uma pessoa melhor', "
-        "'O erro que 90% das pessoas cometem com dinheiro'.\n\n"
-        "Retorne APENAS JSON valido no formato: {\"suggestions\": [\"titulo1\", \"titulo2\", ...]}\n"
-        "Nenhum texto fora do JSON."
+    sub = sub_theme.strip() or ""
+
+    # Check cache
+    result = await db.execute(
+        select(EnhanceThemeCache).where(
+            EnhanceThemeCache.user_id == current_user.id,
+            EnhanceThemeCache.niche_id == niche_id,
+            EnhanceThemeCache.sub_theme == sub,
+        )
     )
+    cached = result.scalar_one_or_none()
+
+    now = datetime.now(timezone.utc)
+    cache_ttl = timedelta(hours=24)
+
+    if cached:
+        created = cached.created_at.replace(tzinfo=timezone.utc) if cached.created_at.tzinfo is None else cached.created_at
+        is_fresh = (now - created) < cache_ttl
+        if is_fresh:
+            used = set(cached.used_suggestions or [])
+            available = [s for s in (cached.suggestions or []) if s not in used]
+            if available:
+                return {"suggestions": available, "cached": True}
+
+    # Generate new suggestions via Gemini
+    user_msg = f"Niche: {niche_id}"
+    if sub:
+        user_msg += f"\nSub-theme: {sub}"
+    user_msg += "\nGenerate 8 reel topic suggestions."
 
     try:
-        client = _get_client()
-        resp = await asyncio.to_thread(
-            client.models.generate_content,
-            model="gemini-2.5-flash",
-            contents=prompt,
+        raw = await asyncio.to_thread(
+            generate_json,
+            system_prompt=ENHANCE_REELS_SYSTEM_PROMPT,
+            user_message=user_msg,
+            tier="lite",
         )
-        text = _extract_text(resp)
-        clean = text.strip().removeprefix("```json").removesuffix("```").strip()
-        result = json.loads(clean)
-        return {"suggestions": result.get("suggestions", [])}
+        suggestions = json.loads(raw)
+        if not isinstance(suggestions, list):
+            suggestions = suggestions.get("suggestions", []) if isinstance(suggestions, dict) else []
+        suggestions = [str(s) for s in suggestions if s][:8]
     except Exception as e:
-        logger.warning("enhance_theme failed: %s", e)
-        return {"suggestions": []}
+        logger.error("Enhance theme Gemini error: %s", e)
+        raise HTTPException(status_code=502, detail=f"Erro ao gerar sugestoes: {e}")
+
+    if not suggestions:
+        raise HTTPException(status_code=502, detail="Gemini nao gerou sugestoes validas")
+
+    # Upsert cache row
+    if cached:
+        cached.suggestions = suggestions
+        cached.used_suggestions = []
+        cached.created_at = now.replace(tzinfo=None)
+        flag_modified(cached, "suggestions")
+        flag_modified(cached, "used_suggestions")
+    else:
+        cached = EnhanceThemeCache(
+            user_id=current_user.id,
+            niche_id=niche_id,
+            sub_theme=sub,
+            suggestions=suggestions,
+            used_suggestions=[],
+        )
+        db.add(cached)
+    await db.commit()
+
+    return {"suggestions": suggestions, "cached": False}
+
+
+@router.delete("/enhance-theme/cache", summary="Clear cached suggestions for a niche+sub-theme")
+async def clear_enhance_cache(
+    niche_id: str = Query(..., description="Niche identifier"),
+    sub_theme: str = Query("", description="Optional sub-theme"),
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Delete cache row so next enhance-theme call regenerates suggestions."""
+    from src.database.models import EnhanceThemeCache
+
+    sub = sub_theme.strip() or ""
+    result = await db.execute(
+        select(EnhanceThemeCache).where(
+            EnhanceThemeCache.user_id == current_user.id,
+            EnhanceThemeCache.niche_id == niche_id,
+            EnhanceThemeCache.sub_theme == sub,
+        )
+    )
+    cached = result.scalar_one_or_none()
+    if cached:
+        await db.delete(cached)
+        await db.commit()
+    return {"cleared": True}
