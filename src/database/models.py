@@ -731,6 +731,10 @@ class ReelsJob(TimestampMixin, Base):
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
     cost_brl: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0")
 
+    # Multi-platform output (Phase E)
+    platforms: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    platform_outputs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     __table_args__ = (
         Index("idx_reels_jobs_user_id", "user_id"),
         Index("idx_reels_jobs_status", "status"),

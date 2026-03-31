@@ -238,6 +238,21 @@ async def _execute_step_task(
                 step_data["status"] = "complete"
                 job.video_path = video_path
 
+                # Generate platform metadata after video completes
+                platforms = job.platforms or ["instagram"]
+                if platforms:
+                    try:
+                        from src.reels_pipeline.platform_metadata import generate_platform_metadata
+                        platform_outputs = await generate_platform_metadata(
+                            script_json=script_json,
+                            platforms=platforms,
+                            video_url=job.video_url,
+                        )
+                        job.platform_outputs = platform_outputs
+                        flag_modified(job, "platform_outputs")
+                    except Exception as plat_err:
+                        logger.error("Platform metadata generation failed: %s", plat_err)
+
             step_state[step_name] = step_data
             job.step_state = step_state
             flag_modified(job, "step_state")
@@ -444,6 +459,7 @@ async def generate_reel(
         config_id=req.config_id,
         tema=req.tema,
         status="queued",
+        platforms=req.platforms or ["instagram"],
     )
     db.add(job)
     await db.commit()
@@ -521,6 +537,7 @@ async def create_interactive_reel(
         tema=req.tema,
         status="interactive",
         step_state=step_state,
+        platforms=req.platforms or ["instagram"],
     )
     db.add(job)
     await db.commit()
@@ -945,6 +962,7 @@ async def list_reel_jobs(
             caption=j.caption,
             hashtags=j.hashtags,
             cost_brl=j.cost_brl,
+            platforms=j.platforms,
             created_at=j.created_at,
         )
         for j in jobs
@@ -1098,6 +1116,21 @@ async def list_transitions():
     """Return available FFmpeg xfade transition types for config panel."""
     from src.reels_pipeline.config import REELS_AVAILABLE_TRANSITIONS
     return {"transitions": REELS_AVAILABLE_TRANSITIONS}
+
+
+@router.get("/{job_id}/platforms", summary="Get platform-specific metadata")
+async def get_platform_outputs(
+    job_id: str,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Return platform_outputs for a reel job. Tenant-isolated."""
+    job = await _get_user_job(job_id, current_user.id, db)
+    return {
+        "job_id": job.job_id,
+        "platforms": job.platforms or ["instagram"],
+        "platform_outputs": job.platform_outputs or {},
+    }
 
 
 @router.get("/config/presets", summary="List available config presets")

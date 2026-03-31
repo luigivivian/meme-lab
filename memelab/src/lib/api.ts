@@ -1452,6 +1452,7 @@ export interface ReelGenerateRequest {
   target_duration?: number;
   niche?: string;
   keywords?: string[];
+  platforms?: string[];
 }
 
 export interface ReelJob {
@@ -1464,6 +1465,7 @@ export interface ReelJob {
   caption?: string;
   hashtags?: string[];
   cost_brl: number;
+  platforms?: string[];
   error_message?: string;
   created_at: string;
 }
@@ -1569,6 +1571,22 @@ export interface InteractiveReelRequest {
   no_character?: boolean;
   config_id?: number;
   target_duration?: number;
+  platforms?: string[];
+}
+
+export interface PlatformOutput {
+  caption?: string;
+  title?: string;
+  description?: string;
+  hashtags?: string[];
+  tags?: string[];
+  video_url?: string;
+}
+
+export interface PlatformOutputsResponse {
+  job_id: string;
+  platforms: string[];
+  platform_outputs: Record<string, PlatformOutput>;
 }
 
 export async function createInteractiveReel(req: InteractiveReelRequest) {
@@ -1600,6 +1618,10 @@ export async function editStep(jobId: string, step: string, payload: StepEditPay
   return request<{ step: string; updated: boolean }>(
     `/reels/${jobId}/edit/${step}`, { method: "PUT", body: JSON.stringify(payload) }
   );
+}
+
+export async function getPlatformOutputs(jobId: string) {
+  return request<PlatformOutputsResponse>(`/reels/${jobId}/platforms`);
 }
 
 export function reelFileUrl(jobId: string, filename: string): string {

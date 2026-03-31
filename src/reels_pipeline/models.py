@@ -40,6 +40,7 @@ class ReelGenerateRequest(BaseModel):
     target_duration: int = Field(default=30, description="Target duration in seconds: 15/30/60")
     niche: str = Field(default="lifestyle", description="Content niche")
     keywords: list[str] = Field(default_factory=list, description="Additional keywords")
+    platforms: list[str] = Field(default_factory=lambda: ["instagram"], description="Target platforms")
 
 
 class ReelStatusResponse(BaseModel):
@@ -61,6 +62,7 @@ class ReelJobResponse(BaseModel):
     caption: Optional[str] = None
     hashtags: Optional[list[str]] = None
     cost_brl: float = 0.0
+    platforms: Optional[list[str]] = None
     created_at: datetime
 
 
@@ -98,6 +100,7 @@ class ReelCreateInteractiveRequest(BaseModel):
     no_character: bool = False
     config_id: Optional[int] = None
     target_duration: int = 30
+    platforms: list[str] = Field(default_factory=lambda: ["instagram"], description="Target platforms")
 
 
 class ReelsConfigRequest(BaseModel):
