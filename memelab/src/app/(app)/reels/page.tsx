@@ -15,10 +15,10 @@ import {
   ExternalLink,
   Wand2,
   ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -35,10 +35,12 @@ import {
   generateReel,
   createInteractiveReel,
   saveReelsConfig,
+  enhanceReelTheme,
   type ReelGenerateRequest,
   type ReelJob,
   type ReelsConfig,
 } from "@/lib/api";
+import { REEL_NICHES, getNicheById, TIER_LABELS } from "@/components/reels/reel-niches";
 
 const STEP_LABELS: Record<string, string> = {
   images: "Gerando imagens...",
@@ -74,13 +76,17 @@ function GenerationForm() {
   const [characterId, setCharacterId] = useState<string>("auto");
   const [tone, setTone] = useState("inspiracional");
   const [duration, setDuration] = useState("30");
-  const [niche, setNiche] = useState("lifestyle");
+  const [selectedNiche, setSelectedNiche] = useState("");
+  const [selectedSubTheme, setSelectedSubTheme] = useState("");
   const [preset, setPreset] = useState("clean");
   const [showAjustes, setShowAjustes] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submittingInteractive, setSubmittingInteractive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enhancing, setEnhancing] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [enhanceError, setEnhanceError] = useState<string | null>(null);
 
   const { data: presets } = useReelsPresets();
   const { data: characters } = useCharacters();
@@ -95,11 +101,12 @@ function GenerationForm() {
     setSubmitting(true);
     setError(null);
     try {
+      const nicheLabel = getNicheById(selectedNiche)?.labelEn ?? selectedNiche;
       const req: ReelGenerateRequest = {
         tema: tema.trim(),
         tone,
         target_duration: parseInt(duration),
-        niche,
+        niche: nicheLabel || "lifestyle",
         ...(characterId === "none"
           ? { no_character: true }
           : characterId !== "auto"
@@ -142,6 +149,24 @@ function GenerationForm() {
       setSubmittingInteractive(false);
     }
   }
+
+  async function handleEnhanceTheme() {
+    if (!selectedNiche || !selectedSubTheme) return;
+    setEnhancing(true);
+    setEnhanceError(null);
+    setSuggestions([]);
+    try {
+      const nicheLabel = getNicheById(selectedNiche)?.label ?? selectedNiche;
+      const res = await enhanceReelTheme(nicheLabel, selectedSubTheme);
+      setSuggestions(res.suggestions ?? []);
+    } catch (err) {
+      setEnhanceError(err instanceof Error ? err.message : "Erro ao sugerir temas");
+    } finally {
+      setEnhancing(false);
+    }
+  }
+
+  const currentNiche = getNicheById(selectedNiche);
 
   return (
     <Card>
@@ -223,6 +248,86 @@ function GenerationForm() {
               </Select>
             </div>
 
+            {/* Niche selector */}
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Nicho</label>
+              <Select value={selectedNiche} onValueChange={(v) => { setSelectedNiche(v); setSelectedSubTheme(""); setSuggestions([]); }}>
+                <SelectTrigger><SelectValue placeholder="Selecionar nicho" /></SelectTrigger>
+                <SelectContent>
+                  {([1, 2, 3, 4] as const).map((tier) => {
+                    const niches = REEL_NICHES.filter(n => n.tier === tier);
+                    if (niches.length === 0) return null;
+                    return niches.map((n, i) => (
+                      <SelectItem key={n.id} value={n.id}>
+                        {i === 0 ? `--- ${TIER_LABELS[tier]} ---` : ""}{i === 0 ? " " : ""}{n.label}
+                      </SelectItem>
+                    ));
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sub-theme pills */}
+            {currentNiche && (
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Sub-tema</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {currentNiche.subThemes.map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => { setSelectedSubTheme(st); setSuggestions([]); }}
+                      className={`px-2.5 py-1 rounded-full text-xs border transition-all ${
+                        selectedSubTheme === st
+                          ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                          : "bg-secondary text-muted-foreground border-border hover:bg-secondary/80"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Enhance theme button + suggestions */}
+            {selectedSubTheme && (
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEnhanceTheme}
+                  disabled={enhancing}
+                >
+                  {enhancing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  Sugerir Temas
+                </Button>
+
+                {enhanceError && (
+                  <p className="text-xs text-red-400">{enhanceError}</p>
+                )}
+
+                {suggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setTema(s)}
+                        className="px-2.5 py-1 rounded-full text-xs bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40 transition-all"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <Textarea
               placeholder="Ex: 3 habitos matinais que mudaram minha produtividade"
               value={tema}
@@ -264,11 +369,6 @@ function GenerationForm() {
                       <SelectItem value="60">60 segundos</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Nicho</label>
-                  <Input value={niche} onChange={(e) => setNiche(e.target.value)} />
                 </div>
 
                 <div className="space-y-1">

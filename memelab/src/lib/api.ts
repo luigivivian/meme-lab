@@ -1585,6 +1585,67 @@ export function reelFileUrl(jobId: string, filename: string): string {
   return `/api/reels/${jobId}/file/${encoded}`;
 }
 
+export async function enhanceReelTheme(nicheId: string, subTheme: string): Promise<{ suggestions: string[] }> {
+  return request<{ suggestions: string[] }>("/reels/enhance-theme", {
+    method: "POST",
+    body: JSON.stringify({ niche_id: nicheId, sub_theme: subTheme }),
+  });
+}
+
+// --- Product Ads (Phase 421) ---
+
+export interface AdJob {
+  id: string;
+  product_name: string;
+  style: string;
+  status: string;
+  current_step: string;
+  formats: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdStepData {
+  step_name: string;
+  status: "pending" | "generating" | "completed" | "approved" | "failed";
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface AdStepsResponse {
+  job_id: string;
+  current_step: string;
+  steps: AdStepData[];
+}
+
+export async function getAdJobs() {
+  return request<AdJob[]>("/ads/jobs");
+}
+
+export async function getAdJob(jobId: string) {
+  return request<AdJob>(`/ads/jobs/${jobId}`);
+}
+
+export async function getAdSteps(jobId: string) {
+  return request<AdStepsResponse>(`/ads/jobs/${jobId}/steps`);
+}
+
+export async function executeAdStep(jobId: string, stepName: string) {
+  return request<{ status: string }>(`/ads/jobs/${jobId}/step/${stepName}`, { method: "POST" });
+}
+
+export async function approveAdStep(jobId: string, stepName: string) {
+  return request<{ step: string; approved: boolean }>(`/ads/jobs/${jobId}/approve/${stepName}`, { method: "POST" });
+}
+
+export async function regenerateAdStep(jobId: string, stepName: string) {
+  return request<{ status: string }>(`/ads/jobs/${jobId}/regenerate/${stepName}`, { method: "POST" });
+}
+
+export function adFileUrl(jobId: string, filename: string): string {
+  return `/api/ads/${jobId}/file/${encodeURIComponent(filename)}`;
+}
+
 // --- Content Export ---
 export const exportContentPack = (packageId: number) =>
   `${BASE}/content/${packageId}/export`;
