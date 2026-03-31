@@ -545,8 +545,8 @@ function ConfigPanel() {
   const [ttsVoice, setTtsVoice] = useState(config?.tts_voice ?? "nova");
   const [ttsSpeed, setTtsSpeed] = useState(String(config?.tts_speed ?? 1.1));
   const [imageCount, setImageCount] = useState(String(config?.image_count ?? 5));
-  const [imageDuration, setImageDuration] = useState(String(config?.image_duration ?? 4));
   const [transitionType, setTransitionType] = useState(config?.transition_type ?? "fade");
+  const [transitionDuration, setTransitionDuration] = useState(String(config?.transition_duration ?? 0.3));
   const [subtitleFontSize, setSubtitleFontSize] = useState(String(config?.subtitle_font_size ?? 52));
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -560,8 +560,8 @@ function ConfigPanel() {
         tts_voice: ttsVoice,
         tts_speed: parseFloat(ttsSpeed),
         image_count: parseInt(imageCount),
-        image_duration: parseFloat(imageDuration),
         transition_type: transitionType,
+        transition_duration: parseFloat(transitionDuration),
         subtitle_font_size: parseInt(subtitleFontSize),
       });
       setSaved(true);
@@ -630,27 +630,47 @@ function ConfigPanel() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Duracao por imagem ({imageDuration}s)</label>
-              <input
-                type="range"
-                min="3"
-                max="6"
-                step="0.5"
-                value={imageDuration}
-                onChange={(e) => setImageDuration(e.target.value)}
-                className="w-full accent-purple-500"
-              />
-            </div>
-
-            <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Transicao</label>
               <Select value={transitionType} onValueChange={setTransitionType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fade">Fade</SelectItem>
-                  <SelectItem value="cut">Cut</SelectItem>
+                  <SelectItem value="fadeblack">Fade Preto</SelectItem>
+                  <SelectItem value="fadewhite">Fade Branco</SelectItem>
+                  <SelectItem value="dissolve">Dissolver</SelectItem>
+                  <SelectItem value="wipeleft">Limpar Esquerda</SelectItem>
+                  <SelectItem value="wiperight">Limpar Direita</SelectItem>
+                  <SelectItem value="wipeup">Limpar Cima</SelectItem>
+                  <SelectItem value="wipedown">Limpar Baixo</SelectItem>
+                  <SelectItem value="slideleft">Slide Esquerda</SelectItem>
+                  <SelectItem value="slideright">Slide Direita</SelectItem>
+                  <SelectItem value="slideup">Slide Cima</SelectItem>
+                  <SelectItem value="slidedown">Slide Baixo</SelectItem>
+                  <SelectItem value="circlecrop">Circulo</SelectItem>
+                  <SelectItem value="circleopen">Circulo Abrir</SelectItem>
+                  <SelectItem value="circleclose">Circulo Fechar</SelectItem>
+                  <SelectItem value="radial">Radial</SelectItem>
+                  <SelectItem value="smoothleft">Suave Esquerda</SelectItem>
+                  <SelectItem value="smoothright">Suave Direita</SelectItem>
+                  <SelectItem value="zoomin">Zoom In</SelectItem>
+                  <SelectItem value="pixelize">Pixelizar</SelectItem>
+                  <SelectItem value="diagtl">Diagonal Sup-Esq</SelectItem>
+                  <SelectItem value="diagtr">Diagonal Sup-Dir</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Duracao transicao ({transitionDuration}s)</label>
+              <input
+                type="range"
+                min="0.1"
+                max="1.0"
+                step="0.1"
+                value={transitionDuration}
+                onChange={(e) => setTransitionDuration(e.target.value)}
+                className="w-full accent-purple-500"
+              />
             </div>
 
             <div className="space-y-1">
