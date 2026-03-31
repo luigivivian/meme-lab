@@ -127,6 +127,7 @@ class ReelsConfigRequest(BaseModel):
     subtitle_color: Optional[str] = "#FFFFFF"
     logo_enabled: Optional[bool] = False
     preset: Optional[str] = None
+    video_model: Optional[str] = None
 
 
 class ReelsConfigResponse(BaseModel):
@@ -157,3 +158,4 @@ class ReelsConfigResponse(BaseModel):
     subtitle_color: str = "#FFFFFF"
     logo_enabled: bool = False
     preset: Optional[str] = None
+    video_model: str = "hailuo/2-3-image-to-video-standard"

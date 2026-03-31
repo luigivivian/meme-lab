@@ -673,6 +673,9 @@ class ReelsConfig(TimestampMixin, Base):
     # Branding
     logo_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
+    # Video model (Kie.ai)
+    video_model: Mapped[str] = mapped_column(String(100), default="hailuo/2-3-image-to-video-standard", server_default="hailuo/2-3-image-to-video-standard")
+
     # Preset
     preset: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
