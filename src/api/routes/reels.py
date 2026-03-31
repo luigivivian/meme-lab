@@ -7,6 +7,7 @@ Per Phase 999.1 pattern: background tasks use get_session_factory() for independ
 Phase 999.4/999.5 — Instagram Reels Pipeline
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -1071,3 +1072,45 @@ async def upsert_reels_config(
 async def list_presets():
     """Return static preset configurations. Per D-04: pre-configured, editable."""
     return {"presets": PRESETS}
+
+
+@router.post("/enhance-theme", summary="AI-powered theme suggestions")
+async def enhance_theme(
+    req: dict,
+    current_user=Depends(get_current_user),
+):
+    """Generate 5-8 viral/trending video topic suggestions for a given niche+sub-theme using Gemini."""
+    from src.llm_client import _get_client, _extract_text
+
+    niche_id = req.get("niche_id", "")
+    sub_theme = req.get("sub_theme", "")
+    if not niche_id or not sub_theme:
+        raise HTTPException(status_code=400, detail="niche_id and sub_theme are required")
+
+    prompt = (
+        f"Voce e um especialista em conteudo viral para Instagram Reels no Brasil.\n"
+        f"Nicho: {niche_id}\n"
+        f"Sub-tema: {sub_theme}\n\n"
+        "Gere de 5 a 8 sugestoes de titulos/temas especificos para videos curtos (Reels) "
+        "que tenham alto potencial de engajamento (saves, shares, comentarios).\n"
+        "Os titulos devem ser no estilo hook, curtos e impactantes, em portugues brasileiro.\n"
+        "Exemplos de estilo: '3 habitos para ter apos acordar', '5 dicas para ser uma pessoa melhor', "
+        "'O erro que 90% das pessoas cometem com dinheiro'.\n\n"
+        "Retorne APENAS JSON valido no formato: {\"suggestions\": [\"titulo1\", \"titulo2\", ...]}\n"
+        "Nenhum texto fora do JSON."
+    )
+
+    try:
+        client = _get_client()
+        resp = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+        text = _extract_text(resp)
+        clean = text.strip().removeprefix("```json").removesuffix("```").strip()
+        result = json.loads(clean)
+        return {"suggestions": result.get("suggestions", [])}
+    except Exception as e:
+        logger.warning("enhance_theme failed: %s", e)
+        return {"suggestions": []}

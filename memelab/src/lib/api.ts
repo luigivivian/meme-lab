@@ -1583,6 +1583,13 @@ export function reelFileUrl(jobId: string, filename: string): string {
   return `/api/reels/${jobId}/file/${encodeURIComponent(filename)}`;
 }
 
+export async function enhanceReelTheme(nicheId: string, subTheme: string): Promise<{ suggestions: string[] }> {
+  return request<{ suggestions: string[] }>("/reels/enhance-theme", {
+    method: "POST",
+    body: JSON.stringify({ niche_id: nicheId, sub_theme: subTheme }),
+  });
+}
+
 // --- Product Ads (Phase 421) ---
 
 export interface AdJob {
