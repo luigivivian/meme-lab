@@ -40,6 +40,16 @@ REELS_SEGMENT_MAX_DURATION = float(os.getenv("REELS_SEGMENT_MAX_DURATION", "30.0
 REELS_FPS = 30
 REELS_VIDEO_CRF = 18
 
+# Available FFmpeg xfade transitions (for frontend config panel)
+REELS_AVAILABLE_TRANSITIONS = [
+    "fade", "fadeblack", "fadewhite", "dissolve",
+    "wipeleft", "wiperight", "wipeup", "wipedown",
+    "slideleft", "slideright", "slideup", "slidedown",
+    "circlecrop", "circleopen", "circleclose",
+    "radial", "smoothleft", "smoothright", "zoomin",
+    "pixelize", "diagtl", "diagtr",
+]
+
 # Output
 REELS_OUTPUT_DIR = os.getenv("REELS_OUTPUT_DIR", "output/reels")
 

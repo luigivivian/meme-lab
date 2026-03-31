@@ -52,6 +52,62 @@ def _build_sub_style() -> str:
     )
 
 
+def compute_scene_durations_from_script(
+    script_json: dict,
+    total_audio_duration: float,
+    n_scenes: int,
+) -> list[float]:
+    """Compute per-scene durations weighted by narration length.
+
+    Allocates total_audio_duration proportionally based on each scene's
+    narration character count. Enforces a 3s minimum per scene.
+
+    Args:
+        script_json: Script dict with 'cenas' list, each having 'narracao'.
+        total_audio_duration: Total audio duration in seconds.
+        n_scenes: Number of scenes (clips/images).
+
+    Returns:
+        List of durations in seconds, one per scene.
+    """
+    cenas = script_json.get("cenas", [])
+    min_duration = 3.0
+
+    # Compute weights from narration char count
+    weights = []
+    for i in range(n_scenes):
+        if i < len(cenas):
+            narracao = cenas[i].get("narracao", "")
+            weights.append(max(len(narracao), 1))
+        else:
+            weights.append(1)
+
+    total_weight = sum(weights)
+    if total_weight == 0:
+        return [total_audio_duration / n_scenes] * n_scenes
+
+    # Proportional allocation
+    durations = [(w / total_weight) * total_audio_duration for w in weights]
+
+    # Enforce minimum 3s per scene, redistribute excess
+    deficit = 0.0
+    above_min_indices = []
+    for i, d in enumerate(durations):
+        if d < min_duration:
+            deficit += min_duration - d
+            durations[i] = min_duration
+        else:
+            above_min_indices.append(i)
+
+    if deficit > 0 and above_min_indices:
+        above_total = sum(durations[i] for i in above_min_indices)
+        for i in above_min_indices:
+            share = (durations[i] / above_total) * deficit if above_total > 0 else deficit / len(above_min_indices)
+            durations[i] = max(durations[i] - share, min_duration)
+
+    return durations
+
+
 def is_ffmpeg_available() -> bool:
     """Check if FFmpeg is installed and on PATH."""
     return shutil.which("ffmpeg") is not None
@@ -420,6 +476,7 @@ def concat_segments(
     segment_paths: list[str],
     output_path: str,
     transition_duration: float = 0.5,
+    transition_type: str = "fade",
 ) -> str:
     """Concatenate segment videos with xfade crossfade transitions.
 
@@ -427,6 +484,7 @@ def concat_segments(
         segment_paths: Paths to segment MP4 files.
         output_path: Path for the concatenated output.
         transition_duration: Duration of crossfade between segments.
+        transition_type: FFmpeg xfade transition name (fade, dissolve, etc).
 
     Returns:
         output_path.
@@ -458,7 +516,7 @@ def concat_segments(
         offset = max(offset, 0)
         out = f"v{i}" if i < n - 1 else "vout"
         xfade_filters.append(
-            f"[{prev}][{i}:v]xfade=transition=fade:duration={transition_duration}:offset={offset}[{out}]"
+            f"[{prev}][{i}:v]xfade=transition={transition_type}:duration={transition_duration}:offset={offset}[{out}]"
         )
         prev = out
 
@@ -499,6 +557,7 @@ def concat_clips_with_audio(
     srt_path: str,
     output_path: str,
     transition_duration: float = 0.3,
+    transition_type: str = "fade",
 ) -> str:
     """Concatenate Hailuo video clips, overlay audio and subtitles.
 
@@ -511,6 +570,7 @@ def concat_clips_with_audio(
         srt_path: Path to SRT subtitle file.
         output_path: Path for final output MP4.
         transition_duration: Duration of xfade between clips.
+        transition_type: FFmpeg xfade transition name (fade, dissolve, etc).
 
     Returns:
         output_path on success.
@@ -561,7 +621,7 @@ def concat_clips_with_audio(
         offset = max(offset, 0)
         out = f"v{i}" if i < n - 1 else "vconcat"
         xfade_filters.append(
-            f"[{prev}][{i}:v]xfade=transition=fade:duration={transition_duration}:offset={offset}[{out}]"
+            f"[{prev}][{i}:v]xfade=transition={transition_type}:duration={transition_duration}:offset={offset}[{out}]"
         )
         prev = out
 

@@ -1067,6 +1067,13 @@ async def upsert_reels_config(
     )
 
 
+@router.get("/config/transitions", summary="List available video transitions")
+async def list_transitions():
+    """Return available FFmpeg xfade transition types for config panel."""
+    from src.reels_pipeline.config import REELS_AVAILABLE_TRANSITIONS
+    return {"transitions": REELS_AVAILABLE_TRANSITIONS}
+
+
 @router.get("/config/presets", summary="List available config presets")
 async def list_presets():
     """Return static preset configurations. Per D-04: pre-configured, editable."""

@@ -390,7 +390,11 @@ class ReelsPipeline:
                 job_dir=job_dir,
                 config_override=self.config,
             )
-            concat_segments(segment_paths, video_path)
+            concat_segments(
+                segment_paths,
+                video_path,
+                transition_type=self.config.get("transition_type", "fade"),
+            )
         else:
             build_reel_video(
                 image_paths=image_paths,
@@ -535,7 +539,8 @@ class ReelsPipeline:
             audio_path=audio_path,
             srt_path=srt_path,
             output_path=video_path,
-            transition_duration=0.3,
+            transition_duration=self.config.get("transition_duration", 0.3),
+            transition_type=self.config.get("transition_type", "fade"),
         )
 
         logger.info(f"Hailuo reel assembled: {video_path} from {len(clip_paths)} clips")
