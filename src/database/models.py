@@ -1,4 +1,4 @@
-"""ORM models — 16 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
+"""ORM models — 17 tabelas do banco de dados clip-flow (MySQL + SQLite)."""
 
 from datetime import datetime
 from typing import Optional
@@ -817,4 +817,36 @@ class EnhanceThemeCache(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "niche_id", "sub_theme", name="uq_enhance_cache_user_niche_sub"),
         Index("idx_enhance_cache_user_id", "user_id"),
+    )
+
+
+# ============================================================
+# 19. scene_assets (Phase G — Asset Registry with Semantic Reuse)
+# ============================================================
+
+class SceneAsset(TimestampMixin, Base):
+    __tablename__ = "scene_assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    character_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("characters.id"), nullable=True
+    )
+    asset_type: Mapped[str] = mapped_column(String(10), nullable=False)  # "image" | "video"
+    scene_description: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list] = mapped_column(JSON, nullable=False)  # 768 float list
+    file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    file_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    kie_task_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    model_used: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    generation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    usage_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+    __table_args__ = (
+        Index("idx_scene_assets_user_type_char", "user_id", "asset_type", "character_id"),
+        Index("idx_scene_assets_user_id", "user_id"),
+        Index("idx_scene_assets_file_hash", "file_hash"),
     )
