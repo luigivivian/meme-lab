@@ -575,6 +575,10 @@ async def create_interactive_reel(
         if cfg:
             step_state["config"] = {"video_model": cfg.video_model}
 
+    # Per-reel image_count override (independent of saved config)
+    if req.image_count is not None:
+        step_state.setdefault("config", {})["image_count"] = req.image_count
+
     # Create job_dir immediately so all subsequent steps can use it
     from src.reels_pipeline.main import ReelsPipeline
     pipeline = ReelsPipeline()
@@ -700,6 +704,12 @@ async def execute_step(
                 "video_model": cfg.video_model,
             }
 
+    # Merge per-job overrides from step_state (e.g. image_count set at creation)
+    job_config = step_state.get("config", {})
+    for key in ("image_count",):
+        if key in job_config and key not in config_override:
+            config_override[key] = job_config[key]
+
     # Mark step as generating
     step_data = step_state.get(step_name, {})
     step_data["status"] = "generating"
@@ -781,6 +791,11 @@ async def approve_step(
                     "niche": cfg.niche,
                     "cta_default": cfg.cta_default,
                 }
+        # Merge per-job overrides from step_state
+        job_config = step_state.get("config", {})
+        for key in ("image_count",):
+            if key in job_config and key not in config_override:
+                config_override[key] = job_config[key]
         from src.database.session import get_session_factory
         session_factory = get_session_factory()
         background_tasks.add_task(
@@ -859,6 +874,12 @@ async def regenerate_step(
                 "transcription_provider": cfg.transcription_provider,
             }
 
+    # Merge per-job overrides from step_state
+    job_config = step_state.get("config", {})
+    for key in ("image_count",):
+        if key in job_config and key not in config_override:
+            config_override[key] = job_config[key]
+
     session_factory = get_session_factory()
     background_tasks.add_task(
         _execute_step_task, job_id, step_name, config_override, session_factory
@@ -897,6 +918,12 @@ async def edit_step(
     elif step_name == "script":
         if req.script_json is None:
             raise HTTPException(status_code=400, detail="'script_json' field required for script edit")
+        # Rebuild narracao_completa from edited cenas
+        cenas = req.script_json.get("cenas", [])
+        if cenas:
+            req.script_json["narracao_completa"] = " ".join(
+                c.get("narracao", "") for c in cenas if c.get("narracao")
+            )
         step_state["script"]["json"] = req.script_json
         job.script_json = req.script_json
 
@@ -931,8 +958,12 @@ async def regenerate_single_image(
     background_tasks: BackgroundTasks,
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(db_session),
+    prompt: str | None = None,
 ):
-    """Force-regenerate a single scene image (bypass cache). Runs in background."""
+    """Force-regenerate a single scene image (bypass cache). Runs in background.
+
+    Optional prompt query param overrides the scene description for this generation.
+    """
     from src.database.session import get_session_factory
 
     job = await _get_user_job(job_id, current_user.id, db)
@@ -943,9 +974,18 @@ async def regenerate_single_image(
     if scene_index < 0 or scene_index >= len(paths):
         raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
 
+    # Mark this image as generating so frontend can poll
+    reuse_info = dict(images_data.get("reuse_info", {}))
+    reuse_info[str(scene_index)] = {"reused": False, "generating": True}
+    images_data["reuse_info"] = reuse_info
+    step_state["images"] = images_data
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
     session_factory = get_session_factory()
     background_tasks.add_task(
-        _regenerate_single_image_task, job_id, scene_index, session_factory
+        _regenerate_single_image_task, job_id, scene_index, session_factory, prompt
     )
 
     return {"scene_index": scene_index, "status": "generating"}
@@ -955,6 +995,7 @@ async def _regenerate_single_image_task(
     job_id: str,
     scene_index: int,
     session_factory,
+    custom_prompt: str | None = None,
 ):
     """Background task: regenerate a single scene image via Gemini, register as new asset."""
     from src.reels_pipeline.image_gen import generate_reel_images_per_cena
@@ -978,8 +1019,10 @@ async def _regenerate_single_image_task(
                 logger.error("Regenerate image: scene_index %d >= cenas count %d", scene_index, len(cenas))
                 return
 
-            # Generate single cena image
-            single_cena = cenas[scene_index]
+            # Generate single cena image — use custom prompt if provided
+            single_cena = dict(cenas[scene_index])
+            if custom_prompt:
+                single_cena["legenda_overlay"] = custom_prompt
             new_paths = await generate_reel_images_per_cena(
                 cenas=[single_cena],
                 character_id=job.character_id,
@@ -999,9 +1042,10 @@ async def _regenerate_single_image_task(
                     paths[scene_index] = target_path
                 images_data["paths"] = paths
 
-                # Update reuse_info
+                # Update reuse_info — clear generating flag, add version for cache busting
+                import time
                 reuse_info = images_data.get("reuse_info", {})
-                reuse_info[str(scene_index)] = {"reused": False}
+                reuse_info[str(scene_index)] = {"reused": False, "generating": False, "version": int(time.time())}
                 images_data["reuse_info"] = reuse_info
 
                 step_state["images"] = images_data
@@ -1031,6 +1075,23 @@ async def _regenerate_single_image_task(
 
         except Exception as e:
             logger.error("Regenerate image %d for job %s failed: %s", scene_index, job_id, e)
+            # Clear generating flag on failure
+            try:
+                result2 = await session.execute(
+                    select(ReelsJob).where(ReelsJob.job_id == job_id)
+                )
+                job2 = result2.scalar_one_or_none()
+                if job2:
+                    ss = dict(job2.step_state or {})
+                    ri = ss.get("images", {}).get("reuse_info", {})
+                    if str(scene_index) in ri:
+                        ri[str(scene_index)]["generating"] = False
+                        ss["images"]["reuse_info"] = ri
+                        job2.step_state = ss
+                        flag_modified(job2, "step_state")
+                        await session.commit()
+            except Exception:
+                pass
 
 
 @router.post("/{job_id}/regenerate-scene-video/{scene_index}", summary="Regenerate a single scene video")
@@ -1178,7 +1239,12 @@ async def _retry_scene_task(
 
             # Determine prompt and image URL
             retry_prompt = custom_prompt or scene.get("prompt", "")
-            img_path = scene.get("img_path", "")
+            # Use latest image from images.paths (may have been regenerated)
+            images_paths = step_state.get("images", {}).get("paths", [])
+            if scene_index < len(images_paths) and os.path.isfile(images_paths[scene_index]):
+                img_path = images_paths[scene_index]
+            else:
+                img_path = scene.get("img_path", "")
             duration = scene.get("duration", 6)
 
             # Upload image to GCS for retry
@@ -1251,6 +1317,137 @@ async def _retry_scene_task(
                     job.step_state = step_state
                     flag_modified(job, "step_state")
                     await session.commit()
+            except Exception:
+                pass
+
+
+@router.post("/{job_id}/reassemble-video", summary="Reassemble final video from existing clips")
+async def reassemble_video(
+    job_id: str,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Reassemble the final video from existing scene clips WITHOUT re-calling Kie.ai.
+
+    Use this after editing/regenerating individual scenes to rebuild the final video.
+    """
+    from src.database.session import get_session_factory
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+    video_data = step_state.get("video", {})
+    scenes = video_data.get("scenes", [])
+
+    if not scenes:
+        raise HTTPException(status_code=400, detail="No scene clips available to reassemble")
+
+    clips_with_success = [s for s in scenes if s.get("status") in ("success", "static_fallback")]
+    if not clips_with_success:
+        raise HTTPException(status_code=400, detail="No completed scene clips to assemble")
+
+    # Mark as reassembling
+    video_data["status"] = "generating"
+    video_data.pop("path", None)
+    step_state["video"] = video_data
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
+    session_factory = get_session_factory()
+    background_tasks.add_task(
+        _reassemble_video_task, job_id, session_factory
+    )
+
+    return {"status": "reassembling"}
+
+
+async def _reassemble_video_task(job_id: str, session_factory):
+    """Background task: reassemble final video from existing clips."""
+    from src.reels_pipeline.video_builder import concat_clips_with_audio
+
+    async with session_factory() as session:
+        try:
+            result = await session.execute(
+                select(ReelsJob).where(ReelsJob.job_id == job_id)
+            )
+            job = result.scalar_one_or_none()
+            if not job:
+                return
+
+            step_state = dict(job.step_state or {})
+            video_data = step_state.get("video", {})
+            scenes = video_data.get("scenes", [])
+            job_dir = step_state.get("prompt", {}).get("job_dir", "")
+            clips_dir = os.path.join(job_dir, "clips")
+
+            clip_paths = []
+            for s in scenes:
+                cp = s.get("clip_path", "")
+                if cp and os.path.isfile(cp):
+                    clip_paths.append(cp)
+                else:
+                    expected = os.path.join(clips_dir, f"clip_{s['index']:02d}.mp4")
+                    if os.path.isfile(expected):
+                        clip_paths.append(expected)
+
+            if not clip_paths:
+                video_data["status"] = "error"
+                video_data["error"] = "No clip files found on disk"
+                step_state["video"] = video_data
+                job.step_state = step_state
+                flag_modified(job, "step_state")
+                await session.commit()
+                return
+
+            audio_path = step_state.get("tts", {}).get("path", "")
+            srt_path = step_state.get("srt", {}).get("path", "")
+            script_json = step_state.get("script", {}).get("json", {})
+            video_path = os.path.join(job_dir, "final.mp4")
+
+            concat_clips_with_audio(
+                clip_paths=clip_paths,
+                audio_path=audio_path,
+                srt_path=srt_path,
+                output_path=video_path,
+                transition_duration=0.3,
+                script_json=script_json,
+            )
+
+            video_data["path"] = video_path
+            video_data["status"] = "complete"
+            step_state["video"] = video_data
+            job.step_state = step_state
+            job.video_path = video_path
+            flag_modified(job, "step_state")
+
+            # Re-generate platform metadata
+            platforms = job.platforms or ["instagram"]
+            if platforms:
+                try:
+                    from src.reels_pipeline.platform_metadata import generate_platform_metadata
+                    platform_outputs = await generate_platform_metadata(
+                        script_json=script_json,
+                        platforms=platforms,
+                        video_url=job.video_url,
+                    )
+                    job.platform_outputs = platform_outputs
+                    flag_modified(job, "platform_outputs")
+                except Exception as pm_err:
+                    logger.warning("Platform metadata failed on reassemble: %s", pm_err)
+
+            await session.commit()
+            logger.info("Reassembled video for job %s: %s", job_id, video_path)
+
+        except Exception as e:
+            logger.error("Reassemble video for job %s failed: %s", job_id, e)
+            try:
+                step_state = dict(job.step_state or {})
+                step_state.setdefault("video", {})["status"] = "error"
+                step_state["video"]["error"] = str(e)[:300]
+                job.step_state = step_state
+                flag_modified(job, "step_state")
+                await session.commit()
             except Exception:
                 pass
 
@@ -1533,32 +1730,73 @@ async def list_presets():
 
 # ── Enhance Theme (Phase 999.8-A) ─────────────────────────────────────────
 
-ENHANCE_REELS_SYSTEM_PROMPT = """You are a Brazilian Instagram Reels content strategist.
-Given a niche and optional sub-theme, generate 8 specific, engaging reel topic suggestions in Portuguese (pt-BR).
-Each suggestion should be a concise topic/title (max 80 chars) that works well for short-form video.
-Return a JSON array of strings. Example: ["5 habitos matinais para produtividade","Como organizar sua rotina em 3 passos"]"""
+ENHANCE_REELS_SYSTEM_PROMPT = """Voce e um estrategista de conteudo informativo para Instagram Reels no Brasil.
+Seu objetivo: criar sugestoes de video que entreguem VALOR REAL ao espectador — dicas praticas, informacoes uteis, hacks aplicaveis no dia a dia.
+
+## REGRAS INVIOLAVEIS
+
+1. FOCO ABSOLUTO: Toda sugestao DEVE ser sobre o SUB-TEMA dentro do NICHO informado. Nao desvie. Nao generalize. Nao misture sub-temas.
+2. CONTEUDO SOLIDO: Cada topico DEVE ser uma dica pratica, informacao util ou insight aplicavel IMEDIATAMENTE pelo espectador. Sem frases vagas como "melhore sua vida" ou "tenha disciplina".
+3. GANCHO INFORMATIVO: O titulo deve criar curiosidade sobre informacao util — use numeros, "como fazer", contrastes ou revelacoes. Exemplos: "3 erros que...", "O metodo que...", "Por que voce nao deveria...".
+4. TOPICOS SAO CENAS: Cada topico vira uma cena do video com narracao propria. Escreva como se fosse o roteiro resumido daquela cena — concreto, especifico, com a dica completa.
+5. PT-BR NATURAL: Tom coloquial brasileiro, como se estivesse explicando para um amigo.
+
+## FORMATO DE SAIDA
+
+Retorne APENAS um JSON array valido. Cada objeto:
+- "title": gancho informativo (max 80 chars) — cria curiosidade sobre algo util
+- "outline": 2-3 frases descrevendo o angulo do video, publico-alvo e por que o espectador vai se beneficiar
+- "topics": array de 3-5 dicas concretas. Cada uma DEVE conter: a dica em si + por que funciona ou como aplicar (20-50 palavras cada)
+
+## EXEMPLOS
+
+Niche: "Financas Pessoais" | Sub-theme: "como sair das dividas"
+[
+  {
+    "title": "4 passos para zerar suas dividas esse ano",
+    "outline": "Guia pratico com metodo bola de neve adaptado para a realidade brasileira. Para quem ganha ate 5 mil e quer sair do vermelho sem cortar tudo.",
+    "topics": [
+      "Liste TODAS as dividas em uma planilha com valor, juros e parcelas — voce precisa enxergar o monstro inteiro antes de atacar",
+      "Priorize a divida com maior juros (geralmente cartao de credito a 15% ao mes) — renegocie direto com o banco, nunca com intermediarios",
+      "Crie uma reserva minima de R$500 antes de pagar dividas extras — sem colchao financeiro voce volta a se endividar no primeiro imprevisto",
+      "Use a regra 50-30-20 adaptada: 50% essenciais, 30% quitar dividas, 20% fundo de emergencia ate ter 3 meses de gastos guardados"
+    ]
+  }
+]
+
+Niche: "Desenvolvimento Pessoal" | Sub-theme: "foco"
+[
+  {
+    "title": "3 tecnicas de foco que neurocientistas recomendam",
+    "outline": "Video baseado em estudos de neurociencia sobre como o cerebro mantem atencao. Para quem se distrai facilmente e quer produzir mais em menos tempo.",
+    "topics": [
+      "Tecnica Pomodoro invertida: trabalhe 25min e descanse 5, mas no descanso faca algo fisico (levantar, alongar) — ativa o cortex pre-frontal e renova o foco",
+      "Regra dos 2 minutos: se uma tarefa leva menos de 2 minutos, faca agora — tarefas pendentes ocupam espaco mental e drenam concentracao",
+      "Ambiente de foco: tire notificacoes, coloque o celular em outro comodo e use fones — o cerebro leva 23 minutos para recuperar foco apos uma interrupcao"
+    ]
+  }
+]"""
 
 
-@router.post("/enhance-theme", summary="AI topic suggestions for reels (cached)")
+@router.post("/enhance-theme", summary="AI structured topic suggestions for reels (cached)")
 async def enhance_theme(
     niche_id: str = Query(..., description="Niche identifier"),
     sub_theme: str = Query("", description="Optional sub-theme"),
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(db_session),
 ):
-    """Generate AI topic suggestions for a niche, with 24h cache.
+    """Generate structured AI topic suggestions for a niche, with persistent cache.
 
-    Returns cached suggestions (minus used ones) if available and fresh.
-    Otherwise calls Gemini and upserts cache row.
+    Returns all suggestions for the niche+sub-theme, accumulating across calls.
+    New suggestions are appended to the existing list (not replaced).
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
     from src.database.models import EnhanceThemeCache
-    from src.llm_client import generate_json
-    import asyncio
+    from src.llm_client import _get_client, _extract_text
 
     sub = sub_theme.strip() or ""
 
-    # Check cache
+    # Load existing cache row (persistent, no TTL — accumulates over time)
     result = await db.execute(
         select(EnhanceThemeCache).where(
             EnhanceThemeCache.user_id == current_user.id,
@@ -1568,61 +1806,114 @@ async def enhance_theme(
     )
     cached = result.scalar_one_or_none()
 
-    now = datetime.now(timezone.utc)
-    cache_ttl = timedelta(hours=24)
+    existing = cached.suggestions if cached else []
+    used_titles = set(cached.used_suggestions or []) if cached else set()
 
-    if cached:
-        created = cached.created_at.replace(tzinfo=timezone.utc) if cached.created_at.tzinfo is None else cached.created_at
-        is_fresh = (now - created) < cache_ttl
-        if is_fresh:
-            used = set(cached.used_suggestions or [])
-            available = [s for s in (cached.suggestions or []) if s not in used]
-            if available:
-                return {"suggestions": available, "cached": True}
+    # Generate new batch via Gemini
+    existing_titles = [s["title"] for s in existing if isinstance(s, dict)] if existing else []
+    avoid_clause = ""
+    if existing_titles:
+        avoid_clause = f"\n\nAVOID repeating these already-generated topics:\n" + "\n".join(f"- {t}" for t in existing_titles[-12:])
 
-    # Generate new suggestions via Gemini
-    user_msg = f"Niche: {niche_id}"
-    if sub:
-        user_msg += f"\nSub-theme: {sub}"
-    user_msg += "\nGenerate 8 reel topic suggestions."
+    prompt = (
+        f"NICHO: {niche_id}\n"
+        f"SUB-TEMA: {sub or niche_id}\n"
+        f"\nGere 6 sugestoes de video INFORMATIVO sobre \"{sub or niche_id}\"."
+        f"\nCada sugestao deve entregar dicas praticas, informacoes uteis e conteudo aplicavel no dia a dia."
+        f"\nOs topicos devem ser dicas completas com explicacao — nao apenas titulos."
+        f"\nFoque 100% no sub-tema \"{sub or niche_id}\" dentro do nicho \"{niche_id}\"."
+        f"{avoid_clause}"
+    )
 
     try:
-        raw = await asyncio.to_thread(
-            generate_json,
-            system_prompt=ENHANCE_REELS_SYSTEM_PROMPT,
-            user_message=user_msg,
-            tier="lite",
+        client = _get_client()
+        resp = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=[
+                {"role": "user", "parts": [{"text": ENHANCE_REELS_SYSTEM_PROMPT}]},
+                {"role": "user", "parts": [{"text": prompt}]},
+            ],
         )
-        suggestions = json.loads(raw)
-        if not isinstance(suggestions, list):
-            suggestions = suggestions.get("suggestions", []) if isinstance(suggestions, dict) else []
-        suggestions = [str(s) for s in suggestions if s][:8]
+        text = _extract_text(resp)
+        clean = text.strip().removeprefix("```json").removesuffix("```").strip()
+        new_suggestions = json.loads(clean)
+
+        if isinstance(new_suggestions, dict):
+            new_suggestions = new_suggestions.get("suggestions", [])
+        if not isinstance(new_suggestions, list):
+            new_suggestions = []
+
+        # Validate structure
+        validated = []
+        for s in new_suggestions:
+            if isinstance(s, dict) and "title" in s:
+                validated.append({
+                    "title": str(s["title"])[:100],
+                    "outline": str(s.get("outline", ""))[:500],
+                    "topics": [str(t)[:200] for t in s.get("topics", [])][:7],
+                })
+            elif isinstance(s, str):
+                # Backward compat: plain string → wrap in structure
+                validated.append({"title": s[:100], "outline": "", "topics": []})
+        new_suggestions = validated[:6]
+
     except Exception as e:
         logger.error("Enhance theme Gemini error: %s", e)
         raise HTTPException(status_code=502, detail=f"Erro ao gerar sugestoes: {e}")
 
-    if not suggestions:
+    if not new_suggestions:
         raise HTTPException(status_code=502, detail="Gemini nao gerou sugestoes validas")
 
-    # Upsert cache row
+    # Append new suggestions to existing (accumulate)
+    all_suggestions = list(existing) + new_suggestions
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if cached:
-        cached.suggestions = suggestions
-        cached.used_suggestions = []
-        cached.created_at = now.replace(tzinfo=None)
+        cached.suggestions = all_suggestions
+        cached.created_at = now
         flag_modified(cached, "suggestions")
-        flag_modified(cached, "used_suggestions")
     else:
         cached = EnhanceThemeCache(
             user_id=current_user.id,
             niche_id=niche_id,
             sub_theme=sub,
-            suggestions=suggestions,
-            used_suggestions=[],
+            suggestions=all_suggestions,
+            used_suggestions=list(used_titles),
         )
         db.add(cached)
     await db.commit()
 
-    return {"suggestions": suggestions, "cached": False}
+    # Return all available (not used)
+    available = [s for s in all_suggestions if isinstance(s, dict) and s.get("title") not in used_titles]
+    return {"suggestions": available, "cached": len(existing) > 0, "total": len(all_suggestions)}
+
+
+@router.get("/enhance-theme/suggestions", summary="Load cached suggestions without generating")
+async def get_cached_suggestions(
+    niche_id: str = Query(..., description="Niche identifier"),
+    sub_theme: str = Query("", description="Optional sub-theme"),
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Return existing cached suggestions for a niche+sub-theme (no Gemini call)."""
+    from src.database.models import EnhanceThemeCache
+
+    sub = sub_theme.strip() or ""
+    result = await db.execute(
+        select(EnhanceThemeCache).where(
+            EnhanceThemeCache.user_id == current_user.id,
+            EnhanceThemeCache.niche_id == niche_id,
+            EnhanceThemeCache.sub_theme == sub,
+        )
+    )
+    cached = result.scalar_one_or_none()
+    if not cached:
+        return {"suggestions": [], "total": 0}
+
+    used_titles = set(cached.used_suggestions or [])
+    available = [s for s in (cached.suggestions or []) if isinstance(s, dict) and s.get("title") not in used_titles]
+    return {"suggestions": available, "total": len(cached.suggestions or [])}
 
 
 @router.delete("/enhance-theme/cache", summary="Clear cached suggestions for a niche+sub-theme")

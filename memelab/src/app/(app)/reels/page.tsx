@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Clapperboard,
@@ -37,10 +37,12 @@ import {
   createInteractiveReel,
   saveReelsConfig,
   enhanceReelTheme,
+  getCachedSuggestions,
   clearEnhanceCache,
   type ReelGenerateRequest,
   type ReelJob,
   type ReelsConfig,
+  type ThemeSuggestion,
 } from "@/lib/api";
 import { REEL_NICHES, getNicheById, TIER_LABELS } from "@/components/reels/reel-niches";
 
@@ -83,14 +85,15 @@ function GenerationForm() {
   const [niche, setNiche] = useState("lifestyle");
   const [language, setLanguage] = useState("pt-BR");
   const [preset, setPreset] = useState("clean");
+  const [sceneCount, setSceneCount] = useState("5");
   const [showAjustes, setShowAjustes] = useState(false);
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submittingInteractive, setSubmittingInteractive] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [isCached, setIsCached] = useState(false);
+  const [suggestions, setSuggestions] = useState<ThemeSuggestion[]>([]);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<ThemeSuggestion | null>(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
 
@@ -102,35 +105,59 @@ function GenerationForm() {
   const isFailed = jobStatus?.status === "failed";
   const isGenerating = activeJobId && !isComplete && !isFailed;
 
+  // Load cached suggestions when sub-theme changes
+  useEffect(() => {
+    if (!selectedSubTheme || !selectedNiche) {
+      setSuggestions([]);
+      setSelectedSuggestion(null);
+      return;
+    }
+    const nicheLabel = getNicheById(selectedNiche)?.label ?? selectedNiche;
+    getCachedSuggestions(nicheLabel, selectedSubTheme).then((res) => {
+      setSuggestions(res.suggestions ?? []);
+    }).catch(() => {});
+  }, [selectedNiche, selectedSubTheme]);
+
   async function handleSuggestThemes() {
+    if (!selectedNiche) return;
     setLoadingSuggestions(true);
+    setEnhanceError(null);
     try {
-      const res = await enhanceReelTheme(niche, tema.trim());
-      setSuggestions(res.suggestions);
-      setIsCached(res.cached);
+      const nicheLabel = getNicheById(selectedNiche)?.label ?? selectedNiche;
+      const res = await enhanceReelTheme(nicheLabel, selectedSubTheme);
+      setSuggestions(res.suggestions ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao sugerir temas");
+      setEnhanceError(err instanceof Error ? err.message : "Erro ao sugerir temas");
     } finally {
       setLoadingSuggestions(false);
     }
   }
 
+  function handleSelectSuggestion(s: ThemeSuggestion) {
+    setSelectedSuggestion(s);
+    // Build full tema from structured suggestion
+    const topicsText = s.topics.length > 0 ? "\n\n" + s.topics.map((t, i) => `${i + 1}. ${t}`).join("\n") : "";
+    setTema(`${s.title}${s.outline ? "\n\n" + s.outline : ""}${topicsText}`);
+  }
+
   async function handleRefreshSuggestions() {
+    if (!selectedNiche) return;
     setLoadingSuggestions(true);
+    setEnhanceError(null);
     try {
-      await clearEnhanceCache(niche, tema.trim());
-      const res = await enhanceReelTheme(niche, tema.trim());
-      setSuggestions(res.suggestions);
-      setIsCached(res.cached);
+      const nicheLabel = getNicheById(selectedNiche)?.label ?? selectedNiche;
+      await clearEnhanceCache(nicheLabel, selectedSubTheme);
+      const res = await enhanceReelTheme(nicheLabel, selectedSubTheme);
+      setSuggestions(res.suggestions ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao atualizar sugestoes");
+      setEnhanceError(err instanceof Error ? err.message : "Erro ao atualizar sugestoes");
     } finally {
       setLoadingSuggestions(false);
     }
   }
 
   async function handleGenerate() {
-    if (!tema.trim()) return;
+    if (!tema.trim() || submitting || submittingInteractive) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -164,13 +191,20 @@ function GenerationForm() {
   }
 
   async function handleInteractive() {
-    if (!tema.trim()) return;
+    if (!tema.trim() || submitting || submittingInteractive) return;
     setSubmittingInteractive(true);
     setError(null);
     try {
+      const nicheLabel = getNicheById(selectedNiche)?.labelEn ?? selectedNiche;
       const res = await createInteractiveReel({
         tema: tema.trim(),
         target_duration: parseInt(duration),
+        image_count: parseInt(sceneCount),
+        tone,
+        niche: nicheLabel || "lifestyle",
+        preset,
+        niche_id: selectedNiche || undefined,
+        sub_theme: selectedSubTheme || undefined,
         platforms,
         language,
         ...(characterId === "none"
@@ -187,21 +221,6 @@ function GenerationForm() {
     }
   }
 
-  async function handleEnhanceTheme() {
-    if (!selectedNiche || !selectedSubTheme) return;
-    setEnhancing(true);
-    setEnhanceError(null);
-    setSuggestions([]);
-    try {
-      const nicheLabel = getNicheById(selectedNiche)?.label ?? selectedNiche;
-      const res = await enhanceReelTheme(nicheLabel, selectedSubTheme);
-      setSuggestions(res.suggestions ?? []);
-    } catch (err) {
-      setEnhanceError(err instanceof Error ? err.message : "Erro ao sugerir temas");
-    } finally {
-      setEnhancing(false);
-    }
-  }
 
   const currentNiche = getNicheById(selectedNiche);
 
@@ -327,44 +346,6 @@ function GenerationForm() {
               </div>
             )}
 
-            {/* Enhance theme button + suggestions */}
-            {selectedSubTheme && (
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleEnhanceTheme}
-                  disabled={enhancing}
-                >
-                  {enhancing ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  Sugerir Temas
-                </Button>
-
-                {enhanceError && (
-                  <p className="text-xs text-red-400">{enhanceError}</p>
-                )}
-
-                {suggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {suggestions.map((s, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setTema(s)}
-                        className="px-2.5 py-1 rounded-full text-xs bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40 transition-all"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             <Textarea
               placeholder="Ex: 3 habitos matinais que mudaram minha produtividade"
               value={tema}
@@ -378,7 +359,7 @@ function GenerationForm() {
                 variant="ghost"
                 size="sm"
                 onClick={handleSuggestThemes}
-                disabled={loadingSuggestions}
+                disabled={loadingSuggestions || !selectedNiche}
                 className="text-purple-400 hover:text-purple-300"
               >
                 {loadingSuggestions ? (
@@ -388,32 +369,50 @@ function GenerationForm() {
                 )}
                 Sugerir Temas
               </Button>
-              {isCached && (
-                <span className="text-xs text-muted-foreground">(em cache)</span>
-              )}
               {suggestions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleRefreshSuggestions}
-                  disabled={loadingSuggestions}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  title="Gerar novas sugestoes"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${loadingSuggestions ? "animate-spin" : ""}`} />
-                </button>
+                <>
+                  <span className="text-xs text-muted-foreground">({suggestions.length} sugestoes)</span>
+                  <button
+                    type="button"
+                    onClick={handleRefreshSuggestions}
+                    disabled={loadingSuggestions}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Gerar mais sugestoes"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${loadingSuggestions ? "animate-spin" : ""}`} />
+                  </button>
+                </>
               )}
             </div>
 
+            {enhanceError && <p className="text-xs text-red-400">{enhanceError}</p>}
+
             {suggestions.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="space-y-2">
                 {suggestions.map((s, i) => (
                   <button
                     key={i}
                     type="button"
-                    className="text-xs px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
-                    onClick={() => setTema(s)}
+                    onClick={() => handleSelectSuggestion(s)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                      selectedSuggestion?.title === s.title
+                        ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30"
+                        : "border-border hover:border-purple-500/30 hover:bg-secondary/50"
+                    }`}
                   >
-                    {s}
+                    <p className="text-sm font-medium text-purple-300">{s.title}</p>
+                    {s.outline && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.outline}</p>
+                    )}
+                    {s.topics.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {s.topics.map((t, ti) => (
+                          <span key={ti} className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -514,6 +513,18 @@ function GenerationForm() {
                           <SelectItem value="minimal">Minimal</SelectItem>
                         </>
                       )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Numero de Cenas</label>
+                  <Select value={sceneCount} onValueChange={setSceneCount}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[3, 4, 5, 6, 7, 8].map((n) => (
+                        <SelectItem key={n} value={String(n)}>{n} cenas</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

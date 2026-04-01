@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -17,6 +18,7 @@ export default function ReelJobPage() {
   const params = useParams<{ jobId: string }>();
   const jobId = params.jobId;
   const { data: stepState, error, isLoading, mutate } = useStepState(jobId);
+  const [viewStep, setViewStep] = useState<number | null>(null);
 
   if (isLoading || !stepState) {
     return (
@@ -50,11 +52,14 @@ export default function ReelJobPage() {
 
   async function handleRegenerate(step: string) {
     await regenerateStep(jobId, step);
+    setViewStep(null);
     mutate();
   }
 
+  const displayStep = viewStep ?? currentStep;
+
   function renderStepContent() {
-    switch (currentStep) {
+    switch (displayStep) {
       case 0:
         return <StepPrompt jobId={jobId} stepState={state} />;
       case 1:
@@ -107,9 +112,14 @@ export default function ReelJobPage() {
         <h1 className="text-xl font-bold tracking-tight">Reel Interativo</h1>
       </div>
 
-      <StepperHeader currentStep={currentStep} stepState={state} />
+      <StepperHeader
+        currentStep={currentStep}
+        stepState={state}
+        displayStep={displayStep}
+        onStepClick={setViewStep}
+      />
 
-      <StepContent currentStep={currentStep}>
+      <StepContent currentStep={currentStep} displayStep={displayStep}>
         {renderStepContent()}
       </StepContent>
     </div>

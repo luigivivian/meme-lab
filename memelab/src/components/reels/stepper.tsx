@@ -22,11 +22,25 @@ function getStepStatus(index: number, currentStep: number, stepState: StepState)
   return "pending";
 }
 
-export function StepperHeader({ currentStep, stepState }: { currentStep: number; stepState: StepState }) {
+export function StepperHeader({
+  currentStep,
+  stepState,
+  displayStep,
+  onStepClick,
+}: {
+  currentStep: number;
+  stepState: StepState;
+  displayStep?: number;
+  onStepClick?: (index: number) => void;
+}) {
+  const activeDisplay = displayStep ?? currentStep;
+
   return (
     <div className="flex items-center justify-center gap-1 sm:gap-2 py-4">
       {STEPS.map((step, i) => {
         const status = getStepStatus(i, currentStep, stepState);
+        const isViewing = i === activeDisplay;
+        const isClickable = status === "completed" && !isViewing;
         const Icon = step.icon;
         return (
           <div key={step.id} className="flex items-center">
@@ -39,15 +53,24 @@ export function StepperHeader({ currentStep, stepState }: { currentStep: number;
                 }`}
               />
             )}
-            <div className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              disabled={!isClickable}
+              onClick={() => isClickable && onStepClick?.(i)}
+              className={`flex flex-col items-center gap-1 group ${
+                isClickable ? "cursor-pointer" : status === "pending" ? "cursor-not-allowed" : "cursor-default"
+              }`}
+            >
               <div
-                className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-colors ${
-                  status === "completed"
-                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
-                    : status === "active"
-                      ? "border-purple-500 text-purple-400 bg-purple-500/10"
-                      : "border-muted text-muted-foreground"
-                }`}
+                className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all ${
+                  isViewing && status !== "active"
+                    ? "border-purple-500 ring-2 ring-purple-500/30 bg-emerald-500/20 text-emerald-400"
+                    : status === "completed"
+                      ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
+                      : status === "active"
+                        ? "border-purple-500 text-purple-400 bg-purple-500/10"
+                        : "border-muted text-muted-foreground"
+                } ${isClickable ? "group-hover:scale-110 group-hover:ring-2 group-hover:ring-emerald-500/30" : ""}`}
               >
                 {status === "completed" ? (
                   <Check className="h-4 w-4" />
@@ -56,13 +79,17 @@ export function StepperHeader({ currentStep, stepState }: { currentStep: number;
                 )}
               </div>
               <span
-                className={`text-[10px] sm:text-xs hidden sm:block ${
-                  status === "active" ? "text-purple-400 font-medium" : "text-muted-foreground"
-                }`}
+                className={`text-[10px] sm:text-xs hidden sm:block transition-colors ${
+                  isViewing
+                    ? "text-purple-400 font-medium"
+                    : status === "active"
+                      ? "text-purple-400 font-medium"
+                      : "text-muted-foreground"
+                } ${isClickable ? "group-hover:text-emerald-400" : ""}`}
               >
                 {step.label}
               </span>
-            </div>
+            </button>
           </div>
         );
       })}
@@ -82,15 +109,16 @@ const variants = {
   }),
 };
 
-export function StepContent({ currentStep, children }: { currentStep: number; children: ReactNode }) {
-  const prevStep = useRef(currentStep);
-  const direction = currentStep >= prevStep.current ? 1 : -1;
-  prevStep.current = currentStep;
+export function StepContent({ currentStep, displayStep, children }: { currentStep: number; displayStep?: number; children: ReactNode }) {
+  const step = displayStep ?? currentStep;
+  const prevStep = useRef(step);
+  const direction = step >= prevStep.current ? 1 : -1;
+  prevStep.current = step;
 
   return (
     <AnimatePresence mode="wait" custom={direction}>
       <motion.div
-        key={currentStep}
+        key={step}
         custom={direction}
         variants={variants}
         initial="enter"

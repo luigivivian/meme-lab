@@ -1537,9 +1537,16 @@ export async function getReelsPresets() {
 
 // --- Enhance Theme Cache (Phase 999.8-A) ---
 
+export interface ThemeSuggestion {
+  title: string;
+  outline: string;
+  topics: string[];
+}
+
 export interface EnhanceThemeResponse {
-  suggestions: string[];
+  suggestions: ThemeSuggestion[];
   cached: boolean;
+  total: number;
 }
 
 export async function enhanceReelTheme(nicheId: string, subTheme = "") {
@@ -1548,6 +1555,12 @@ export async function enhanceReelTheme(nicheId: string, subTheme = "") {
   return request<EnhanceThemeResponse>(`/reels/enhance-theme?${params}`, {
     method: "POST",
   });
+}
+
+export async function getCachedSuggestions(nicheId: string, subTheme = "") {
+  const params = new URLSearchParams({ niche_id: nicheId });
+  if (subTheme) params.set("sub_theme", subTheme);
+  return request<{ suggestions: ThemeSuggestion[]; total: number }>(`/reels/enhance-theme/suggestions?${params}`);
 }
 
 export async function clearEnhanceCache(nicheId: string, subTheme = "") {
@@ -1569,9 +1582,10 @@ export async function retryScene(jobId: string, sceneIndex: number, prompt?: str
   );
 }
 
-export async function regenerateSingleImage(jobId: string, sceneIndex: number) {
+export async function regenerateSingleImage(jobId: string, sceneIndex: number, prompt?: string) {
+  const params = prompt ? `?prompt=${encodeURIComponent(prompt)}` : "";
   return request<{ scene_index: number; status: string }>(
-    `/reels/${jobId}/regenerate-image/${sceneIndex}`, { method: "POST" }
+    `/reels/${jobId}/regenerate-image/${sceneIndex}${params}`, { method: "POST" }
   );
 }
 
@@ -1582,11 +1596,19 @@ export async function regenerateSceneVideo(jobId: string, sceneIndex: number, pr
   );
 }
 
+export async function reassembleVideo(jobId: string) {
+  return request<{ status: string }>(
+    `/reels/${jobId}/reassemble-video`, { method: "POST" }
+  );
+}
+
 // --- Interactive Reels (Phase 999.5) ---
 
 export interface ImageReuseInfo {
   reused: boolean;
   source_asset_id?: number;
+  generating?: boolean;
+  version?: number;
 }
 
 export interface StepState {
@@ -1626,6 +1648,12 @@ export interface InteractiveReelRequest {
   no_character?: boolean;
   config_id?: number;
   target_duration?: number;
+  image_count?: number;
+  tone?: string;
+  niche?: string;
+  preset?: string;
+  niche_id?: string;
+  sub_theme?: string;
   platforms?: string[];
   language?: string;
 }

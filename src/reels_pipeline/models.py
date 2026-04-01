@@ -101,6 +101,7 @@ class ReelCreateInteractiveRequest(BaseModel):
     no_character: bool = False
     config_id: Optional[int] = None
     target_duration: int = 30
+    image_count: Optional[int] = None
     platforms: list[str] = Field(default_factory=lambda: ["instagram"], description="Target platforms")
     language: str = "pt-BR"
 
