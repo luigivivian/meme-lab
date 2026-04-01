@@ -206,12 +206,14 @@ async def generate_reel_images_per_cena(
 
         if char_ctx and char_ctx.get("character_dna"):
             prompt = (
-                f"SCENE DESCRIPTION (THIS IS THE PRIORITY — illustrate exactly this):\n"
-                f"{overlay}\n"
-                f"Context: {narracao}\n\n"
-                f"The scene must visually depict the action and setting described above. "
-                f"Do NOT just show the character standing — show the specific action, objects, and environment.\n\n"
-                f"CHARACTER STYLE (use this character in the scene above):\n"
+                f"WHAT THE CHARACTER IS SAYING (the image MUST illustrate this message):\n"
+                f'"{narracao}"\n\n'
+                f"VISUAL DIRECTION (how to depict the message above):\n"
+                f"{overlay}\n\n"
+                f"CRITICAL: The image must clearly convey the narration's KEY CONCEPT. "
+                f"Show the specific action, objects, emotion, and environment that match what is being said. "
+                f"Do NOT just show the character standing — illustrate the MESSAGE.\n\n"
+                f"CHARACTER STYLE:\n"
                 f"{char_ctx['character_dna']}\n\n"
                 f"FORMAT: Instagram Reels vertical 9:16 (1080x1920). Scene {i+1} of {n}.\n"
                 f"{char_ctx.get('composition', '')}\n"
@@ -220,10 +222,11 @@ async def generate_reel_images_per_cena(
             )
         else:
             prompt = (
-                f"SCENE DESCRIPTION (illustrate exactly this):\n"
-                f"{overlay}\n"
-                f"Context: {narracao}\n\n"
-                f"Show the specific action, objects, and environment described. "
+                f"WHAT IS BEING SAID (the image MUST illustrate this message):\n"
+                f'"{narracao}"\n\n'
+                f"VISUAL DIRECTION:\n"
+                f"{overlay}\n\n"
+                f"Show the specific action, objects, and environment that match the narration. "
                 f"Instagram Reels vertical 9:16 (1080x1920). Scene {i+1} of {n}.\n"
                 f"High quality, photographic, vibrant colors, cinematic lighting."
             )

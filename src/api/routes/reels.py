@@ -219,9 +219,11 @@ async def _execute_step_task(
 
             elif step_name == "srt":
                 audio_path = step_state.get("tts", {}).get("path", "")
+                script_json = step_state.get("script", {}).get("json", {})
                 srt_path, duration = await pipeline.run_step_srt(
                     audio_path=audio_path,
                     job_dir=job_dir,
+                    script=script_json or None,
                 )
                 step_data["path"] = srt_path
                 step_data["duration"] = duration

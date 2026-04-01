@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
@@ -115,10 +116,11 @@ class ReelsPipeline:
     def __init__(self, config_override: dict | None = None):
         self.config = config_override or {}
 
-    def _make_job_dir(self, tema: str) -> tuple[str, str]:
-        """Create and return (job_dir, images_dir) for a tema.
+    def _make_job_dir(self, tema: str) -> tuple[str, str, str]:
+        """Create and return (job_dir, images_dir, tema_slug) for a tema.
 
         Uses sequential numbering: reel_001, reel_002, etc.
+        Directory named with MMDD date instead of tema slug.
         """
         existing = [
             d for d in os.listdir(REELS_OUTPUT_DIR)
@@ -143,10 +145,11 @@ class ReelsPipeline:
                     pass
             next_num = max(nums, default=0) + 1
         tema_slug = re.sub(r"[^a-z0-9]+", "_", tema.lower().strip())[:40]
-        job_dir = os.path.join(REELS_OUTPUT_DIR, f"reel_{next_num:03d}_{tema_slug}")
+        date_suffix = datetime.now().strftime("%m%d")
+        job_dir = os.path.join(REELS_OUTPUT_DIR, f"reel_{next_num:03d}_{date_suffix}")
         images_dir = os.path.join(job_dir, "images")
         os.makedirs(images_dir, exist_ok=True)
-        return job_dir, images_dir
+        return job_dir, images_dir, tema_slug
 
     # ------------------------------------------------------------------
     # Per-step methods (interactive mode)
@@ -164,9 +167,9 @@ class ReelsPipeline:
         Returns:
             dict with keys: text, job_dir, images_dir.
         """
-        job_dir, images_dir = self._make_job_dir(tema)
+        job_dir, images_dir, tema_slug = self._make_job_dir(tema)
         logger.info(f"Step prompt: tema='{tema}', job_dir={job_dir}")
-        return {"text": tema, "job_dir": job_dir, "images_dir": images_dir}
+        return {"text": tema, "job_dir": job_dir, "images_dir": images_dir, "tema_slug": tema_slug}
 
     async def run_step_images(
         self,
@@ -373,18 +376,22 @@ class ReelsPipeline:
         return audio_path, cost_usd
 
     async def run_step_srt(
-        self, audio_path: str, job_dir: str
+        self, audio_path: str, job_dir: str, script: dict | None = None
     ) -> tuple[str, float]:
         """Step 5: Transcribe audio to SRT subtitles.
 
         Args:
             audio_path: Path to narration audio file.
             job_dir: Job working directory (SRT saved here).
+            script: Optional script dict with cenas. When provided,
+                    post-processes SRT to use script narrations instead
+                    of raw transcription text.
 
         Returns:
             Tuple of (srt_path, cost_usd).
         """
         from src.reels_pipeline.transcriber import (
+            align_srt_with_script,
             estimate_transcription_cost,
             transcribe_to_srt,
         )
@@ -396,6 +403,16 @@ class ReelsPipeline:
             language=self.config.get("script_language"),
             provider=self.config.get("transcription_provider"),
         )
+
+        # Post-process: replace transcription text with approved script narrations
+        if script and script.get("cenas"):
+            with open(srt_path, "r", encoding="utf-8") as f:
+                srt_text = f.read()
+            aligned = align_srt_with_script(srt_text, script)
+            with open(srt_path, "w", encoding="utf-8") as f:
+                f.write(aligned)
+            logger.info("SRT aligned with script narrations")
+
         # Estimate duration from audio file size (~48kB/s for 24kHz 16-bit mono)
         try:
             audio_size = os.path.getsize(audio_path)
@@ -777,6 +794,7 @@ class ReelsPipeline:
         prompt_data = await self.run_step_prompt(tema, character_id)
         job_dir = prompt_data["job_dir"]
         images_dir = prompt_data["images_dir"]
+        tema_slug = prompt_data["tema_slug"]
 
         logger.info(f"Pipeline started: tema='{tema}', job_dir={job_dir}")
 
@@ -800,7 +818,7 @@ class ReelsPipeline:
         _progress("tts", 60)
 
         # Step 5 - Transcription (60-75%)
-        srt_path, srt_cost = await self.run_step_srt(audio_path, job_dir)
+        srt_path, srt_cost = await self.run_step_srt(audio_path, job_dir, script=script)
         cost_usd += srt_cost
         _progress("transcription", 75)
 
@@ -809,6 +827,11 @@ class ReelsPipeline:
             image_paths, audio_path, srt_path, job_dir, script
         )
         _progress("assembly", 95)
+
+        # Copy final.mp4 with clean tema-based name
+        clean_name = f"{tema_slug}.mp4"
+        clean_path = os.path.join(job_dir, clean_name)
+        shutil.copy2(video_path, clean_path)
 
         # Done (100%)
         cost_brl = cost_usd * REELS_USD_TO_BRL

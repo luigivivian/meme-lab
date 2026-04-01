@@ -75,6 +75,7 @@ async def transcribe_to_srt(
             lines = lines[:-1]
         srt_text = "\n".join(lines)
 
+    srt_text = _normalize_srt_structure(srt_text)
     srt_text = _normalize_srt_timestamps(srt_text)
     srt_text = _validate_srt_timestamps(srt_text)
 
@@ -83,6 +84,16 @@ async def transcribe_to_srt(
 
     logger.info(f"SRT saved: {output_path} ({len(srt_text)} chars)")
     return output_path
+
+
+def _normalize_srt_structure(srt_text: str) -> str:
+    """Ensure double-newline separators between SRT entries.
+
+    Gemini sometimes returns entries separated by single newlines.
+    Inserts blank line before each entry index (digit line followed by timestamp).
+    """
+    srt_text = srt_text.replace("\r\n", "\n")
+    return re.sub(r"\n(?=\d+\n\d{2}:\d{2})", "\n\n", srt_text)
 
 
 def _normalize_srt_timestamps(srt_text: str) -> str:
@@ -211,6 +222,141 @@ def _validate_srt_timestamps(srt_text: str) -> str:
     result = "\n\n".join(result_blocks)
     logger.info("SRT timestamps validated and corrected")
     return result
+
+
+def align_srt_with_script(srt_text: str, script: dict) -> str:
+    """Replace SRT entry text with script narrations while keeping timestamps.
+
+    Groups SRT entries into N equal time buckets (one per cena),
+    then replaces each bucket's text with the cena's narracao.
+    Long narrations are split into 2-line entries (~40 chars/line).
+    """
+    cenas = script.get("cenas", [])
+    if not cenas:
+        return srt_text
+
+    narracoes = [c.get("narracao", "") for c in cenas]
+    narracoes = [n for n in narracoes if n.strip()]
+    if not narracoes:
+        return srt_text
+
+    # Parse SRT entries
+    blocks = srt_text.strip().split("\n\n")
+    entries = []
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if len(lines) < 3:
+            continue
+        ts_match = re.match(
+            r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})",
+            lines[1].strip(),
+        )
+        if not ts_match:
+            continue
+        entries.append({
+            "start": _srt_ts_to_seconds(ts_match.group(1)),
+            "end": _srt_ts_to_seconds(ts_match.group(2)),
+            "text": "\n".join(lines[2:]),
+        })
+
+    if not entries:
+        return srt_text
+
+    n_cenas = len(narracoes)
+    total_start = entries[0]["start"]
+    total_end = entries[-1]["end"]
+    total_duration = total_end - total_start
+    if total_duration <= 0:
+        return srt_text
+
+    # Group entries into N buckets by equal time distribution
+    bucket_duration = total_duration / n_cenas
+    buckets: list[list[dict]] = [[] for _ in range(n_cenas)]
+    for entry in entries:
+        mid = (entry["start"] + entry["end"]) / 2
+        bucket_idx = int((mid - total_start) / bucket_duration)
+        bucket_idx = min(bucket_idx, n_cenas - 1)
+        buckets[bucket_idx].append(entry)
+
+    # Build new SRT from buckets + narrations
+    new_blocks = []
+    entry_num = 1
+    for bucket_idx, (bucket, narracao) in enumerate(zip(buckets, narracoes)):
+        if not bucket:
+            # No transcription entries in this bucket — use interpolated timestamps
+            bucket_start = total_start + bucket_idx * bucket_duration
+            bucket_end = total_start + (bucket_idx + 1) * bucket_duration
+        else:
+            bucket_start = bucket[0]["start"]
+            bucket_end = bucket[-1]["end"]
+
+        subtitle_lines = _wrap_subtitle_text(narracao, max_chars=40)
+
+        if len(subtitle_lines) == 1:
+            ts_start = _seconds_to_srt_ts(bucket_start)
+            ts_end = _seconds_to_srt_ts(bucket_end)
+            new_blocks.append(f"{entry_num}\n{ts_start} --> {ts_end}\n{subtitle_lines[0]}")
+            entry_num += 1
+        else:
+            # Distribute time equally across subtitle chunks
+            chunk_duration = (bucket_end - bucket_start) / len(subtitle_lines)
+            for i, line in enumerate(subtitle_lines):
+                cs = bucket_start + i * chunk_duration
+                ce = bucket_start + (i + 1) * chunk_duration
+                ts_start = _seconds_to_srt_ts(cs)
+                ts_end = _seconds_to_srt_ts(ce)
+                new_blocks.append(f"{entry_num}\n{ts_start} --> {ts_end}\n{line}")
+                entry_num += 1
+
+    result = "\n\n".join(new_blocks) + "\n"
+    logger.info(f"SRT aligned with script: {n_cenas} cenas, {entry_num - 1} subtitle entries")
+    return result
+
+
+def _wrap_subtitle_text(text: str, max_chars: int = 40) -> list[str]:
+    """Split narration text into subtitle-friendly chunks of ~max_chars.
+
+    Splits on sentence boundaries first, then word-wraps long sentences.
+    Each chunk becomes a separate SRT entry.
+    """
+    # Split into sentences (period, exclamation, question mark)
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+
+    chunks = []
+    current = ""
+    for sentence in sentences:
+        if not sentence:
+            continue
+        if not current:
+            current = sentence
+        elif len(current) + 1 + len(sentence) <= max_chars:
+            current += " " + sentence
+        else:
+            chunks.append(current)
+            current = sentence
+    if current:
+        chunks.append(current)
+
+    # Word-wrap any chunk that's still too long
+    result = []
+    for chunk in chunks:
+        if len(chunk) <= max_chars:
+            result.append(chunk)
+        else:
+            words = chunk.split()
+            line = ""
+            for word in words:
+                if not line:
+                    line = word
+                elif len(line) + 1 + len(word) <= max_chars:
+                    line += " " + word
+                else:
+                    result.append(line)
+                    line = word
+            if line:
+                result.append(line)
+
+    return result if result else [text]
 
 
 def estimate_transcription_cost(audio_duration_seconds: float) -> float:
