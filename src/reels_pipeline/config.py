@@ -31,6 +31,7 @@ REELS_SUB_OUTLINE_COLOR = os.getenv("REELS_SUB_OUTLINE_COLOR", "&H000000&")
 REELS_SUB_OUTLINE = int(os.getenv("REELS_SUB_OUTLINE", "1"))
 REELS_SUB_MARGIN_V = int(os.getenv("REELS_SUB_MARGIN_V", "35"))
 REELS_SUB_MARGIN_H = int(os.getenv("REELS_SUB_MARGIN_H", "15"))
+REELS_SUB_MAX_CHARS = int(os.environ.get("REELS_SUB_MAX_CHARS", "25"))
 
 # Video assembly
 REELS_IMAGE_DURATION = float(os.getenv("REELS_IMAGE_DURATION", "4.0"))
@@ -63,6 +64,9 @@ REELS_AVAILABLE_MODELS = {
     "bytedance/seedance-1.5-pro": {"label": "Seedance 1.5 Pro", "price_brl": 2.62, "durations": [4, 8, 12], "resolution": "1080p"},
     "kling-3.0/video": {"label": "Kling 3.0", "price_brl": 2.10, "durations": [3, 5, 10, 15], "resolution": "1080p"},
 }
+
+# Ken-burns (zoompan) effect on static image slideshow
+REELS_KENBURNS_ENABLED = os.environ.get("REELS_KENBURNS_ENABLED", "true").lower() == "true"
 
 # Output
 REELS_OUTPUT_DIR = os.getenv("REELS_OUTPUT_DIR", "output/reels")

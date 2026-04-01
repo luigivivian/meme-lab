@@ -204,8 +204,19 @@ async def generate_reel_images_per_cena(
         narracao = cena.get("narracao", "")
         overlay = cena.get("legenda_overlay", "")
 
+        # First-frame hook: prepend attention-grabbing instruction for scene 0
+        hook_prefix = ""
+        if i == 0:
+            hook_prefix = (
+                "FIRST FRAME — HOOK IMAGE (must grab attention instantly):\n"
+                "This is the opening frame. It must be immediately eye-catching: "
+                "high contrast, bold subject placement, dramatic lighting or composition. "
+                "The viewer decides to stay or scroll in under 1 second based on this image.\n\n"
+            )
+
         if char_ctx and char_ctx.get("character_dna"):
             prompt = (
+                f"{hook_prefix}"
                 f"WHAT THE CHARACTER IS SAYING (the image MUST illustrate this message):\n"
                 f'"{narracao}"\n\n'
                 f"VISUAL DIRECTION (how to depict the message above):\n"
@@ -222,6 +233,7 @@ async def generate_reel_images_per_cena(
             )
         else:
             prompt = (
+                f"{hook_prefix}"
                 f"WHAT IS BEING SAID (the image MUST illustrate this message):\n"
                 f'"{narracao}"\n\n'
                 f"VISUAL DIRECTION:\n"

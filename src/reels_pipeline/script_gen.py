@@ -54,13 +54,29 @@ Regras:
 - Narracao de cada cena: maximo 15 palavras
 - legenda_overlay de cada cena: descricao visual detalhada do cenario (15-30 palavras, ex: 'mago idoso meditando no topo de montanha com neblina ao amanhecer'). Sera usado como prompt para gerar a imagem da cena
 - CTA final claro e direto
+- NUNCA use termos de Star Wars (padawan, jedi, force). Para se dirigir ao espectador use expressoes de mago/feiticeiro: "meu jovem bruxo", "jovem feiticeiro", "meu caro aprendiz", "nobre aventureiro", "jovem mago"
 - Linguagem PT-BR coloquial, tom {tom}
 - Duracao total alvo: {duracao}s
 - Nicho: {nicho}
 - Keywords: {keywords}
 - CTA padrao: {cta}
 
-{image_instruction}
+ESTRUTURA OBRIGATÓRIA DO ROTEIRO (5 fases):
+1. GANCHO (0-3s): Primeira frase impactante, SEM saudação. Crie um gap de informação que obrigue o espectador a continuar.
+2. CONTEXTO (3-5s): Por que o espectador deveria se importar. Use prova social ou conexão emocional.
+3. CONTEÚDO (5-25s): Entregue o valor prometido no gancho. UMA mensagem central por vídeo. Ritmo acelerado, sem pausas mortas.
+4. PAYOFF (penúltimos segundos): Entregue a promessa do gancho. Momento de satisfação que gera saves e shares.
+5. LOOP/CTA (últimos segundos): A frase final deve fluir imperceptivelmente de volta ao gancho — o espectador não deve perceber onde o vídeo termina e recomeça.
+
+A primeira cena SEMPRE é o gancho. A última cena SEMPRE termina com frase que conecta ao gancho para criar loop.
+
+TÉCNICA DE LOOP VERBAL (OBRIGATÓRIO):
+A última frase da narracao_completa deve terminar de forma que flua naturalmente de volta à primeira frase. Exemplo: se o gancho é "Ninguém fala sobre isso, mas..." a última frase pode ser "...e é exatamente isso que → ninguém fala sobre, mas..."
+
+SEO DE VOZ (OBRIGATÓRIO):
+Fale as palavras-chave principais do tema em voz alta na narração, especialmente nos primeiros 5 segundos. TikTok e YouTube indexam o áudio falado — keywords ditas em voz alta melhoram a descoberta orgânica.
+
+{hook_type_instruction}{image_instruction}
 Crie um roteiro que:
 1. {cena_instruction}
 2. Distribua a narracao entre as cenas de forma natural
@@ -82,7 +98,22 @@ Rules:
 - Keywords: {keywords}
 - Default CTA: {cta}
 
-{image_instruction}
+ESTRUTURA OBRIGATÓRIA DO ROTEIRO (5 fases):
+1. GANCHO (0-3s): Primeira frase impactante, SEM saudação. Crie um gap de informação que obrigue o espectador a continuar.
+2. CONTEXTO (3-5s): Por que o espectador deveria se importar. Use prova social ou conexão emocional.
+3. CONTEÚDO (5-25s): Entregue o valor prometido no gancho. UMA mensagem central por vídeo. Ritmo acelerado, sem pausas mortas.
+4. PAYOFF (penúltimos segundos): Entregue a promessa do gancho. Momento de satisfação que gera saves e shares.
+5. LOOP/CTA (últimos segundos): A frase final deve fluir imperceptivelmente de volta ao gancho — o espectador não deve perceber onde o vídeo termina e recomeça.
+
+A primeira cena SEMPRE é o gancho. A última cena SEMPRE termina com frase que conecta ao gancho para criar loop.
+
+TÉCNICA DE LOOP VERBAL (OBRIGATÓRIO):
+A última frase da narracao_completa deve terminar de forma que flua naturalmente de volta à primeira frase. Exemplo: se o gancho é "Ninguém fala sobre isso, mas..." a última frase pode ser "...e é exatamente isso que → ninguém fala sobre, mas..."
+
+SEO DE VOZ (OBRIGATÓRIO):
+Fale as palavras-chave principais do tema em voz alta na narração, especialmente nos primeiros 5 segundos. TikTok e YouTube indexam o áudio falado — keywords ditas em voz alta melhoram a descoberta orgânica.
+
+{hook_type_instruction}{image_instruction}
 Create a script that:
 1. {cena_instruction}
 2. Distributes narration naturally across scenes
@@ -104,7 +135,22 @@ Reglas:
 - Keywords: {keywords}
 - CTA predeterminado: {cta}
 
-{image_instruction}
+ESTRUTURA OBRIGATÓRIA DO ROTEIRO (5 fases):
+1. GANCHO (0-3s): Primeira frase impactante, SEM saudação. Crie um gap de informação que obrigue o espectador a continuar.
+2. CONTEXTO (3-5s): Por que o espectador deveria se importar. Use prova social ou conexão emocional.
+3. CONTEÚDO (5-25s): Entregue o valor prometido no gancho. UMA mensagem central por vídeo. Ritmo acelerado, sem pausas mortas.
+4. PAYOFF (penúltimos segundos): Entregue a promessa do gancho. Momento de satisfação que gera saves e shares.
+5. LOOP/CTA (últimos segundos): A frase final deve fluir imperceptivelmente de volta ao gancho — o espectador não deve perceber onde o vídeo termina e recomeça.
+
+A primeira cena SEMPRE é o gancho. A última cena SEMPRE termina com frase que conecta ao gancho para criar loop.
+
+TÉCNICA DE LOOP VERBAL (OBRIGATÓRIO):
+A última frase da narracao_completa deve terminar de forma que flua naturalmente de volta à primeira frase. Exemplo: se o gancho é "Ninguém fala sobre isso, mas..." a última frase pode ser "...e é exatamente isso que → ninguém fala sobre, mas..."
+
+SEO DE VOZ (OBRIGATÓRIO):
+Fale as palavras-chave principais do tema em voz alta na narração, especialmente nos primeiros 5 segundos. TikTok e YouTube indexam o áudio falado — keywords ditas em voz alta melhoram a descoberta orgânica.
+
+{hook_type_instruction}{image_instruction}
 Crea un guion que:
 1. {cena_instruction}
 2. Distribuya la narracion entre las escenas de forma natural
@@ -129,7 +175,22 @@ Rules:
 - Keywords: {keywords}
 - Default CTA: {cta}
 
-{image_instruction}
+ESTRUTURA OBRIGATÓRIA DO ROTEIRO (5 fases):
+1. GANCHO (0-3s): Primeira frase impactante, SEM saudação. Crie um gap de informação que obrigue o espectador a continuar.
+2. CONTEXTO (3-5s): Por que o espectador deveria se importar. Use prova social ou conexão emocional.
+3. CONTEÚDO (5-25s): Entregue o valor prometido no gancho. UMA mensagem central por vídeo. Ritmo acelerado, sem pausas mortas.
+4. PAYOFF (penúltimos segundos): Entregue a promessa do gancho. Momento de satisfação que gera saves e shares.
+5. LOOP/CTA (últimos segundos): A frase final deve fluir imperceptivelmente de volta ao gancho — o espectador não deve perceber onde o vídeo termina e recomeça.
+
+A primeira cena SEMPRE é o gancho. A última cena SEMPRE termina com frase que conecta ao gancho para criar loop.
+
+TÉCNICA DE LOOP VERBAL (OBRIGATÓRIO):
+A última frase da narracao_completa deve terminar de forma que flua naturalmente de volta à primeira frase. Exemplo: se o gancho é "Ninguém fala sobre isso, mas..." a última frase pode ser "...e é exatamente isso que → ninguém fala sobre, mas..."
+
+SEO DE VOZ (OBRIGATÓRIO):
+Fale as palavras-chave principais do tema em voz alta na narração, especialmente nos primeiros 5 segundos. TikTok e YouTube indexam o áudio falado — keywords ditas em voz alta melhoram a descoberta orgânica.
+
+{hook_type_instruction}{image_instruction}
 Create a script that:
 1. {cena_instruction}
 2. Distributes narration naturally across scenes
@@ -218,6 +279,21 @@ async def generate_script(
             )
             cena_instruction = "One scene per key moment in the script (imagem_index sequential from 0)"
 
+    # Build hook_type instruction if provided in config
+    hook_type = cfg.get("hook_type")
+    if hook_type:
+        hook_type_instruction = (
+            f"TIPO DE GANCHO: {hook_type}\n"
+            "- curiosidade: Abra um loop mental (ex: \"Ninguém fala sobre isso, mas...\")\n"
+            "- dor: Toque na frustração (ex: \"Para de fazer [ERRO] agora!\")\n"
+            "- contrario: Desafie crença popular (ex: \"Tudo que você sabia sobre [X] está errado\")\n"
+            "- autoridade: Mostre resultado concreto (ex: \"Como eu fui de [X] para [Y]\")\n"
+            "- resultado: Mostre o final primeiro (ex: \"[RESULTADO] — e aqui está como\")\n"
+            "Use este tipo de gancho no roteiro.\n\n"
+        )
+    else:
+        hook_type_instruction = ""
+
     # Select language-appropriate system prompt template
     prompt_template = _SYSTEM_PROMPTS.get(language)
     if prompt_template:
@@ -229,6 +305,7 @@ async def generate_script(
             cta=cta,
             image_instruction=image_instruction,
             cena_instruction=cena_instruction,
+            hook_type_instruction=hook_type_instruction,
         )
     else:
         system_prompt = _SYSTEM_PROMPT_FALLBACK.format(
@@ -240,6 +317,7 @@ async def generate_script(
             cta=cta,
             image_instruction=image_instruction,
             cena_instruction=cena_instruction,
+            hook_type_instruction=hook_type_instruction,
         )
     system_prompt += character_section
 

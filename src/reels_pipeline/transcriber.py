@@ -9,7 +9,7 @@ from pathlib import Path
 from google.genai import types
 
 from src.llm_client import _get_client
-from src.reels_pipeline.config import REELS_SCRIPT_LANGUAGE
+from src.reels_pipeline.config import REELS_SCRIPT_LANGUAGE, REELS_SUB_MAX_CHARS
 
 logger = logging.getLogger("clip-flow.reels.transcriber")
 
@@ -229,7 +229,7 @@ def align_srt_with_script(srt_text: str, script: dict) -> str:
 
     Groups SRT entries into N equal time buckets (one per cena),
     then replaces each bucket's text with the cena's narracao.
-    Long narrations are split into 2-line entries (~40 chars/line).
+    Long narrations are split into 2-line entries (~REELS_SUB_MAX_CHARS chars/line).
     """
     cenas = script.get("cenas", [])
     if not cenas:
@@ -290,7 +290,7 @@ def align_srt_with_script(srt_text: str, script: dict) -> str:
             bucket_start = bucket[0]["start"]
             bucket_end = bucket[-1]["end"]
 
-        subtitle_lines = _wrap_subtitle_text(narracao, max_chars=40)
+        subtitle_lines = _wrap_subtitle_text(narracao, max_chars=REELS_SUB_MAX_CHARS)
 
         if len(subtitle_lines) == 1:
             ts_start = _seconds_to_srt_ts(bucket_start)
@@ -313,7 +313,7 @@ def align_srt_with_script(srt_text: str, script: dict) -> str:
     return result
 
 
-def _wrap_subtitle_text(text: str, max_chars: int = 40) -> list[str]:
+def _wrap_subtitle_text(text: str, max_chars: int = REELS_SUB_MAX_CHARS) -> list[str]:
     """Split narration text into subtitle-friendly chunks of ~max_chars.
 
     Splits on sentence boundaries first, then word-wraps long sentences.

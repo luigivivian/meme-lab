@@ -17,19 +17,20 @@ logger = logging.getLogger("clip-flow.reels.platform_metadata")
 PLATFORM_SPECS = {
     "instagram": {
         "max_caption": 2200,
-        "max_hashtags": 30,
+        "max_hashtags": 8,
         "tone": "engaging, visual, use emojis sparingly",
         "fields": ["caption", "hashtags"],
     },
     "youtube_shorts": {
         "max_title": 100,
         "max_description": 5000,
+        "max_hashtags": 5,
         "tone": "SEO-friendly, informative, searchable",
         "fields": ["title", "description", "tags"],
     },
     "tiktok": {
         "max_caption": 2200,
-        "max_hashtags": 20,
+        "max_hashtags": 5,
         "tone": "casual, trendy, conversational, use hashtags inline",
         "fields": ["caption", "hashtags"],
     },
@@ -69,14 +70,28 @@ RULES:
 - Write in Brazilian Portuguese (pt-BR)
 - Caption must be engaging and platform-appropriate
 """
+    if platform == "instagram":
+        prompt += (
+            "- Caption: Write a keyword-rich caption like a mini blog post (3-5 lines). "
+            "Integrate the primary topic keywords naturally into the text. "
+            "This is critical for Instagram SEO — the algorithm reads captions as searchable text content.\n"
+        )
     if "max_caption" in spec:
         prompt += f"- Caption max {spec['max_caption']} characters\n"
-    if "max_hashtags" in spec:
-        prompt += f"- Max {spec['max_hashtags']} hashtags\n"
     if "max_title" in spec:
         prompt += f"- Title max {spec['max_title']} characters\n"
     if "max_description" in spec:
         prompt += f"- Description max {spec['max_description']} characters\n"
+
+    if "max_hashtags" in spec:
+        prompt += (
+            f"- Hashtags: Generate EXACTLY {spec['max_hashtags']} hashtags following this formula:\n"
+            "  - 1 broad/trending hashtag (ex: #viral, #dicas)\n"
+            "  - 2 niche-specific hashtags (ex: #marketingdigital, #empreendedorismo)\n"
+            "  - 2 micro-niche hashtags (ex: #reelsparainiciantes, #tiktokbrasil2026)\n"
+            "  NEVER use #fyp, #foryou, or #viral as primary hashtags.\n"
+            f"  Total: exactly {spec['max_hashtags']} hashtags, no more.\n"
+        )
 
     prompt += f"""
 Return ONLY valid JSON with these exact keys: {fields_str}

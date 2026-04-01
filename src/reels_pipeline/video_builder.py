@@ -18,6 +18,7 @@ import re
 from src.reels_pipeline.config import (
     REELS_FPS,
     REELS_IMAGE_DURATION,
+    REELS_KENBURNS_ENABLED,
     REELS_SEGMENT_MAX_DURATION,
     REELS_SUB_COLOR,
     REELS_SUB_FONT,
@@ -56,22 +57,31 @@ def compute_scene_durations_from_script(
     script_json: dict,
     total_audio_duration: float,
     n_scenes: int,
+    transition_duration: float = 0.3,
 ) -> list[float]:
     """Compute per-scene durations weighted by narration length.
 
-    Allocates total_audio_duration proportionally based on each scene's
-    narration character count. Enforces a 3s minimum per scene.
+    Allocates durations proportionally based on each scene's narration character
+    count. Compensates for xfade overlap: with n clips and transition_duration t,
+    xfade shortens the assembled video by (n-1)*t. We pad the target so that
+    the final assembled video duration equals total_audio_duration.
 
     Args:
         script_json: Script dict with 'cenas' list, each having 'narracao'.
         total_audio_duration: Total audio duration in seconds.
         n_scenes: Number of scenes (clips/images).
+        transition_duration: Duration of xfade between clips (default 0.3s).
 
     Returns:
         List of durations in seconds, one per scene.
     """
     cenas = script_json.get("cenas", [])
     min_duration = 3.0
+
+    # Compensate for xfade overlap: each transition eats transition_duration
+    # from the total assembled video length, so clips need to be longer.
+    xfade_compensation = (n_scenes - 1) * transition_duration if n_scenes > 1 else 0
+    target_total = total_audio_duration + xfade_compensation
 
     # Compute weights from narration char count
     weights = []
@@ -84,10 +94,10 @@ def compute_scene_durations_from_script(
 
     total_weight = sum(weights)
     if total_weight == 0:
-        return [total_audio_duration / n_scenes] * n_scenes
+        return [target_total / n_scenes] * n_scenes
 
-    # Proportional allocation
-    durations = [(w / total_weight) * total_audio_duration for w in weights]
+    # Proportional allocation against padded target
+    durations = [(w / total_weight) * target_total for w in weights]
 
     # Enforce minimum 3s per scene, redistribute excess
     deficit = 0.0
@@ -175,13 +185,29 @@ def build_reel_video(
     # 2. Build filter_complex
     n = len(image_paths)
 
-    # Scale filters: force all images to 1080x1920
+    # Scale filters: force all images to 1080x1920, with optional ken-burns effect
     scale_filters = []
     for i in range(n):
-        scale_filters.append(
-            f"[{i}]scale=1080:1920:force_original_aspect_ratio=decrease,"
-            f"pad=1080:1920:-1:-1:color=black[s{i}]"
-        )
+        if REELS_KENBURNS_ENABLED:
+            # Ken-burns (zoom-pan) effect for visual dynamism on static images
+            if i % 2 == 0:
+                # Zoom in: start at 100%, end at 115%
+                zoom = "min(zoom+0.0008,1.15)"
+            else:
+                # Zoom out: start at 115%, end at 100%
+                zoom = "if(eq(on\\,1)\\,1.15\\,max(zoom-0.0008\\,1.0))"
+
+            frames = int(image_duration * fps)
+            scale_filters.append(
+                f"[{i}]scale=1920:-1,zoompan=z='{zoom}'"
+                f":d={frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                f":s=1080x1920:fps={fps}[s{i}]"
+            )
+        else:
+            scale_filters.append(
+                f"[{i}]scale=1080:1920:force_original_aspect_ratio=decrease,"
+                f"pad=1080:1920:-1:-1:color=black[s{i}]"
+            )
 
     # 3. xfade chain
     xfade_filters = []
@@ -236,7 +262,6 @@ def build_reel_video(
         "-c:a", "aac",
         "-b:a", "192k",
         "-r", str(fps),
-        "-shortest",
         "-movflags", "+faststart",
         output_path,
     ]
@@ -778,7 +803,9 @@ def concat_clips_with_audio(
     # Trim clips to match narration timing — proportional if script available
     if script_json:
         total_dur = get_video_duration(audio_path) if os.path.exists(audio_path) else 30.0
-        scene_durs = compute_scene_durations_from_script(script_json, total_dur, len(clip_paths))
+        scene_durs = compute_scene_durations_from_script(
+            script_json, total_dur, len(clip_paths), transition_duration
+        )
         # Align SRT to computed scene windows
         srt_path = _align_srt_to_scenes(srt_path, scene_durs, script_json)
         logger.info(f"Using proportional durations from script ({len(scene_durs)} scenes)")
@@ -805,7 +832,7 @@ def concat_clips_with_audio(
             "-map", "[final]", "-map", "1:a",
             "-c:v", "libx264", "-preset", "fast", "-crf", "18",
             "-c:a", "aac", "-b:a", "192k",
-            "-shortest", "-movflags", "+faststart",
+            "-movflags", "+faststart",
             output_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -854,7 +881,7 @@ def concat_clips_with_audio(
         "-map", f"{audio_idx}:a",
         "-c:v", "libx264", "-preset", "fast", "-crf", "18",
         "-c:a", "aac", "-b:a", "192k",
-        "-shortest", "-movflags", "+faststart",
+        "-movflags", "+faststart",
         output_path,
     ]
 
