@@ -25,6 +25,7 @@ import {
   generateVideoFromImage,
   deleteVideo,
   imageDownloadUrl,
+  downloadImage,
   videoFileUrl,
   approveContent,
   rejectContent,
@@ -377,11 +378,9 @@ export default function GalleryPage() {
                     <p className="text-[10px] text-white/50">{img.theme} | {img.size_kb.toFixed(0)}kb</p>
                   </div>
                   <div className="grid grid-cols-2 gap-1">
-                    <a href={imageDownloadUrl(img.filename)} onClick={(e) => e.stopPropagation()}>
-                      <Button size="sm" variant="secondary" className="w-full h-7 text-xs">
-                        <Download className="mr-1 h-3 w-3" /> Baixar
-                      </Button>
-                    </a>
+                    <Button size="sm" variant="secondary" className="w-full h-7 text-xs" onClick={(e) => { e.stopPropagation(); downloadImage(img.filename); }}>
+                      <Download className="mr-1 h-3 w-3" /> Baixar
+                    </Button>
                     {img.category !== "meme" && (
                       <>
                         <Button
@@ -805,11 +804,9 @@ export default function GalleryPage() {
                         </div>
 
                         {/* Download + Action buttons */}
-                        <a href={imageDownloadUrl(filename)} className="block">
-                          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1">
-                            <Download className="h-3 w-3" /> Baixar com watermark
-                          </Button>
-                        </a>
+                        <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={() => downloadImage(filename)}>
+                          <Download className="h-3 w-3" /> Baixar com watermark
+                        </Button>
 
                         {isPending && (
                           <div className="flex gap-1.5">

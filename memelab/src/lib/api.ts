@@ -679,6 +679,28 @@ export const videoFileUrl = (contentPackageId: number) =>
 export const imageDownloadUrl = (filename: string) =>
   `${BASE}/drive/images/${encodeURIComponent(filename)}/download`;
 
+export async function downloadImage(filename: string) {
+  const token =
+    typeof window !== "undefined"
+      ? (localStorage.getItem("access_token") ?? sessionStorage.getItem("access_token"))
+      : null;
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(imageDownloadUrl(filename), { headers });
+  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // --- Video Delete ---
 
 export const deleteVideo = (contentPackageId: number) =>
