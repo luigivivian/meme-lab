@@ -4,30 +4,30 @@
 
 Plataforma de geração e publicação automatizada de memes para Instagram. Pipeline simplificado compõe backgrounds existentes + frases, sem depender de APIs externas de imagem. Suporta múltiplos personagens e publicação automática.
 
-## Completed Milestone: v2.0 Pipeline Simplification, Auto-Publicacao & Multi-Tenant (shipped 2026-03-27)
+## Completed Milestones
 
-See `.planning/milestones/v2.0-ROADMAP.md` for full details.
+- **v1.0** Auth, Rate Limiting & Gemini Image Fix — shipped 2026-03-24
+- **v2.0** Pipeline Simplification, Auto-Publicacao & Multi-Tenant — shipped 2026-04-01
 
-## Current State (updated 2026-03-27)
+See `.planning/milestones/` for archived details.
 
-**v2.0 shipped.** 13 phases, 8 plans. Full platform: pipeline simplification (static backgrounds + Pillow composition), tenant isolation, Instagram publishing & scheduling, Stripe billing, Kie.ai video generation (Sora 2 + legends), video gallery, BRL credits tracking, and business dashboard metrics.
+## Current State (updated 2026-04-01)
+
+**v2.0 shipped.** 17 phases, 27 plans, 599 commits in 24 days. Full platform with meme pipeline, reels generation, product video ads, and business dashboard.
 
 **What's working:**
 - 9 trend agents feeding ~227+ events per run
 - Manual pipeline composes memes without Gemini Image API
 - Full auth flow (JWT) with tenant isolation on all endpoints
 - Instagram scheduling, publishing, and content calendar
-- Kie.ai video generation with 10 models, motion prompts, and legends
+- Kie.ai video generation with 10+ models, motion prompts, and legends
 - Video gallery with inline player, approve/delete, filters
 - BRL-native cost tracking per model, credits summary API
 - Business dashboard with trend indicators and 7d comparison
 - Stripe billing with plan enforcement
-
-**What's working:**
-- 9 trend agents feeding ~227+ events per run
-- Gemini phrase generation + image generation with dual-key quota control
-- Full auth flow (backend + frontend) with JWT route protection on all endpoints
-- Usage dashboard showing daily consumption and per-image source badges
+- Interactive Reels pipeline: 6-step stepper, Hailuo per-scene video, SRT trim-to-narration
+- Product Studio: 8-step wizard for AI video ads (cinematic/narrated/lifestyle), multi-format export
+- Scene asset registry with semantic reuse (cosine similarity)
 - Pipeline never stops — degrades gracefully from Gemini → static backgrounds
 
 **Tech debt carried forward:**
