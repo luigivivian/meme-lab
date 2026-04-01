@@ -30,9 +30,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 20: Kie.ai Credits & Cost Tracking** - Credits system per model, only charge on success, BRL cost tracking (completed 2026-03-27)
 - [x] **Phase 21: Dashboard Business Metrics** - Spending in BRL, business-relevant cards, improved info density (completed 2026-03-27)
 - [x] **Phase 999.4: Instagram Reels Pipeline** - Geracao automatizada de Reels: imagens → roteiro Claude → TTS → legendas → FFmpeg → MP4 (completed 2026-03-28)
-- [ ] **Phase 999.5: Interactive Reels Pipeline** - Stepper UI com aprovacao por etapa, regeneracao individual, videos longos via segmentacao (BACKLOG)
-- [ ] **Phase 999.6: Reels Pipeline v2 — Hailuo + Scene Context + Interactive Fix** - Fix interactive stepper flow, scene-by-scene image gen following script, Hailuo video generation per scene, mobile-optimized subtitles (BACKLOG)
-- [ ] **Phase 421: Product Studio — AI Video Ads Generator** - Wizard progressivo para geracao 100% IA de videos comerciais de produto. 8-step pipeline: analise, cenario, prompt, video (Wan 2.6/Kling 2.5), copy, audio (Suno+TTS), montagem, export multi-formato. 3 estilos: cinematico, narrado, lifestyle. Secao /ads (BACKLOG)
+- [x] **Phase 999.5: Interactive Reels Pipeline** - Stepper UI com aprovacao por etapa, regeneracao individual, videos longos via segmentacao (completed 2026-03-28)
+- [x] **Phase 999.6: Reels Pipeline v2 — Hailuo + Scene Context + Interactive Fix** - Fix interactive stepper flow, scene-by-scene image gen following script, Hailuo video generation per scene, mobile-optimized subtitles (completed 2026-03-28)
+- [x] **Phase 421: Product Studio — AI Video Ads Generator** - Wizard progressivo para geracao 100% IA de videos comerciais de produto. 8-step pipeline: analise, cenario, prompt, video (Wan 2.6/Kling 2.5), copy, audio (Suno+TTS), montagem, export multi-formato. 3 estilos: cinematico, narrado, lifestyle. Secao /ads (completed 2026-03-30)
 
 ## Phase Details
 
