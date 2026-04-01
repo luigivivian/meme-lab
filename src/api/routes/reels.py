@@ -1150,6 +1150,64 @@ async def regenerate_scene_video(
     return {"scene_index": scene_index, "status": "generating"}
 
 
+@router.post("/{job_id}/set-scene-static/{scene_index}", summary="Use static image for a scene")
+async def set_scene_static(
+    job_id: str,
+    scene_index: int,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Mark a scene to use its static image instead of AI video.
+
+    Creates a static clip from the scene image via FFmpeg and marks status as static_fallback.
+    """
+    import subprocess as sp
+    from src.database.session import get_session_factory
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+    video_data = step_state.get("video", {})
+    scenes = video_data.get("scenes", [])
+
+    if scene_index < 0 or scene_index >= len(scenes):
+        raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
+
+    scene = scenes[scene_index]
+    images_paths = step_state.get("images", {}).get("paths", [])
+    img_path = images_paths[scene_index] if scene_index < len(images_paths) else scene.get("img_path", "")
+    if not img_path or not os.path.isfile(img_path):
+        raise HTTPException(status_code=400, detail="Image not found for this scene")
+
+    job_dir = step_state.get("prompt", {}).get("job_dir", "")
+    clips_dir = os.path.join(job_dir, "clips")
+    os.makedirs(clips_dir, exist_ok=True)
+    clip_path = os.path.join(clips_dir, f"clip_{scene_index:02d}.mp4")
+    duration = scene.get("duration", 6)
+
+    # Generate static clip from image
+    sp.run([
+        "ffmpeg", "-y", "-loop", "1", "-t", str(duration),
+        "-i", img_path,
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+        clip_path,
+    ], capture_output=True, timeout=60)
+
+    scene["status"] = "static_fallback"
+    scene["clip_path"] = clip_path
+    scene["error"] = None
+    scene.pop("reused", None)
+    scenes[scene_index] = scene
+    video_data["scenes"] = scenes
+    step_state["video"] = video_data
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
+    return {"scene_index": scene_index, "status": "static_fallback"}
+
+
 @router.post("/{job_id}/retry-scene/{scene_index}", summary="Retry a single failed scene")
 async def retry_scene(
     job_id: str,

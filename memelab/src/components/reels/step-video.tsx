@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   ImageIcon,
   Play,
+  Film,
   Copy,
   CheckCircle2,
 } from "lucide-react";
@@ -18,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { regenerateStep, retryScene, regenerateSceneVideo, reelFileUrl, getPlatformOutputs, type StepState, type SceneStatus, type PlatformOutput } from "@/lib/api";
+import { regenerateStep, retryScene, regenerateSceneVideo, setSceneStatic, reassembleVideo, reelFileUrl, getPlatformOutputs, type StepState, type SceneStatus, type PlatformOutput } from "@/lib/api";
 
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   pending: { color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30", label: "Pendente" },
@@ -39,26 +40,37 @@ function SceneCard({
   mutate: () => void;
 }) {
   const [retrying, setRetrying] = useState(false);
+  const [settingStatic, setSettingStatic] = useState(false);
   const [editPrompt, setEditPrompt] = useState(scene.prompt ?? "");
   const [showPrompt, setShowPrompt] = useState(false);
 
   const cfg = STATUS_CONFIG[scene.status] ?? STATUS_CONFIG.pending;
-  const isRetryable = scene.status === "failed" || scene.status === "static_fallback";
   const isReused = scene.reused === true;
-  const canRegenerate = isRetryable || isReused;
+  const isPending = scene.status === "pending";
+  const isGenerating = scene.status === "generating" || scene.status === "uploading";
+  const isStatic = scene.status === "static_fallback";
+  const isDone = scene.status === "success";
+  const isFailed = scene.status === "failed";
+  const canRegenerate = !isGenerating && !isPending;
   const imgSrc = scene.img_path ? reelFileUrl(jobId, scene.img_path) : "";
 
-  async function handleRetry() {
+  async function handleGenerate() {
     setRetrying(true);
     try {
-      if (isReused) {
-        await regenerateSceneVideo(jobId, scene.index, editPrompt || undefined);
-      } else {
-        await retryScene(jobId, scene.index, editPrompt || undefined);
-      }
+      await regenerateSceneVideo(jobId, scene.index, editPrompt || undefined);
       mutate();
     } finally {
       setRetrying(false);
+    }
+  }
+
+  async function handleSetStatic() {
+    setSettingStatic(true);
+    try {
+      await setSceneStatic(jobId, scene.index);
+      mutate();
+    } finally {
+      setSettingStatic(false);
     }
   }
 
@@ -67,7 +79,7 @@ function SceneCard({
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">Cena {scene.index + 1}</span>
         <Badge variant="outline" className={cfg.color}>
-          {scene.status === "generating" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+          {isGenerating && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
           {cfg.label}
         </Badge>
       </div>
@@ -81,22 +93,29 @@ function SceneCard({
             <ImageIcon className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
-        {scene.status === "generating" && (
+        {isGenerating && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-white" />
           </div>
         )}
-        {scene.status === "success" && !isReused && (
+        {isDone && !isReused && (
           <div className="absolute top-2 right-2">
             <div className="rounded-full bg-emerald-500 p-1">
               <Check className="h-3 w-3 text-white" />
             </div>
           </div>
         )}
-        {isReused && scene.status === "success" && (
+        {isReused && isDone && (
           <div className="absolute top-2 left-2">
             <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">
               Reaproveitado
+            </Badge>
+          </div>
+        )}
+        {isStatic && (
+          <div className="absolute top-2 right-2">
+            <Badge variant="outline" className="bg-zinc-500/20 text-zinc-400 border-zinc-500/30 text-[10px]">
+              Estatica
             </Badge>
           </div>
         )}
@@ -114,7 +133,32 @@ function SceneCard({
         </div>
       )}
 
-      {/* Retry / regenerate controls */}
+      {/* Pending: generate or keep static */}
+      {isPending && (
+        <div className="space-y-1.5">
+          <Button
+            size="sm"
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+            onClick={handleGenerate}
+            disabled={retrying}
+          >
+            {retrying ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Play className="mr-2 h-3 w-3" />}
+            Gerar Clip
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={handleSetStatic}
+            disabled={settingStatic}
+          >
+            {settingStatic ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <ImageIcon className="mr-2 h-3 w-3" />}
+            Manter Estatica
+          </Button>
+        </div>
+      )}
+
+      {/* Completed/failed/static: regenerate controls */}
       {canRegenerate && (
         <div className="space-y-2">
           <button
@@ -135,20 +179,30 @@ function SceneCard({
             />
           )}
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full"
-            onClick={handleRetry}
-            disabled={retrying}
-          >
-            {retrying ? (
-              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-3 w-3" />
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={handleGenerate}
+              disabled={retrying}
+            >
+              {retrying ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+              {isFailed ? "Tentar" : "Regenerar"}
+            </Button>
+            {!isStatic && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs px-2"
+                onClick={handleSetStatic}
+                disabled={settingStatic}
+                title="Usar imagem estatica"
+              >
+                {settingStatic ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageIcon className="h-3 w-3" />}
+              </Button>
             )}
-            {isReused ? "Gerar Novo Video" : "Tentar Novamente"}
-          </Button>
+          </div>
         </div>
       )}
     </div>
@@ -183,6 +237,8 @@ export function StepVideo({
     setTimeout(() => setCopiedField(null), 2000);
   }
 
+  const [generatingAll, setGeneratingAll] = useState(false);
+
   const isGenerating = stepData?.status === "generating";
   const hasError = stepData?.status === "error";
   const errorMsg = (stepData as Record<string, unknown>)?.error as string | undefined;
@@ -191,10 +247,52 @@ export function StepVideo({
   const scenes = stepData?.scenes ?? [];
   const hasScenes = scenes.length > 0;
 
-  async function handleRegenerate() {
+  const pendingScenes = scenes.filter((s) => s.status === "pending");
+  const readyScenes = scenes.filter((s) => s.status === "success" || s.status === "static_fallback");
+  const allScenesReady = hasScenes && readyScenes.length === scenes.length;
+  const hasPending = pendingScenes.length > 0;
+
+  async function handleReassemble() {
+    setLoading(true);
+    try {
+      await reassembleVideo(jobId);
+      mutate();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRegenAll() {
+    if (!confirm("Isso vai re-gerar TODOS os clips via Kie.ai (consome creditos). Continuar?")) return;
     setLoading(true);
     try {
       await regenerateStep(jobId, "video");
+      mutate();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGenerateAllPending() {
+    if (!confirm(`Gerar ${pendingScenes.length} clips via Kie.ai? Isso consome creditos.`)) return;
+    setGeneratingAll(true);
+    try {
+      for (const scene of pendingScenes) {
+        await regenerateSceneVideo(jobId, scene.index);
+      }
+      mutate();
+    } finally {
+      setGeneratingAll(false);
+    }
+  }
+
+  async function handleSetAllStatic() {
+    if (!confirm(`Marcar ${pendingScenes.length} cenas como imagem estatica?`)) return;
+    setLoading(true);
+    try {
+      for (const scene of pendingScenes) {
+        await setSceneStatic(jobId, scene.index);
+      }
       mutate();
     } finally {
       setLoading(false);
@@ -244,9 +342,9 @@ export function StepVideo({
                 Voltar para Reels
               </Button>
             </Link>
-            <Button onClick={handleRegenerate} disabled={loading}>
+            <Button onClick={handleRegenAll} disabled={loading} variant="destructive">
               {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
-              Regenerar Video
+              Regenerar Tudo (Kie.ai)
             </Button>
           </div>
         </CardContent>
@@ -266,10 +364,47 @@ export function StepVideo({
       <CardContent className="space-y-4">
         {/* Per-scene grid */}
         {hasScenes && (
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">
-              {scenes.filter((s) => s.status === "success").length}/{scenes.length} cenas prontas
-            </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {readyScenes.length}/{scenes.length} cenas prontas
+              </p>
+              <div className="flex gap-2">
+                {hasPending && (
+                  <>
+                    <Button
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      onClick={handleGenerateAllPending}
+                      disabled={generatingAll || loading}
+                    >
+                      {generatingAll ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Play className="mr-2 h-3 w-3" />}
+                      Gerar Todos Clips ({pendingScenes.length})
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSetAllStatic}
+                      disabled={loading}
+                    >
+                      <ImageIcon className="mr-2 h-3 w-3" />
+                      Todas Estaticas
+                    </Button>
+                  </>
+                )}
+                {allScenesReady && !videoUrl && (
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={handleReassemble}
+                    disabled={loading}
+                  >
+                    {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Film className="mr-2 h-3 w-3" />}
+                    Montar Video Final
+                  </Button>
+                )}
+              </div>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {scenes.map((scene) => (
                 <SceneCard key={scene.index} scene={scene} jobId={jobId} mutate={mutate} />
@@ -380,9 +515,9 @@ export function StepVideo({
               Voltar para Reels
             </Button>
           </Link>
-          <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={handleReassemble} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
-            Regenerar Video
+            Remontar Video
           </Button>
         </div>
       </CardContent>
