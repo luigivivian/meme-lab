@@ -2,7 +2,7 @@
 
 Phase G: Scene Asset Registry with Semantic Reuse
 - cosine_similarity: pure Python dot product (no numpy)
-- generate_embedding: Gemini text-embedding-004
+- generate_embedding: Gemini gemini-embedding-001
 - find_similar_asset: queries all assets for user+type+character, returns best match
 - register_asset: saves new asset to DB
 - compute_file_hash: SHA-256
@@ -43,11 +43,11 @@ def _get_client():
 
 
 async def generate_embedding(text: str) -> list[float]:
-    """Generate 768-dim embedding via Gemini text-embedding-004."""
+    """Generate 3072-dim embedding via Gemini gemini-embedding-001."""
     def _embed():
         client = _get_client()
         response = client.models.embed_content(
-            model="text-embedding-004",
+            model="gemini-embedding-001",
             contents=text,
         )
         return response.embeddings[0].values
@@ -112,6 +112,64 @@ async def find_similar_asset(
         best_score, threshold, asset_type,
     )
     return None, embedding
+
+
+async def find_similar_assets(
+    user_id: int,
+    character_id: int | None,
+    asset_type: str,
+    description: str,
+    threshold: float = 0.75,
+    max_results: int = 3,
+) -> tuple[list[tuple[SceneAsset, float]], list[float]]:
+    """Find similar assets above threshold, sorted by score descending.
+
+    Returns (list of (asset, score) tuples, computed_embedding).
+    """
+    from sqlalchemy import select
+    from src.database.session import get_session_factory
+
+    embedding = await generate_embedding(description)
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        query = select(SceneAsset).where(
+            SceneAsset.user_id == user_id,
+            SceneAsset.asset_type == asset_type,
+        )
+        if character_id is not None:
+            query = query.where(SceneAsset.character_id == character_id)
+
+        result = await session.execute(query)
+        assets = result.scalars().all()
+
+    if not assets:
+        return [], embedding
+
+    scored: list[tuple[SceneAsset, float]] = []
+    for asset in assets:
+        stored_emb = asset.embedding
+        if not stored_emb or not isinstance(stored_emb, list):
+            continue
+        score = cosine_similarity(embedding, stored_emb)
+        if score >= threshold:
+            scored.append((asset, score))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+    top = scored[:max_results]
+
+    if top:
+        logger.info(
+            "Asset reuse candidates: %d matches above %.2f for type=%s desc='%s'",
+            len(top), threshold, asset_type, description[:60],
+        )
+    else:
+        logger.debug(
+            "No similar assets above threshold=%.2f type=%s",
+            threshold, asset_type,
+        )
+
+    return top, embedding
 
 
 async def register_asset(

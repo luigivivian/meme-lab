@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { regenerateStep, retryScene, regenerateSceneVideo, setSceneStatic, reassembleVideo, reelFileUrl, getPlatformOutputs, type StepState, type SceneStatus, type PlatformOutput } from "@/lib/api";
+import { regenerateStep, retryScene, regenerateSceneVideo, setSceneStatic, reassembleVideo, reelFileUrl, getPlatformOutputs, getClipSuggestions, useClip, type StepState, type SceneStatus, type PlatformOutput, type ClipSuggestion } from "@/lib/api";
 
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   pending: { color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30", label: "Pendente" },
@@ -43,6 +43,8 @@ function SceneCard({
   const [settingStatic, setSettingStatic] = useState(false);
   const [editPrompt, setEditPrompt] = useState(scene.prompt ?? "");
   const [showPrompt, setShowPrompt] = useState(false);
+  const [suggestions, setSuggestions] = useState<ClipSuggestion[]>([]);
+  const [usingClip, setUsingClip] = useState(false);
 
   const cfg = STATUS_CONFIG[scene.status] ?? STATUS_CONFIG.pending;
   const isReused = scene.reused === true;
@@ -53,6 +55,24 @@ function SceneCard({
   const isFailed = scene.status === "failed";
   const canRegenerate = !isGenerating && !isPending;
   const imgSrc = scene.img_path ? reelFileUrl(jobId, scene.img_path) : "";
+
+  useEffect(() => {
+    if (isPending) {
+      getClipSuggestions(jobId, scene.index)
+        .then((r) => setSuggestions(r.suggestions))
+        .catch(() => {});
+    }
+  }, [jobId, scene.index, isPending]);
+
+  async function handleUseClip(assetId: number) {
+    setUsingClip(true);
+    try {
+      await useClip(jobId, scene.index, assetId);
+      mutate();
+    } finally {
+      setUsingClip(false);
+    }
+  }
 
   async function handleGenerate() {
     setRetrying(true);
@@ -130,6 +150,32 @@ function SceneCard({
       {scene.error && (
         <div className="rounded bg-red-500/10 border border-red-500/20 p-2">
           <p className="text-xs text-red-400 line-clamp-3">{scene.error}</p>
+        </div>
+      )}
+
+      {/* Clip suggestions */}
+      {isPending && suggestions.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Clips similares encontrados:</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {suggestions.map((s) => (
+              <button
+                key={s.asset_id}
+                type="button"
+                onClick={() => handleUseClip(s.asset_id)}
+                disabled={usingClip}
+                className="shrink-0 rounded-md border bg-secondary/50 hover:border-purple-500 transition-colors overflow-hidden w-20"
+              >
+                <div className="aspect-9/16 relative">
+                  <img src={`/api/reels/asset-thumb/${s.asset_id}`} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
+                    <span className="text-[9px] text-emerald-400 font-medium">{Math.round(s.score * 100)}%</span>
+                  </div>
+                </div>
+                <p className="text-[9px] text-muted-foreground p-1 line-clamp-2">{s.description}</p>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

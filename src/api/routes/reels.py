@@ -11,17 +11,19 @@ import asyncio
 import json
 import logging
 import os
+import shutil
+import subprocess
 import traceback
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from src.api.deps import get_current_user, db_session
-from src.database.models import ReelsConfig, ReelsJob
+from src.database.models import ReelsConfig, ReelsJob, SceneAsset
 from src.reels_pipeline.models import (
     ReelGenerateRequest,
     ReelStatusResponse,
@@ -1152,6 +1154,161 @@ async def regenerate_scene_video(
     return {"scene_index": scene_index, "status": "generating"}
 
 
+# ── Clip reuse endpoints ─────────────────────────────────────────────────
+
+
+@router.get("/{job_id}/clip-suggestions/{scene_index}", summary="Get reusable clip suggestions for a scene")
+async def get_clip_suggestions(
+    job_id: str,
+    scene_index: int,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Find similar existing video clips that could be reused for a scene.
+
+    Searches the asset registry using the scene's narration text as the semantic query.
+    Returns up to 3 suggestions with thumbnails.
+    """
+    from src.reels_pipeline.asset_registry import find_similar_assets
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = job.step_state or {}
+    script = step_state.get("script", {}).get("json", {})
+    cenas = script.get("cenas", [])
+
+    if scene_index < 0 or scene_index >= len(cenas):
+        raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
+
+    narracao = cenas[scene_index].get("narracao", "")
+    if not narracao:
+        return {"suggestions": []}
+
+    matches, _embedding = await find_similar_assets(
+        user_id=current_user.id,
+        character_id=job.character_id,
+        asset_type="video",
+        description=narracao,
+        threshold=0.75,
+        max_results=3,
+    )
+
+    suggestions = []
+    for asset, score in matches:
+        clip_path = asset.file_path or ""
+        if not clip_path or not os.path.isfile(clip_path):
+            continue
+
+        # Generate thumbnail from first frame if missing
+        thumb_path = clip_path.replace(".mp4", "_thumb.jpg")
+        if not os.path.exists(thumb_path):
+            try:
+                subprocess.run(
+                    ["ffmpeg", "-y", "-i", clip_path, "-vframes", "1", "-vf", "scale=270:480", thumb_path],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except Exception:
+                thumb_path = ""
+
+        desc = (asset.scene_description or "")[:80]
+        suggestions.append({
+            "asset_id": asset.id,
+            "score": round(score, 3),
+            "description": desc,
+            "duration": (asset.metadata_json or {}).get("duration"),
+            "thumbnail_url": f"/reels/asset-thumb/{asset.id}" if thumb_path and os.path.isfile(thumb_path) else None,
+        })
+
+    return {"suggestions": suggestions}
+
+
+@router.get("/asset-thumb/{asset_id}", summary="Serve asset thumbnail image")
+async def serve_asset_thumbnail(
+    asset_id: int,
+    db: AsyncSession = Depends(db_session),
+):
+    """Serve a thumbnail image for a video asset.
+
+    No auth required — same pattern as artifact file serving (img tags can't send auth headers).
+    """
+    result = await db.execute(
+        select(SceneAsset).where(SceneAsset.id == asset_id)
+    )
+    asset = result.scalar_one_or_none()
+    if not asset or not asset.file_path:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    thumb_path = asset.file_path.replace(".mp4", "_thumb.jpg")
+    if not os.path.isfile(thumb_path):
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+    return FileResponse(thumb_path)
+
+
+@router.post("/{job_id}/use-clip/{scene_index}", summary="Use an existing clip for a scene")
+async def use_clip(
+    job_id: str,
+    scene_index: int,
+    asset_id: int = Body(..., embed=True),
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Reuse an existing video clip asset for a scene.
+
+    Copies the clip file into the job's clips directory and updates step_state.
+    """
+    from src.reels_pipeline.asset_registry import increment_usage
+
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+    video_data = step_state.get("video", {})
+    scenes = video_data.get("scenes", [])
+
+    if scene_index < 0 or scene_index >= len(scenes):
+        raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
+
+    # Look up asset and verify ownership
+    result = await db.execute(
+        select(SceneAsset).where(
+            SceneAsset.id == asset_id,
+            SceneAsset.user_id == current_user.id,
+        )
+    )
+    asset = result.scalar_one_or_none()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found or not owned by user")
+
+    if not asset.file_path or not os.path.isfile(asset.file_path):
+        raise HTTPException(status_code=400, detail="Asset file not found on disk")
+
+    # Copy clip to job directory
+    job_dir = step_state.get("prompt", {}).get("job_dir", "")
+    if not job_dir:
+        raise HTTPException(status_code=400, detail="Job directory not initialized")
+
+    clips_dir = os.path.join(job_dir, "clips")
+    os.makedirs(clips_dir, exist_ok=True)
+    clip_path = os.path.join(clips_dir, f"clip_{scene_index:02d}.mp4")
+    shutil.copy2(asset.file_path, clip_path)
+
+    # Update scene in step_state
+    scene = scenes[scene_index]
+    scene["status"] = "success"
+    scene["clip_path"] = clip_path
+    scene["reused"] = True
+    scene["source_asset_id"] = asset_id
+    scenes[scene_index] = scene
+    video_data["scenes"] = scenes
+    step_state["video"] = video_data
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+
+    await increment_usage(asset_id)
+    await db.commit()
+
+    return {"scene_index": scene_index, "status": "success"}
+
+
 @router.post("/{job_id}/set-scene-static/{scene_index}", summary="Use static image for a scene")
 async def set_scene_static(
     job_id: str,
@@ -1327,6 +1484,30 @@ async def _retry_scene_task(
             scenes[scene_index] = {**scene, **retry_result}
             video_data["scenes"] = scenes
             step_state["video"] = video_data
+
+            # Register clip in asset registry after successful generation
+            if retry_result.get("status") == "success" and job.user_id:
+                try:
+                    from src.reels_pipeline.asset_registry import register_asset, generate_embedding
+                    script = step_state.get("script", {}).get("json", {})
+                    cenas = script.get("cenas", [])
+                    narracao = cenas[scene_index].get("narracao", "") if scene_index < len(cenas) else ""
+                    clip_path = retry_result.get("clip_path", "")
+                    if narracao and clip_path:
+                        embedding = await generate_embedding(narracao)
+                        tid = retry_result.get("task_id")
+                        await register_asset(
+                            user_id=job.user_id,
+                            character_id=job.character_id,
+                            asset_type="video",
+                            description=narracao,
+                            file_path=clip_path,
+                            embedding=embedding,
+                            model_used=config_override.get("video_model", "hailuo/2-3-image-to-video-standard"),
+                            kie_task_id=str(tid) if tid else None,
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to register clip asset: {e}")
 
             # Check if all scenes now have clips — auto-reassemble
             all_have_clips = all(

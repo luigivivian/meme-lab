@@ -1575,6 +1575,27 @@ export async function getReelsModels() {
   return request<ReelsModels>("/reels/config/models");
 }
 
+// --- Clip Suggestions (asset reuse) ---
+
+export interface ClipSuggestion {
+  asset_id: number;
+  score: number;
+  description: string;
+  duration: number;
+  thumbnail_url: string;
+}
+
+export async function getClipSuggestions(jobId: string, sceneIndex: number) {
+  return request<{ suggestions: ClipSuggestion[] }>(`/reels/${jobId}/clip-suggestions/${sceneIndex}`);
+}
+
+export async function useClip(jobId: string, sceneIndex: number, assetId: number) {
+  return request<{ scene_index: number; status: string }>(`/reels/${jobId}/use-clip/${sceneIndex}`, {
+    method: "POST",
+    body: JSON.stringify({ asset_id: assetId }),
+  });
+}
+
 export async function retryScene(jobId: string, sceneIndex: number, prompt?: string) {
   const params = prompt ? `?prompt=${encodeURIComponent(prompt)}` : "";
   return request<{ scene_index: number; status: string }>(
