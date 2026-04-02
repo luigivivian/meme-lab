@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -44,30 +44,67 @@ export default function ReelJobPage() {
 
   const currentStep = stepState.current_step;
   const state = stepState!;
+  const prevCurrentStep = useRef(currentStep);
 
+  // When backend's currentStep changes (approve/regenerate from any step component),
+  // auto-reset viewStep so the user follows the new active step
+  useEffect(() => {
+    if (currentStep !== prevCurrentStep.current) {
+      prevCurrentStep.current = currentStep;
+      setViewStep(null);
+    }
+  }, [currentStep]);
+
+  // When viewing a past step, approve should return to the current step (no-op on backend)
+  // When viewing the current step, approve advances normally
   async function handleApprove(step: string) {
     await approveStep(jobId, step);
+    // If we were viewing a past step, return to the backend's current step
+    if (viewStep !== null) {
+      setViewStep(null);
+    }
     mutate();
   }
 
   async function handleRegenerate(step: string) {
     await regenerateStep(jobId, step);
+    // Regenerate clears downstream and resets current_step — follow it
     setViewStep(null);
     mutate();
   }
 
   const displayStep = viewStep ?? currentStep;
+  // Whether we're viewing a past completed step (read-only navigation)
+  const isViewingPast = viewStep !== null && viewStep < currentStep;
 
   function renderStepContent() {
+    // When viewing a past step, show a "back to current" bar
+    const viewingPastBar = isViewingPast ? (
+      <div className="flex items-center justify-between rounded-lg border border-purple-500/30 bg-purple-500/5 p-3 mb-3">
+        <p className="text-sm text-purple-300">Visualizando passo anterior. Pode regenerar ou voltar ao passo atual.</p>
+        <button
+          type="button"
+          onClick={() => setViewStep(null)}
+          className="text-sm text-purple-400 hover:text-purple-300 font-medium"
+        >
+          Voltar ao passo atual →
+        </button>
+      </div>
+    ) : null;
+
+    let content;
     switch (displayStep) {
       case 0:
-        return <StepPrompt jobId={jobId} stepState={state} />;
+        content = <StepPrompt jobId={jobId} stepState={state} />;
+        break;
       case 1:
-        return <StepScript jobId={jobId} stepState={state} />;
+        content = <StepScript jobId={jobId} stepState={state} />;
+        break;
       case 2:
-        return <StepImages jobId={jobId} stepState={state} />;
+        content = <StepImages jobId={jobId} stepState={state} />;
+        break;
       case 3:
-        return (
+        content = (
           <StepNarration
             jobId={jobId}
             stepData={state.tts}
@@ -76,8 +113,9 @@ export default function ReelJobPage() {
             mutate={() => mutate()}
           />
         );
+        break;
       case 4:
-        return (
+        content = (
           <StepSubtitles
             jobId={jobId}
             stepData={state.srt}
@@ -86,21 +124,30 @@ export default function ReelJobPage() {
             mutate={() => mutate()}
           />
         );
+        break;
       case 5:
-        return (
+        content = (
           <StepVideo
             jobId={jobId}
             stepData={state.video}
             mutate={() => mutate()}
           />
         );
+        break;
       default:
-        return (
+        content = (
           <div className="rounded-lg border p-8 text-center">
             <p className="text-muted-foreground">Passo desconhecido.</p>
           </div>
         );
     }
+
+    return (
+      <>
+        {viewingPastBar}
+        {content}
+      </>
+    );
   }
 
   return (
