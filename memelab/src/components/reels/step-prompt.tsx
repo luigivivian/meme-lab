@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { approveStep, editStep, type StepState } from "@/lib/api";
 
-export function StepPrompt({ jobId, stepState }: { jobId: string; stepState: StepState }) {
+export function StepPrompt({ jobId, stepState, onApprove, mutate }: { jobId: string; stepState: StepState; onApprove?: (step: string) => Promise<void>; mutate?: () => void }) {
   const prompt = stepState.prompt;
   const [text, setText] = useState(prompt?.text ?? "");
   const [editing, setEditing] = useState(!prompt?.approved);
@@ -16,9 +16,13 @@ export function StepPrompt({ jobId, stepState }: { jobId: string; stepState: Ste
   async function handleApproveAndNext() {
     setLoading(true);
     try {
-      await approveStep(jobId, "prompt");
-      // Keep loading=true — SWR will switch to next step component
-    } catch {
+      if (onApprove) {
+        await onApprove("prompt");
+      } else {
+        await approveStep(jobId, "prompt");
+      }
+      mutate?.();
+    } finally {
       setLoading(false);
     }
   }

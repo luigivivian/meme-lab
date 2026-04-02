@@ -98,10 +98,10 @@ export default function ReelJobPage() {
     let content;
     switch (displayStep) {
       case 0:
-        content = <StepPrompt jobId={jobId} stepState={state} />;
+        content = <StepPrompt jobId={jobId} stepState={state} onApprove={handleApprove} mutate={() => mutate()} />;
         break;
       case 1:
-        content = <StepScript jobId={jobId} stepState={state} />;
+        content = <StepScript jobId={jobId} stepState={state} onApprove={handleApprove} mutate={() => mutate()} />;
         break;
       case 2:
         content = (
@@ -126,7 +126,7 @@ export default function ReelJobPage() {
         );
         break;
       case 4:
-        content = <StepImages jobId={jobId} stepState={state} />;
+        content = <StepImages jobId={jobId} stepState={state} mutate={() => mutate()} onApprove={handleApprove} />;
         break;
       case 5:
         content = (

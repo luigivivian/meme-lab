@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { approveStep, regenerateStep, regenerateSingleImage, reelFileUrl, type StepState } from "@/lib/api";
 
-export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepState: StepState; mutate?: () => void }) {
+export function StepImages({ jobId, stepState, mutate, onApprove }: { jobId: string; stepState: StepState; mutate?: () => void; onApprove?: (step: string) => Promise<void> }) {
   const images = stepState.images;
   const isGenerating = images?.status === "generating";
   const paths = images?.paths ?? [];
@@ -26,7 +26,11 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
   async function handleApprove() {
     setLoading(true);
     try {
-      await approveStep(jobId, "images");
+      if (onApprove) {
+        await onApprove("images");
+      } else {
+        await approveStep(jobId, "images");
+      }
       mutate?.();
     } finally {
       setLoading(false);

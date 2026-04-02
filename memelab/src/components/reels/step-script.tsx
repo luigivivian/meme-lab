@@ -36,7 +36,7 @@ function parseScript(raw: Record<string, unknown> | undefined): ScriptJson {
   };
 }
 
-export function StepScript({ jobId, stepState }: { jobId: string; stepState: StepState }) {
+export function StepScript({ jobId, stepState, onApprove, mutate }: { jobId: string; stepState: StepState; onApprove?: (step: string) => Promise<void>; mutate?: () => void }) {
   const script = stepState.script;
   const isGenerating = script?.status === "generating";
   const [form, setForm] = useState<ScriptJson>(() => parseScript(script?.json));
@@ -80,8 +80,13 @@ export function StepScript({ jobId, stepState }: { jobId: string; stepState: Ste
         await editStep(jobId, "script", { script_json: form as unknown as Record<string, unknown> });
         setDirty(false);
       }
-      await approveStep(jobId, "script");
-    } catch {
+      if (onApprove) {
+        await onApprove("script");
+      } else {
+        await approveStep(jobId, "script");
+      }
+      mutate?.();
+    } finally {
       setLoading(false);
     }
   }
