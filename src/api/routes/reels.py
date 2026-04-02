@@ -1053,6 +1053,23 @@ async def _regenerate_single_image_task(
                 images_data["reuse_info"] = reuse_info
 
                 step_state["images"] = images_data
+
+                # Invalidate corresponding video clip — forces re-generation
+                video_data = step_state.get("video", {})
+                video_scenes = video_data.get("scenes", [])
+                if scene_index < len(video_scenes):
+                    video_scenes[scene_index]["status"] = "pending"
+                    video_scenes[scene_index].pop("clip_path", None)
+                    video_scenes[scene_index].pop("reused", None)
+                    video_scenes[scene_index].pop("source_asset_id", None)
+                    video_scenes[scene_index]["img_path"] = target_path
+                    video_data["scenes"] = video_scenes
+                    # Clear final video path since it's now stale
+                    video_data.pop("path", None)
+                    video_data["status"] = None
+                    step_state["video"] = video_data
+                    logger.info("Invalidated video clip %d after image regeneration", scene_index)
+
                 job.step_state = step_state
                 flag_modified(job, "step_state")
 

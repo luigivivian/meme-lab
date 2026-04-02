@@ -578,6 +578,16 @@ class ReelsPipeline:
 
         tasks_info = []
         for i, img_path in enumerate(image_paths):
+            # Always verify the image file exists on disk
+            if not os.path.isfile(img_path):
+                logger.warning(f"Scene {i}: image not found at {img_path}, checking alternatives")
+                # Try cena_XX.jpg pattern (regenerated images)
+                alt_path = os.path.join(os.path.dirname(img_path), f"cena_{i:02d}.jpg")
+                if os.path.isfile(alt_path):
+                    img_path = alt_path
+                    image_paths[i] = alt_path
+                    logger.info(f"Scene {i}: using regenerated image {alt_path}")
+
             cena = cenas[i] if i < len(cenas) else {}
             gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{i}_{_cache_bust}.jpg"
             public_url = gcs.upload_image(img_path, gcs_key)
