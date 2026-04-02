@@ -572,10 +572,14 @@ class ReelsPipeline:
             ], capture_output=True, timeout=60)
 
         # Phase 1: Upload images to GCS and build scene-aware motion prompts
+        # Use unique GCS keys with timestamp to bust CDN cache when images are regenerated
+        import time as _time
+        _cache_bust = int(_time.time())
+
         tasks_info = []
         for i, img_path in enumerate(image_paths):
             cena = cenas[i] if i < len(cenas) else {}
-            gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{i}.jpg"
+            gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{i}_{_cache_bust}.jpg"
             public_url = gcs.upload_image(img_path, gcs_key)
 
             narracao = cena.get("narracao", "")

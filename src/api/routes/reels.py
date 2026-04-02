@@ -1464,10 +1464,11 @@ async def _retry_scene_task(
                 img_path = scene.get("img_path", "")
             duration = scene.get("duration", 6)
 
-            # Upload image to GCS for retry
+            # Upload image to GCS for retry (timestamp bust CDN cache for regenerated images)
+            import time as _time
             from src.video_gen.gcs_uploader import GCSUploader
             gcs = GCSUploader()
-            gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{scene_index}_retry.jpg"
+            gcs_key = f"reels/{os.path.basename(job_dir)}/scene_{scene_index}_{int(_time.time())}.jpg"
             image_url = gcs.upload_image(img_path, gcs_key)
 
             pipeline = ReelsPipeline(config_override=config_override)
