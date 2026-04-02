@@ -197,10 +197,11 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 260330-ie5 | Enhance ads wizard scene step with customizable presets for backgrounds cameras lighting organized by product categories editable scene suggestions product description and manual prompt editing | 2026-03-30 | 9e02cdc | [260330-ie5-enhance-ads-wizard-scene-step-with-custo](./quick/260330-ie5-enhance-ads-wizard-scene-step-with-custo/) |
 | 260330-tgu | Add Enhance Theme button to reels creation - AI-powered topic suggestions after sub-theme selection | 2026-03-31 | 073c33c | [260330-tgu-add-enhance-theme-button-to-reels-creati](./quick/260330-tgu-add-enhance-theme-button-to-reels-creati/) |
+| 260402-04t | Add loop option to reels - end phrase transitions back to video start for infinite loop effect | 2026-04-02 | pending | [260402-04t-add-loop-option-to-reels-end-phrase-tran](./quick/260402-04t-add-loop-option-to-reels-end-phrase-tran/) |
 
 ## Session Continuity
 
-Last activity: 2026-04-01
+Last activity: 2026-04-02
 Last session: 2026-03-31T06:59:03.538Z
 Stopped at: Completed 999.8-G-asset-reuse plan
 Resume file: None

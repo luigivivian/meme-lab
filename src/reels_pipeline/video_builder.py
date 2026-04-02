@@ -503,12 +503,18 @@ def _trim_clips_to_durations(
         base, ext = os.path.splitext(clip_path)
         trimmed_path = f"{base}_trimmed{ext}"
 
-        # Always re-encode to normalize resolution, timebase, and fps
+        # Build video filter: normalize resolution + extend short clips with last-frame freeze
+        vf_parts = ["scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black"]
+        if actual_dur < target_dur - 0.05:
+            pad_dur = target_dur - actual_dur + 0.5  # buffer for precision
+            vf_parts.append(f"tpad=stop_mode=clone:stop_duration={pad_dur:.3f}")
+            logger.info(f"Extending {os.path.basename(clip_path)}: {actual_dur:.2f}s -> {target_dur:.2f}s (freeze last frame)")
+
         subprocess.run(
             [
                 "ffmpeg", "-y", "-i", clip_path,
                 "-t", str(target_dur),
-                "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black",
+                "-vf", ",".join(vf_parts),
                 "-c:v", "libx264", "-preset", "fast", "-crf", "18",
                 "-r", "30", "-an", trimmed_path,
             ],
@@ -800,14 +806,37 @@ def concat_clips_with_audio(
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
+    # Loop phrase: append first scene clip at end to create seamless loop
+    if script_json and script_json.get("frase_loop"):
+        import shutil as _shutil
+        frase_loop = script_json["frase_loop"]
+        # Copy the first clip so _trim_clips_to_durations doesn't overwrite the original's trimmed file
+        first_clip = clip_paths[0]
+        loop_clip = first_clip.replace(".mp4", "_loop.mp4")
+        _shutil.copy2(first_clip, loop_clip)
+        clip_paths = list(clip_paths) + [loop_clip]
+        # Add synthetic cena so duration computation includes the loop segment
+        script_json = dict(script_json)
+        cenas = list(script_json.get("cenas", []))
+        cenas.append({
+            "narracao": frase_loop,
+            "duracao_segundos": 3,
+            "imagem_index": 0,
+            "legenda_overlay": "",
+        })
+        script_json["cenas"] = cenas
+        logger.info(f"Loop phrase enabled: '{frase_loop}' — appended first clip as loop scene")
+
     # Trim clips to match narration timing — proportional if script available
     if script_json:
         total_dur = get_video_duration(audio_path) if os.path.exists(audio_path) else 30.0
         scene_durs = compute_scene_durations_from_script(
             script_json, total_dur, len(clip_paths), transition_duration
         )
-        # Align SRT to computed scene windows
-        srt_path = _align_srt_to_scenes(srt_path, scene_durs, script_json)
+        # Skip SRT alignment — original timestamps match the TTS audio exactly.
+        # Proportional clip durations + tpad extension ensure visuals align with
+        # narration naturally. Clamping SRT to scene windows only introduces
+        # desync since windows don't account for xfade overlap.
         logger.info(f"Using proportional durations from script ({len(scene_durs)} scenes)")
     else:
         scene_durs = _compute_scene_durations_from_srt(

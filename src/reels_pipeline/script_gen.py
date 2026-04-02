@@ -35,12 +35,13 @@ ROTEIRO_SCHEMA = {
             },
         },
         "cta": {"type": "STRING"},
+        "frase_loop": {"type": "STRING"},
         "hashtags": {"type": "ARRAY", "items": {"type": "STRING"}},
         "caption_instagram": {"type": "STRING"},
     },
     "required": [
         "titulo", "gancho", "narracao_completa", "cenas",
-        "cta", "hashtags", "caption_instagram",
+        "cta", "frase_loop", "hashtags", "caption_instagram",
     ],
 }
 
@@ -71,7 +72,9 @@ ESTRUTURA OBRIGATÓRIA DO ROTEIRO (5 fases):
 A primeira cena SEMPRE é o gancho. A última cena SEMPRE termina com frase que conecta ao gancho para criar loop.
 
 TÉCNICA DE LOOP VERBAL (OBRIGATÓRIO):
-A última frase da narracao_completa deve terminar de forma que flua naturalmente de volta à primeira frase. Exemplo: se o gancho é "Ninguém fala sobre isso, mas..." a última frase pode ser "...e é exatamente isso que → ninguém fala sobre, mas..."
+O campo frase_loop deve conter uma frase curta (3-8 palavras) que cria curiosidade e reconecta ao gancho inicial. NÃO repita o CTA — a frase_loop é uma TRANSIÇÃO que faz o espectador querer rever o início.
+Exemplo: se o gancho é "Acordar sem energia é um feitiço terrível!" a frase_loop pode ser "E por falar em feitiço..."
+A frase_loop NÃO deve aparecer na narracao_completa nem nas cenas — será adicionada automaticamente ao final do vídeo.
 
 SEO DE VOZ (OBRIGATÓRIO):
 Fale as palavras-chave principais do tema em voz alta na narração, especialmente nos primeiros 5 segundos. TikTok e YouTube indexam o áudio falado — keywords ditas em voz alta melhoram a descoberta orgânica.
@@ -98,20 +101,22 @@ Rules:
 - Keywords: {keywords}
 - Default CTA: {cta}
 
-ESTRUTURA OBRIGATÓRIA DO ROTEIRO (5 fases):
-1. GANCHO (0-3s): Primeira frase impactante, SEM saudação. Crie um gap de informação que obrigue o espectador a continuar.
-2. CONTEXTO (3-5s): Por que o espectador deveria se importar. Use prova social ou conexão emocional.
-3. CONTEÚDO (5-25s): Entregue o valor prometido no gancho. UMA mensagem central por vídeo. Ritmo acelerado, sem pausas mortas.
-4. PAYOFF (penúltimos segundos): Entregue a promessa do gancho. Momento de satisfação que gera saves e shares.
-5. LOOP/CTA (últimos segundos): A frase final deve fluir imperceptivelmente de volta ao gancho — o espectador não deve perceber onde o vídeo termina e recomeça.
+MANDATORY SCRIPT STRUCTURE (5 phases):
+1. HOOK (0-3s): First impactful sentence, NO greeting. Create an information gap that forces the viewer to continue.
+2. CONTEXT (3-5s): Why the viewer should care. Use social proof or emotional connection.
+3. CONTENT (5-25s): Deliver the value promised in the hook. ONE central message per video. Fast pace, no dead pauses.
+4. PAYOFF (second-to-last seconds): Deliver on the hook's promise. Moment of satisfaction that generates saves and shares.
+5. LOOP/CTA (last seconds): The final sentence should flow imperceptibly back to the hook — the viewer should not notice where the video ends and restarts.
 
-A primeira cena SEMPRE é o gancho. A última cena SEMPRE termina com frase que conecta ao gancho para criar loop.
+The first scene is ALWAYS the hook. The last scene ALWAYS ends with a phrase that connects to the hook to create a loop.
 
-TÉCNICA DE LOOP VERBAL (OBRIGATÓRIO):
-A última frase da narracao_completa deve terminar de forma que flua naturalmente de volta à primeira frase. Exemplo: se o gancho é "Ninguém fala sobre isso, mas..." a última frase pode ser "...e é exatamente isso que → ninguém fala sobre, mas..."
+VERBAL LOOP TECHNIQUE (MANDATORY):
+The frase_loop field must contain a short phrase (3-8 words) that creates curiosity and reconnects to the opening hook. Do NOT repeat the CTA — frase_loop is a TRANSITION that makes the viewer want to rewatch.
+Example: if the hook is "Nobody talks about this but..." the frase_loop could be "And speaking of things nobody mentions..."
+frase_loop must NOT appear in narracao_completa or in the scenes — it will be automatically appended to the end of the video.
 
-SEO DE VOZ (OBRIGATÓRIO):
-Fale as palavras-chave principais do tema em voz alta na narração, especialmente nos primeiros 5 segundos. TikTok e YouTube indexam o áudio falado — keywords ditas em voz alta melhoram a descoberta orgânica.
+VOICE SEO (MANDATORY):
+Speak the main keywords of the topic out loud in the narration, especially in the first 5 seconds.
 
 {hook_type_instruction}{image_instruction}
 Create a script that:
@@ -145,7 +150,9 @@ ESTRUTURA OBRIGATÓRIA DO ROTEIRO (5 fases):
 A primeira cena SEMPRE é o gancho. A última cena SEMPRE termina com frase que conecta ao gancho para criar loop.
 
 TÉCNICA DE LOOP VERBAL (OBRIGATÓRIO):
-A última frase da narracao_completa deve terminar de forma que flua naturalmente de volta à primeira frase. Exemplo: se o gancho é "Ninguém fala sobre isso, mas..." a última frase pode ser "...e é exatamente isso que → ninguém fala sobre, mas..."
+O campo frase_loop deve conter uma frase curta (3-8 palavras) que cria curiosidade e reconecta ao gancho inicial. NÃO repita o CTA — a frase_loop é uma TRANSIÇÃO que faz o espectador querer rever o início.
+Exemplo: se o gancho é "Acordar sem energia é um feitiço terrível!" a frase_loop pode ser "E por falar em feitiço..."
+A frase_loop NÃO deve aparecer na narracao_completa nem nas cenas — será adicionada automaticamente ao final do vídeo.
 
 SEO DE VOZ (OBRIGATÓRIO):
 Fale as palavras-chave principais do tema em voz alta na narração, especialmente nos primeiros 5 segundos. TikTok e YouTube indexam o áudio falado — keywords ditas em voz alta melhoram a descoberta orgânica.
@@ -184,11 +191,13 @@ ESTRUTURA OBRIGATÓRIA DO ROTEIRO (5 fases):
 
 A primeira cena SEMPRE é o gancho. A última cena SEMPRE termina com frase que conecta ao gancho para criar loop.
 
-TÉCNICA DE LOOP VERBAL (OBRIGATÓRIO):
-A última frase da narracao_completa deve terminar de forma que flua naturalmente de volta à primeira frase. Exemplo: se o gancho é "Ninguém fala sobre isso, mas..." a última frase pode ser "...e é exatamente isso que → ninguém fala sobre, mas..."
+VERBAL LOOP TECHNIQUE (MANDATORY):
+The frase_loop field must contain a short phrase (3-8 words) that creates curiosity and reconnects to the opening hook. Do NOT repeat the CTA — frase_loop is a TRANSITION that makes the viewer want to rewatch.
+Example: if the hook is "Nobody talks about this but..." the frase_loop could be "And speaking of things nobody mentions..."
+frase_loop must NOT appear in narracao_completa or in the scenes — it will be automatically appended to the end of the video.
 
-SEO DE VOZ (OBRIGATÓRIO):
-Fale as palavras-chave principais do tema em voz alta na narração, especialmente nos primeiros 5 segundos. TikTok e YouTube indexam o áudio falado — keywords ditas em voz alta melhoram a descoberta orgânica.
+VOICE SEO (MANDATORY):
+Speak the main keywords of the topic out loud in the narration, especially in the first 5 seconds.
 
 {hook_type_instruction}{image_instruction}
 Create a script that:
@@ -366,5 +375,14 @@ async def generate_script(
     )
 
     script = json.loads(response.text)
+
+    # Append frase_loop to narracao_completa so TTS includes it at the end
+    frase_loop = script.get("frase_loop", "")
+    if frase_loop:
+        nc = script.get("narracao_completa", "")
+        if frase_loop not in nc:
+            script["narracao_completa"] = nc.rstrip() + " " + frase_loop
+            logger.info(f"Loop phrase appended to narracao_completa: '{frase_loop}'")
+
     logger.info(f"Script generated: titulo='{script.get('titulo')}', cenas={len(script.get('cenas', []))}")
     return script
