@@ -1645,6 +1645,12 @@ export async function setSceneStatic(jobId: string, sceneIndex: number) {
   );
 }
 
+export async function initScenes(jobId: string) {
+  return request<{ scenes: number; status: string }>(
+    `/reels/${jobId}/init-scenes`, { method: "POST" }
+  );
+}
+
 export async function reassembleVideo(jobId: string) {
   return request<{ status: string }>(
     `/reels/${jobId}/reassemble-video`, { method: "POST" }

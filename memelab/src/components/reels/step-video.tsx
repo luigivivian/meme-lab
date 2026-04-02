@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { regenerateStep, retryScene, regenerateSceneVideo, setSceneStatic, reassembleVideo, reelFileUrl, getPlatformOutputs, getClipSuggestions, useClip, type StepState, type SceneStatus, type PlatformOutput, type ClipSuggestion } from "@/lib/api";
+import { regenerateStep, retryScene, regenerateSceneVideo, setSceneStatic, initScenes, reassembleVideo, reelFileUrl, getPlatformOutputs, getClipSuggestions, useClip, type StepState, type SceneStatus, type PlatformOutput, type ClipSuggestion } from "@/lib/api";
 
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   pending: { color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30", label: "Pendente" },
@@ -474,13 +474,32 @@ export function StepVideo({
               />
             </div>
 
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-2 justify-center flex-wrap">
               <a href={videoUrl} download>
                 <Button variant="outline" size="sm">
                   <Download className="mr-2 h-3 w-3" />
                   Download
                 </Button>
               </a>
+              {!hasScenes && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      await initScenes(jobId);
+                      mutate();
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Play className="mr-2 h-3 w-3" />}
+                  Regenerar com Kie.ai
+                </Button>
+              )}
               <Button variant="outline" size="sm" disabled title="Em breve">
                 Publicar no Instagram
               </Button>

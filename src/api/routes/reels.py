@@ -1580,6 +1580,58 @@ async def _retry_scene_task(
                 pass
 
 
+@router.post("/{job_id}/init-scenes", summary="Initialize per-scene structure from images")
+async def init_scenes(
+    job_id: str,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Initialize video scenes from existing images for per-scene clip control.
+
+    Creates pending scene entries from images.paths, allowing the user to
+    generate clips individually via Kie.ai or keep as static images.
+    """
+    job = await _get_user_job(job_id, current_user.id, db)
+    step_state = dict(job.step_state or {})
+    video_data = step_state.get("video", {})
+
+    # Don't overwrite existing scenes
+    if video_data.get("scenes"):
+        return {"scenes": len(video_data["scenes"]), "status": "already_initialized"}
+
+    images_data = step_state.get("images", {})
+    paths = images_data.get("paths", [])
+    script_json = step_state.get("script", {}).get("json", {})
+    cenas = script_json.get("cenas", [])
+
+    if not paths:
+        raise HTTPException(status_code=400, detail="No images available to initialize scenes")
+
+    target_duration = 30
+    n = len(paths)
+    scenes = []
+    for i, img_path in enumerate(paths):
+        cena = cenas[i] if i < len(cenas) else {}
+        dur = cena.get("duracao_segundos", target_duration // n)
+        scenes.append({
+            "index": i,
+            "status": "pending",
+            "img_path": img_path,
+            "duration": dur,
+            "prompt": cena.get("legenda_overlay", ""),
+        })
+
+    video_data["scenes"] = scenes
+    video_data["status"] = None
+    video_data.pop("path", None)
+    step_state["video"] = video_data
+    job.step_state = step_state
+    flag_modified(job, "step_state")
+    await db.commit()
+
+    return {"scenes": len(scenes), "status": "initialized"}
+
+
 @router.post("/{job_id}/reassemble-video", summary="Reassemble final video from existing clips")
 async def reassemble_video(
     job_id: str,
