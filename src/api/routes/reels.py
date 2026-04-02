@@ -671,6 +671,8 @@ async def get_step_state(
         images=step_state.get("images"),
         clips=step_state.get("clips"),
         video=step_state.get("video"),
+        feedback_status=job.feedback_status,
+        posted_platforms=job.posted_platforms,
     )
 
 
@@ -1544,8 +1546,17 @@ async def _retry_scene_task(
                 duration=duration,
             )
 
-            # Update scene in step_state
-            scenes[scene_index] = {**scene, **retry_result}
+            # Re-read step_state to avoid overwriting concurrent changes
+            # (e.g., user set another scene as static while this one was generating)
+            await session.refresh(job)
+            step_state = dict(job.step_state or {})
+            clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+            scenes = clips_data.get("scenes", [])
+            if scene_index >= len(scenes):
+                return
+
+            # Update only this scene
+            scenes[scene_index] = {**scenes[scene_index], **retry_result}
             clips_data["scenes"] = scenes
             step_state["clips"] = clips_data
 
@@ -1593,6 +1604,7 @@ async def _retry_scene_task(
                 if clip_paths:
                     audio_path = step_state.get("tts", {}).get("path", "")
                     srt_path = step_state.get("srt", {}).get("path", "")
+                    script_json = step_state.get("script", {}).get("json", {})
                     video_path = os.path.join(job_dir, "final.mp4")
                     concat_clips_with_audio(
                         clip_paths=clip_paths,
@@ -1600,6 +1612,7 @@ async def _retry_scene_task(
                         srt_path=srt_path,
                         output_path=video_path,
                         transition_duration=0.3,
+                        script_json=script_json,
                     )
                     step_state.setdefault("video", {})["path"] = video_path
                     job.video_path = video_path
@@ -1612,6 +1625,8 @@ async def _retry_scene_task(
         except Exception as e:
             logger.error(f"Retry scene {scene_index} for job {job_id} failed: {e}")
             try:
+                # Re-read to avoid overwriting concurrent changes
+                await session.refresh(job)
                 step_state = dict(job.step_state or {})
                 clips_data = step_state.get("clips", {}) or step_state.get("video", {})
                 scenes = clips_data.get("scenes", [])
@@ -2079,6 +2094,40 @@ async def get_platform_outputs(
         "job_id": job.job_id,
         "platforms": job.platforms or ["instagram"],
         "platform_outputs": job.platform_outputs or {},
+    }
+
+
+@router.patch("/{job_id}/feedback", summary="Update reel feedback status")
+async def update_feedback(
+    job_id: str,
+    body: dict,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(db_session),
+):
+    """Update feedback lifecycle: null -> 'approved' -> 'posted'.
+
+    Body: { "status": "approved" | "posted", "platforms": ["instagram", ...] }
+    """
+    job = await _get_user_job(job_id, current_user.id, db)
+
+    new_status = body.get("status")
+    if new_status not in ("approved", "posted"):
+        raise HTTPException(status_code=400, detail="status must be 'approved' or 'posted'")
+
+    if new_status == "posted":
+        platforms = body.get("platforms", [])
+        if not platforms or not isinstance(platforms, list):
+            raise HTTPException(status_code=400, detail="platforms list required when posting")
+        job.posted_platforms = platforms
+
+    job.feedback_status = new_status
+    flag_modified(job, "feedback_status")
+    await db.commit()
+
+    return {
+        "job_id": job.job_id,
+        "feedback_status": job.feedback_status,
+        "posted_platforms": job.posted_platforms,
     }
 
 

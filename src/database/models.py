@@ -705,7 +705,7 @@ class ReelsJob(TimestampMixin, Base):
     )
 
     # Input
-    tema: Mapped[str] = mapped_column(String(500), nullable=False)
+    tema: Mapped[str] = mapped_column(Text, nullable=False)
     language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, default="pt-BR", server_default="pt-BR")
 
     # Status tracking
@@ -738,6 +738,10 @@ class ReelsJob(TimestampMixin, Base):
     # Multi-platform output (Phase E)
     platforms: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     platform_outputs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    # Feedback lifecycle: null -> 'approved' -> 'posted'
+    feedback_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    posted_platforms: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
 
     __table_args__ = (
         Index("idx_reels_jobs_user_id", "user_id"),
@@ -836,7 +840,7 @@ class SceneAsset(TimestampMixin, Base):
     )
     asset_type: Mapped[str] = mapped_column(String(10), nullable=False)  # "image" | "video"
     scene_description: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[list] = mapped_column(JSON, nullable=False)  # 768 float list
+    embedding: Mapped[list] = mapped_column(JSON, nullable=False)  # 3072 float list (gemini-embedding-001)
     file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
     file_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     kie_task_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

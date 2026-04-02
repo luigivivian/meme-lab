@@ -143,6 +143,7 @@ export default function ReelJobPage() {
           <StepVideo
             jobId={jobId}
             stepData={state.video}
+            stepState={state}
             mutate={() => mutate()}
           />
         );

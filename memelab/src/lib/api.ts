@@ -1676,6 +1676,8 @@ export interface StepState {
   srt?: { path: string; approved: boolean; status?: string };
   clips?: { status?: string; scenes?: SceneStatus[]; approved?: boolean };
   video?: { path: string; approved: boolean; status?: string; scenes?: SceneStatus[] };
+  feedback_status?: "approved" | "posted" | null;
+  posted_platforms?: string[];
 }
 
 export interface SceneStatus {
@@ -1762,6 +1764,17 @@ export async function editStep(jobId: string, step: string, payload: StepEditPay
 
 export async function getPlatformOutputs(jobId: string) {
   return request<PlatformOutputsResponse>(`/reels/${jobId}/platforms`);
+}
+
+export async function updateReelFeedback(
+  jobId: string,
+  status: "approved" | "posted",
+  platforms?: string[],
+) {
+  return request<{ job_id: string; feedback_status: string; posted_platforms: string[] }>(
+    `/reels/${jobId}/feedback`,
+    { method: "PATCH", body: JSON.stringify({ status, platforms }) },
+  );
 }
 
 export function reelFileUrl(jobId: string, filename: string): string {

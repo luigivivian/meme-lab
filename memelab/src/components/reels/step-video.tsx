@@ -11,25 +11,53 @@ import {
   Play,
   Copy,
   CheckCircle2,
+  ThumbsUp,
+  Send,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { regenerateStep, reassembleVideo, reelFileUrl, getPlatformOutputs, type StepState, type PlatformOutput } from "@/lib/api";
+import {
+  regenerateStep,
+  reassembleVideo,
+  reelFileUrl,
+  getPlatformOutputs,
+  updateReelFeedback,
+  type StepState,
+  type PlatformOutput,
+} from "@/lib/api";
+import { PLATFORM_COLORS, PLATFORM_LABELS } from "@/lib/constants";
+
+const FEEDBACK_STATUS_CONFIG: Record<string, { color: string; label: string }> = {
+  generated: { color: "bg-amber-500/20 text-amber-400 border-amber-500/30", label: "Gerado" },
+  approved: { color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", label: "Aprovado" },
+  posted: { color: "bg-purple-500/20 text-purple-400 border-purple-500/30", label: "Postado" },
+};
+
+const ALL_PLATFORMS = ["instagram", "youtube_shorts", "tiktok", "facebook"] as const;
 
 export function StepVideo({
   jobId,
   stepData,
+  stepState,
   mutate,
 }: {
   jobId: string;
   stepData: StepState["video"];
+  stepState: StepState;
   mutate: () => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [posting, setPosting] = useState(false);
   const [platformOutputs, setPlatformOutputs] = useState<Record<string, PlatformOutput>>({});
   const [activePlatform, setActivePlatform] = useState("instagram");
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+
+  const feedbackStatus = stepState.feedback_status;
+  const postedPlatforms = stepState.posted_platforms ?? [];
 
   useEffect(() => {
     if (stepData?.path) {
@@ -45,11 +73,20 @@ export function StepVideo({
     setTimeout(() => setCopiedField(null), 2000);
   }
 
+  function togglePlatform(platform: string) {
+    setSelectedPlatforms((prev) =>
+      prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform],
+    );
+  }
+
   const isGenerating = stepData?.status === "generating";
   const hasError = stepData?.status === "error";
   const errorMsg = (stepData as Record<string, unknown>)?.error as string | undefined;
   const videoPath = stepData?.path ?? "";
   const videoUrl = videoPath ? reelFileUrl(jobId, videoPath) : "";
+
+  const statusKey = feedbackStatus ?? (videoUrl ? "generated" : null);
+  const statusCfg = statusKey ? FEEDBACK_STATUS_CONFIG[statusKey] : null;
 
   async function handleReassemble() {
     setLoading(true);
@@ -69,6 +106,27 @@ export function StepVideo({
       mutate();
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleApprove() {
+    setApproving(true);
+    try {
+      await updateReelFeedback(jobId, "approved");
+      mutate();
+    } catch {
+      setApproving(false);
+    }
+  }
+
+  async function handleMarkPosted() {
+    if (selectedPlatforms.length === 0) return;
+    setPosting(true);
+    try {
+      await updateReelFeedback(jobId, "posted", selectedPlatforms);
+      mutate();
+    } catch {
+      setPosting(false);
     }
   }
 
@@ -122,16 +180,23 @@ export function StepVideo({
         <CardTitle className="text-lg flex items-center gap-2">
           <Play className="h-4 w-4 text-purple-400" />
           Video Final
+          {statusCfg && (
+            <Badge variant="outline" className={statusCfg.color}>
+              {statusKey === "approved" && <Check className="mr-1 h-3 w-3" />}
+              {statusKey === "posted" && <Send className="mr-1 h-3 w-3" />}
+              {statusCfg.label}
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {videoUrl ? (
           <>
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
-              <div className="flex items-center gap-2 mb-2 px-2">
-                <Check className="h-4 w-4 text-emerald-400" />
-                <span className="text-sm text-emerald-400 font-medium">Reel pronto!</span>
-              </div>
+            <div className={`rounded-lg border p-2 ${
+              feedbackStatus === "approved" || feedbackStatus === "posted"
+                ? "border-emerald-500/30 bg-emerald-500/5"
+                : "border-amber-500/30 bg-amber-500/5"
+            }`}>
               <video
                 src={videoUrl}
                 controls
@@ -139,6 +204,7 @@ export function StepVideo({
               />
             </div>
 
+            {/* Action buttons row */}
             <div className="flex gap-2 justify-center flex-wrap">
               <a href={videoUrl} download>
                 <Button variant="outline" size="sm">
@@ -146,10 +212,68 @@ export function StepVideo({
                   Download
                 </Button>
               </a>
-              <Button variant="outline" size="sm" disabled title="Em breve">
-                Publicar no Instagram
-              </Button>
+
+              {/* Approve button — shown when not yet approved */}
+              {!feedbackStatus && (
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={handleApprove}
+                  disabled={approving}
+                >
+                  {approving ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <ThumbsUp className="mr-2 h-3 w-3" />}
+                  Aprovar Video
+                </Button>
+              )}
             </div>
+
+            {/* Posted platforms badges */}
+            {feedbackStatus === "posted" && postedPlatforms.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">Postado em:</span>
+                {postedPlatforms.map((p) => (
+                  <Badge key={p} variant="outline" className={PLATFORM_COLORS[p] ?? "bg-zinc-500/20 text-zinc-400"}>
+                    {PLATFORM_LABELS[p] ?? p}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {/* Platform selection — shown when approved but not yet posted */}
+            {feedbackStatus === "approved" && (
+              <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-4 space-y-3">
+                <p className="text-sm font-medium">Marcar como postado</p>
+                <div className="flex gap-2 flex-wrap">
+                  {ALL_PLATFORMS.map((p) => {
+                    const selected = selectedPlatforms.includes(p);
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => togglePlatform(p)}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
+                          selected
+                            ? PLATFORM_COLORS[p] + " border-current"
+                            : "bg-secondary text-muted-foreground border-transparent hover:bg-secondary/80"
+                        }`}
+                      >
+                        {selected && <Check className="inline mr-1 h-3 w-3" />}
+                        {PLATFORM_LABELS[p] ?? p}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  onClick={handleMarkPosted}
+                  disabled={posting || selectedPlatforms.length === 0}
+                >
+                  {posting ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Send className="mr-2 h-3 w-3" />}
+                  Confirmar Postagem ({selectedPlatforms.length})
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <div className="rounded-lg border border-dashed p-6 text-center">
@@ -173,7 +297,7 @@ export function StepVideo({
                       : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                   }`}
                 >
-                  {p === "youtube_shorts" ? "Shorts" : p.charAt(0).toUpperCase() + p.slice(1)}
+                  {PLATFORM_LABELS[p] ?? p.charAt(0).toUpperCase() + p.slice(1)}
                 </button>
               ))}
             </div>

@@ -77,4 +77,13 @@ export const PUBLISH_STATUS_COLORS: Record<string, string> = {
 export const PLATFORM_COLORS: Record<string, string> = {
   instagram: "bg-pink-500/20 text-pink-400",
   tiktok: "bg-cyan-500/20 text-cyan-400",
+  youtube_shorts: "bg-red-500/20 text-red-400",
+  facebook: "bg-blue-500/20 text-blue-400",
+};
+
+export const PLATFORM_LABELS: Record<string, string> = {
+  instagram: "Reels",
+  youtube_shorts: "Shorts",
+  tiktok: "TikTok",
+  facebook: "Facebook",
 };

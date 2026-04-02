@@ -86,7 +86,9 @@ function SceneCard({
     try {
       await regenerateSceneVideo(jobId, scene.index, editPrompt || undefined);
       mutate();
-    } finally {
+      // Keep retrying=true — SWR will update scene status to "generating",
+      // hiding the button. Resetting here creates a double-click window.
+    } catch {
       setRetrying(false);
     }
   }
@@ -96,7 +98,8 @@ function SceneCard({
     try {
       await setSceneStatic(jobId, scene.index);
       mutate();
-    } finally {
+      // Keep settingStatic=true — SWR will update status to "static_fallback"
+    } catch {
       setSettingStatic(false);
     }
   }
@@ -221,17 +224,17 @@ function SceneCard({
             size="sm"
             className="w-full bg-purple-600 hover:bg-purple-700 text-white"
             onClick={handleGenerate}
-            disabled={retrying}
+            disabled={retrying || settingStatic}
           >
             {retrying ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Play className="mr-2 h-3 w-3" />}
-            Gerar Clip
+            {retrying ? "Gerando..." : "Gerar Clip"}
           </Button>
           <Button
             size="sm"
             variant="outline"
             className="w-full"
             onClick={handleSetStatic}
-            disabled={settingStatic}
+            disabled={settingStatic || retrying}
           >
             {settingStatic ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <ImageIcon className="mr-2 h-3 w-3" />}
             Manter Estatica
@@ -338,7 +341,8 @@ export function StepClips({
         await regenerateSceneVideo(jobId, scene.index);
       }
       mutate();
-    } finally {
+      // Keep generatingAll=true — SWR will update scenes to "generating"
+    } catch {
       setGeneratingAll(false);
     }
   }
