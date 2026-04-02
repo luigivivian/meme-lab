@@ -19,6 +19,7 @@ import {
   regenerateStep,
   regenerateSceneVideo,
   setSceneStatic,
+  initScenes,
   reelFileUrl,
   getClipSuggestions,
   useClip,
@@ -302,12 +303,24 @@ export function StepClips({
 }) {
   const [loading, setLoading] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
+  const [initializing, setInitializing] = useState(false);
 
   const isGenerating = stepData?.status === "generating";
   const hasError = stepData?.status === "error";
   const errorMsg = (stepData as Record<string, unknown> | undefined)?.error as string | undefined;
   const scenes = stepData?.scenes ?? [];
   const hasScenes = scenes.length > 0;
+
+  // Auto-initialize scenes from approved images when clips step has no scenes
+  useEffect(() => {
+    if (!hasScenes && !isGenerating && !hasError && !initializing) {
+      setInitializing(true);
+      initScenes(jobId)
+        .then(() => mutate())
+        .catch(() => {})
+        .finally(() => setInitializing(false));
+    }
+  }, [jobId, hasScenes, isGenerating, hasError, initializing, mutate]);
 
   const pendingScenes = scenes.filter((s) => s.status === "pending");
   const readyScenes = scenes.filter((s) => s.status === "success" || s.status === "static_fallback");
