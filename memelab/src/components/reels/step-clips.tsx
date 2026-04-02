@@ -317,10 +317,13 @@ export function StepClips({
       setInitializing(true);
       initScenes(jobId)
         .then(() => mutate())
-        .catch(() => {})
+        .catch((err) => {
+          console.error("initScenes failed:", err);
+        })
         .finally(() => setInitializing(false));
     }
-  }, [jobId, hasScenes, isGenerating, hasError, initializing, mutate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, hasScenes, isGenerating, hasError]);
 
   const pendingScenes = scenes.filter((s) => s.status === "pending");
   const readyScenes = scenes.filter((s) => s.status === "success" || s.status === "static_fallback");
