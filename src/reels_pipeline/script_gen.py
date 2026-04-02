@@ -241,7 +241,13 @@ async def generate_script(
                 f"\n\nPERSONAGEM: {char_name}\n"
                 f"Use a persona deste personagem para narrar o Reel:\n{char_prompt}\n"
                 f"Estilo de humor: {char_humor}\nTom: {char_tone}\n"
-                f"A narracao deve soar como se o personagem estivesse falando diretamente."
+                f"A narracao deve soar como se o personagem estivesse falando diretamente.\n\n"
+                f"REGRA CRITICA PARA legenda_overlay:\n"
+                f"TODAS as descricoes visuais (legenda_overlay) DEVEM referenciar o personagem '{char_name}' "
+                f"como protagonista da cena. NUNCA use termos genericos como 'uma pessoa', 'um homem', "
+                f"'alguem', 'uma figura'. SEMPRE descreva o '{char_name}' realizando a acao da cena. "
+                f"Exemplo correto: '{char_name} sentado numa poltrona lendo um livro magico'. "
+                f"Exemplo ERRADO: 'Uma pessoa sorridente abrindo cortinas'."
             )
             tom = char_tone or tom
 
