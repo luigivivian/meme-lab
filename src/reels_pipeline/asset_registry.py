@@ -62,6 +62,7 @@ async def find_similar_asset(
     asset_type: str,
     description: str,
     threshold: float = 0.85,
+    exclude_path_prefix: str | None = None,
 ) -> tuple[Optional[SceneAsset], list[float]]:
     """Find a similar existing asset via cosine similarity.
 
@@ -92,6 +93,9 @@ async def find_similar_asset(
     best_score = 0.0
 
     for asset in assets:
+        # Skip assets from the current job to avoid self-matching
+        if exclude_path_prefix and asset.file_path and asset.file_path.startswith(exclude_path_prefix):
+            continue
         stored_emb = asset.embedding
         if not stored_emb or not isinstance(stored_emb, list):
             continue
@@ -121,6 +125,7 @@ async def find_similar_assets(
     description: str,
     threshold: float = 0.75,
     max_results: int = 3,
+    exclude_path_prefix: str | None = None,
 ) -> tuple[list[tuple[SceneAsset, float]], list[float]]:
     """Find similar assets above threshold, sorted by score descending.
 
@@ -148,6 +153,9 @@ async def find_similar_assets(
 
     scored: list[tuple[SceneAsset, float]] = []
     for asset in assets:
+        # Skip assets from the current job to avoid self-matching
+        if exclude_path_prefix and asset.file_path and asset.file_path.startswith(exclude_path_prefix):
+            continue
         stored_emb = asset.embedding
         if not stored_emb or not isinstance(stored_emb, list):
             continue

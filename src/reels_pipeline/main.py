@@ -617,12 +617,12 @@ class ReelsPipeline:
             prompt = info["motion"]
             clip_path = os.path.join(clips_dir, f"clip_{idx:02d}.mp4")
 
-            # Asset reuse check for video clips
+            # Asset reuse check for video clips (exclude current job to prevent self-matching)
             if user_id and idx not in force_set:
                 try:
                     import shutil
                     from src.reels_pipeline.asset_registry import find_similar_asset, increment_usage
-                    match, _emb = await find_similar_asset(user_id, character_id, "video", prompt)
+                    match, _emb = await find_similar_asset(user_id, character_id, "video", prompt, exclude_path_prefix=job_dir)
                     if match and os.path.isfile(match.file_path):
                         shutil.copy2(match.file_path, clip_path)
                         await increment_usage(match.id)

@@ -1244,6 +1244,7 @@ async def get_clip_suggestions(
     if not narracao:
         return {"suggestions": []}
 
+    job_dir = step_state.get("prompt", {}).get("job_dir", "")
     matches, _embedding = await find_similar_assets(
         user_id=current_user.id,
         character_id=job.character_id,
@@ -1251,6 +1252,7 @@ async def get_clip_suggestions(
         description=narracao,
         threshold=0.75,
         max_results=3,
+        exclude_path_prefix=job_dir,
     )
 
     suggestions = []
