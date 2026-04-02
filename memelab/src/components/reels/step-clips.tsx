@@ -361,6 +361,52 @@ export function StepClips({
     }
   }
 
+  // Show image thumbnails with loading overlay while clips are being generated
+  const imagePaths = stepState.images?.paths ?? [];
+  if (isGenerating && !hasScenes && imagePaths.length > 0) {
+    const generatingCount = imagePaths.length;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Film className="h-4 w-4 text-purple-400" />
+            Clips
+            <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Gerando {generatingCount} clips com Kie.ai... Isso pode levar alguns minutos por cena.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {imagePaths.map((path, i) => (
+              <div key={i} className="rounded-lg border bg-card p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Cena {i + 1}</span>
+                  <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    Gerando
+                  </Badge>
+                </div>
+                <div className="aspect-[9/16] rounded-md overflow-hidden bg-secondary relative">
+                  <img
+                    src={reelFileUrl(jobId, path)}
+                    alt={`Cena ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    <span className="text-xs text-white/80">Gerando clip...</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isGenerating && !hasScenes) {
     return (
       <Card>
