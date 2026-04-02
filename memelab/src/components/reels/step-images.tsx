@@ -27,7 +27,8 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
     setLoading(true);
     try {
       await approveStep(jobId, "images");
-    } catch {
+      mutate?.();
+    } finally {
       setLoading(false);
     }
   }
