@@ -179,9 +179,27 @@ function SceneCard({
         </div>
       )}
 
-      {/* Pending: generate or keep static */}
+      {/* Pending: prompt editor + generate or keep static */}
       {isPending && (
         <div className="space-y-1.5">
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setShowPrompt(!showPrompt)}
+          >
+            {showPrompt ? "Ocultar prompt" : "Editar prompt do clip"}
+          </button>
+
+          {showPrompt && (
+            <Textarea
+              value={editPrompt}
+              onChange={(e) => setEditPrompt(e.target.value)}
+              rows={3}
+              className="text-xs"
+              placeholder="Prompt de movimento para a cena..."
+            />
+          )}
+
           <Button
             size="sm"
             className="w-full bg-purple-600 hover:bg-purple-700 text-white"
