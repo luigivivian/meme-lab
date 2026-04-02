@@ -19,6 +19,19 @@ export default function ReelJobPage() {
   const jobId = params.jobId;
   const { data: stepState, error, isLoading, mutate } = useStepState(jobId);
   const [viewStep, setViewStep] = useState<number | null>(null);
+  const prevCurrentStep = useRef<number>(0);
+
+  // All hooks must be above early returns (Rules of Hooks)
+  const currentStep = stepState?.current_step ?? 0;
+
+  // When backend's currentStep changes (approve/regenerate from any step component),
+  // auto-reset viewStep so the user follows the new active step
+  useEffect(() => {
+    if (currentStep !== prevCurrentStep.current) {
+      prevCurrentStep.current = currentStep;
+      setViewStep(null);
+    }
+  }, [currentStep]);
 
   if (isLoading || !stepState) {
     return (
@@ -42,18 +55,7 @@ export default function ReelJobPage() {
     );
   }
 
-  const currentStep = stepState.current_step;
   const state = stepState!;
-  const prevCurrentStep = useRef(currentStep);
-
-  // When backend's currentStep changes (approve/regenerate from any step component),
-  // auto-reset viewStep so the user follows the new active step
-  useEffect(() => {
-    if (currentStep !== prevCurrentStep.current) {
-      prevCurrentStep.current = currentStep;
-      setViewStep(null);
-    }
-  }, [currentStep]);
 
   // When viewing a past step, approve should return to the current step (no-op on backend)
   // When viewing the current step, approve advances normally
