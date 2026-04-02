@@ -1,7 +1,7 @@
 """Add language column to reels_jobs and reels_config
 
 Revision ID: 024
-Revises: 020
+Revises: 023
 Create Date: 2026-03-31
 
 Phase F: Multi-Language Support for Reels Pipeline
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 
 revision: str = '024'
-down_revision: Union[str, None] = '020'
+down_revision: Union[str, None] = '023'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

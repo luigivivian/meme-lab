@@ -1,7 +1,7 @@
 """create enhance_theme_cache table
 
-Revision ID: 021
-Revises: 020
+Revision ID: 022
+Revises: 021
 Create Date: 2026-03-31
 
 Phase 999.8-A: Cache AI-generated topic suggestions per niche/sub-theme
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers
-revision: str = '021'
-down_revision: Union[str, None] = '020'
+revision: str = '022'
+down_revision: Union[str, None] = '021'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

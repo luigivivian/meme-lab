@@ -1,7 +1,7 @@
 """add platforms and platform_outputs columns to reels_jobs
 
 Revision ID: 023
-Revises: 020
+Revises: 022
 Create Date: 2026-03-31
 
 Phase E: Multi-Platform Output
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 
 revision: str = "023"
-down_revision: Union[str, None] = "020"
+down_revision: Union[str, None] = "022"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

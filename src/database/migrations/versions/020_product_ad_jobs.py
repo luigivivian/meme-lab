@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 # revision identifiers
 revision: str = '020'
-down_revision: Union[str, None] = '018'
+down_revision: Union[str, None] = '019'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -32,7 +32,7 @@ def upgrade() -> None:
         sa.Column("style", sa.String(20), nullable=False, server_default="cinematic"),
         sa.Column("video_model", sa.String(100), server_default="wan2.1-i2v"),
         sa.Column("audio_mode", sa.String(20), server_default="music"),
-        sa.Column("output_formats", sa.JSON, server_default='["9:16"]'),
+        sa.Column("output_formats", sa.JSON, nullable=True),
         sa.Column("target_duration", sa.Integer, server_default="15"),
         sa.Column("tone", sa.String(50), server_default="premium"),
         sa.Column("niche", sa.String(100), server_default=""),
