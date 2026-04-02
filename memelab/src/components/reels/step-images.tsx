@@ -223,13 +223,13 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
               <RefreshCw className="mr-2 h-4 w-4" />
               Regenerar Todas
             </Button>
-            <Button onClick={handleApprove} disabled={loading || !allApproved}>
+            <Button onClick={handleApprove} disabled={loading || approvedCount === 0}>
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Check className="mr-2 h-4 w-4" />
               )}
-              Gerar Clips
+              Avancar ({approvedCount})
             </Button>
           </div>
         </div>
