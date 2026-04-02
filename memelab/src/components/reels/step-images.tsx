@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Check, Recycle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { approveStep, regenerateStep, regenerateSingleImage, reelFileUrl, type StepState } from "@/lib/api";
 
@@ -13,8 +14,10 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
   const isGenerating = images?.status === "generating";
   const paths = images?.paths ?? [];
   const reuseInfo = images?.reuse_info ?? {};
+  const cenas = (stepState.script?.json as { cenas?: Array<{ legenda_overlay?: string; narracao?: string }> })?.cenas ?? [];
   const [loading, setLoading] = useState(false);
-  const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
+  const [editPrompts, setEditPrompts] = useState<Record<number, string>>({});
+  const [showPrompt, setShowPrompt] = useState<Record<number, boolean>>({});
 
   async function handleApprove() {
     setLoading(true);
@@ -35,13 +38,21 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
   }
 
   async function handleRegenSingle(index: number) {
-    setRegeneratingIdx(index);
-    try {
-      await regenerateSingleImage(jobId, index);
-      mutate?.();
-    } finally {
-      setRegeneratingIdx(null);
-    }
+    const customPrompt = editPrompts[index];
+    await regenerateSingleImage(jobId, index, customPrompt || undefined);
+    mutate?.();
+  }
+
+  function togglePrompt(index: number) {
+    setShowPrompt((prev) => {
+      const next = { ...prev, [index]: !prev[index] };
+      // Initialize prompt text from cena data if not already set
+      if (next[index] && editPrompts[index] === undefined) {
+        const cena = cenas[index];
+        setEditPrompts((p) => ({ ...p, [index]: cena?.legenda_overlay ?? "" }));
+      }
+      return next;
+    });
   }
 
   if (isGenerating) {
@@ -76,40 +87,83 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
             {paths.map((path, i) => {
               const info = reuseInfo[String(i)];
               const isReused = info?.reused === true;
-              const isThisRegenerating = regeneratingIdx === i;
+              const isThisGenerating = info?.generating === true;
+              const version = info?.version;
+              const imgUrl = reelFileUrl(jobId, path) + (version ? `?v=${version}` : "");
 
               return (
-                <div key={i} className="relative group rounded-lg overflow-hidden border">
-                  {isThisRegenerating ? (
-                    <div className="w-full aspect-[4/5] flex items-center justify-center bg-secondary">
-                      <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
-                    </div>
-                  ) : (
-                    <img
-                      src={reelFileUrl(jobId, path)}
-                      alt={`Imagem ${i + 1}`}
-                      className="w-full aspect-[4/5] object-cover"
-                    />
-                  )}
+                <div key={i} className="rounded-lg overflow-hidden border space-y-2">
+                  <div className="relative group">
+                    {isThisGenerating ? (
+                      <div className="w-full aspect-[4/5] flex items-center justify-center bg-secondary">
+                        <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+                      </div>
+                    ) : (
+                      <img
+                        src={imgUrl}
+                        alt={`Imagem ${i + 1}`}
+                        className="w-full aspect-[4/5] object-cover"
+                      />
+                    )}
 
-                  {isReused && !isThisRegenerating && (
-                    <Badge
-                      variant="outline"
-                      className="absolute top-2 left-2 bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]"
+                    {isReused && !isThisGenerating && (
+                      <Badge
+                        variant="outline"
+                        className="absolute top-2 left-2 bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]"
+                      >
+                        <Recycle className="mr-1 h-2.5 w-2.5" />
+                        Reaproveitado
+                      </Badge>
+                    )}
+
+                    {!isThisGenerating && (
+                      <button
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80 disabled:opacity-50"
+                        title="Gerar Nova"
+                        onClick={() => handleRegenSingle(i)}
+                        disabled={loading}
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Prompt editing */}
+                  <div className="px-2 pb-2 space-y-1">
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => togglePrompt(i)}
                     >
-                      <Recycle className="mr-1 h-2.5 w-2.5" />
-                      Reaproveitado
-                    </Badge>
-                  )}
+                      {showPrompt[i] ? "Ocultar prompt" : "Editar prompt"}
+                    </button>
 
-                  <button
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80 disabled:opacity-50"
-                    title="Gerar Nova"
-                    onClick={() => handleRegenSingle(i)}
-                    disabled={isThisRegenerating || loading}
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                  </button>
+                    {showPrompt[i] && (
+                      <>
+                        <Textarea
+                          value={editPrompts[i] ?? cenas[i]?.legenda_overlay ?? ""}
+                          onChange={(e) => setEditPrompts((p) => ({ ...p, [i]: e.target.value }))}
+                          rows={3}
+                          className="text-xs"
+                          placeholder="Descricao da cena para gerar a imagem..."
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => handleRegenSingle(i)}
+                          disabled={isThisGenerating || loading}
+                        >
+                          {isThisGenerating ? (
+                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="mr-2 h-3 w-3" />
+                          )}
+                          Gerar com prompt editado
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -131,7 +185,7 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
             ) : (
               <Check className="mr-2 h-4 w-4" />
             )}
-            Aprovar e Gerar Narracao
+            Aprovar e Gerar Clips
           </Button>
         </div>
       </CardContent>

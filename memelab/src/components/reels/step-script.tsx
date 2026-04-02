@@ -169,8 +169,13 @@ export function StepScript({ jobId, stepState }: { jobId: string; stepState: Ste
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Narracao completa</label>
-          <Textarea value={form.narracao_completa} rows={3} readOnly className="text-sm bg-secondary/30" />
+          <label className="text-xs text-muted-foreground">Narracao completa (usada para gerar audio)</label>
+          <Textarea
+            value={form.narracao_completa}
+            onChange={(e) => updateField("narracao_completa", e.target.value)}
+            rows={4}
+            className="text-sm"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -204,7 +209,7 @@ export function StepScript({ jobId, stepState }: { jobId: string; stepState: Ste
             ) : (
               <Check className="mr-2 h-4 w-4" />
             )}
-            Gerar Imagens
+            Gerar Narracao
           </Button>
         </div>
       </CardContent>

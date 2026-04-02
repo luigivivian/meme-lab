@@ -8,10 +8,11 @@ import { useStepState } from "@/hooks/use-reels";
 import { approveStep, regenerateStep } from "@/lib/api";
 import { StepperHeader, StepContent } from "@/components/reels/stepper";
 import { StepPrompt } from "@/components/reels/step-prompt";
-import { StepImages } from "@/components/reels/step-images";
 import { StepScript } from "@/components/reels/step-script";
 import { StepNarration } from "@/components/reels/step-narration";
 import { StepSubtitles } from "@/components/reels/step-subtitles";
+import { StepImages } from "@/components/reels/step-images";
+import { StepClips } from "@/components/reels/step-clips";
 import { StepVideo } from "@/components/reels/step-video";
 
 export default function ReelJobPage() {
@@ -103,9 +104,6 @@ export default function ReelJobPage() {
         content = <StepScript jobId={jobId} stepState={state} />;
         break;
       case 2:
-        content = <StepImages jobId={jobId} stepState={state} />;
-        break;
-      case 3:
         content = (
           <StepNarration
             jobId={jobId}
@@ -116,7 +114,7 @@ export default function ReelJobPage() {
           />
         );
         break;
-      case 4:
+      case 3:
         content = (
           <StepSubtitles
             jobId={jobId}
@@ -127,7 +125,20 @@ export default function ReelJobPage() {
           />
         );
         break;
+      case 4:
+        content = <StepImages jobId={jobId} stepState={state} />;
+        break;
       case 5:
+        content = (
+          <StepClips
+            jobId={jobId}
+            stepData={state.clips}
+            stepState={state}
+            mutate={() => mutate()}
+          />
+        );
+        break;
+      case 6:
         content = (
           <StepVideo
             jobId={jobId}

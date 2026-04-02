@@ -72,10 +72,11 @@ class StepStateResponse(BaseModel):
     job_id: str
     current_step: int
     prompt: Optional[dict] = None
-    images: Optional[dict] = None
     script: Optional[dict] = None
     tts: Optional[dict] = None
     srt: Optional[dict] = None
+    images: Optional[dict] = None
+    clips: Optional[dict] = None
     video: Optional[dict] = None
 
 

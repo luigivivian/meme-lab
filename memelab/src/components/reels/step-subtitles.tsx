@@ -8,7 +8,11 @@ import { SrtEditor, type SrtEntry } from "@/components/reels/srt-editor";
 import { approveStep, editStep, regenerateStep, reelFileUrl, type StepState } from "@/lib/api";
 
 function parseSrt(text: string): SrtEntry[] {
-  return text
+  // Normalize line endings and ensure double-newline separators between entries
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\n(?=\d+\n\d{2}:\d{2})/g, "\n\n");
+  return normalized
     .trim()
     .split(/\n\n+/)
     .map((block) => {
@@ -144,7 +148,7 @@ export function StepSubtitles({
             ) : (
               <ArrowRight className="mr-2 h-4 w-4" />
             )}
-            Aprovar Legendas
+            Aprovar e Gerar Imagens
           </Button>
         </div>
       </CardContent>

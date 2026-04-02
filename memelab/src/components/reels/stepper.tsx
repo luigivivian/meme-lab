@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, MessageSquare, Image, FileText, Mic, Captions, Film } from "lucide-react";
+import { Check, MessageSquare, Image, FileText, Mic, Captions, Clapperboard, Film } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRef, type ReactNode } from "react";
 import type { StepState } from "@/lib/api";
@@ -8,9 +8,10 @@ import type { StepState } from "@/lib/api";
 const STEPS = [
   { id: "prompt", label: "Prompt", icon: MessageSquare },
   { id: "script", label: "Roteiro", icon: FileText },
-  { id: "images", label: "Imagens", icon: Image },
   { id: "tts", label: "Narracao", icon: Mic },
   { id: "srt", label: "Legendas", icon: Captions },
+  { id: "images", label: "Imagens", icon: Image },
+  { id: "clips", label: "Clips", icon: Clapperboard },
   { id: "video", label: "Video", icon: Film },
 ] as const;
 

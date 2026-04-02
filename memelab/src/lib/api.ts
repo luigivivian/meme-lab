@@ -1674,6 +1674,7 @@ export interface StepState {
   script?: { json: Record<string, unknown>; approved: boolean; status?: string };
   tts?: { path: string; approved: boolean; status?: string };
   srt?: { path: string; approved: boolean; status?: string };
+  clips?: { status?: string; scenes?: SceneStatus[]; approved?: boolean };
   video?: { path: string; approved: boolean; status?: string; scenes?: SceneStatus[] };
 }
 

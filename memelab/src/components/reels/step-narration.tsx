@@ -109,7 +109,7 @@ export function StepNarration({
             ) : (
               <ArrowRight className="mr-2 h-4 w-4" />
             )}
-            Aprovar Narracao
+            Aprovar e Gerar Legendas
           </Button>
         </div>
       </CardContent>

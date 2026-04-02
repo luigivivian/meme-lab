@@ -79,7 +79,7 @@ PRESETS = {
 
 # ── Step order for interactive pipeline ────────────────────────────────────
 
-STEP_ORDER = ["prompt", "script", "images", "tts", "srt", "video"]
+STEP_ORDER = ["prompt", "script", "tts", "srt", "images", "clips", "video"]
 
 
 async def _mark_tema_used(db: AsyncSession, user_id: int, tema: str):
@@ -106,10 +106,11 @@ def _init_step_state(tema: str) -> dict:
     return {
         "current_step": 0,
         "prompt": {"text": tema, "approved": False},
-        "images": {"paths": [], "approved": False},
         "script": {"json": {}, "approved": False},
         "tts": {"path": "", "approved": False},
         "srt": {"path": "", "approved": False},
+        "images": {"paths": [], "approved": False},
+        "clips": {"scenes": [], "approved": False},
         "video": {"path": "", "approved": False},
     }
 
@@ -232,7 +233,7 @@ async def _execute_step_task(
                 step_data["status"] = "complete"
                 job.srt_path = srt_path
 
-            elif step_name == "video":
+            elif step_name == "clips":
                 image_paths = step_state.get("images", {}).get("paths", [])
                 audio_path = step_state.get("tts", {}).get("path", "")
                 srt_path = step_state.get("srt", {}).get("path", "")
@@ -253,7 +254,7 @@ async def _execute_step_task(
                                 )
                                 j = result.scalar_one_or_none()
                                 if j and j.step_state:
-                                    j.step_state["video"]["scenes"] = scenes_list
+                                    j.step_state["clips"]["scenes"] = scenes_list
                                     flag_modified(j, "step_state")
                                     await s.commit()
                         except Exception as e:
@@ -280,13 +281,51 @@ async def _execute_step_task(
                 step_data["status"] = "complete"
                 job.video_path = video_path
 
+            elif step_name == "video":
+                # Final assembly only — concat approved clips + audio + srt
+                clips_data = step_state.get("clips", {})
+                scenes = clips_data.get("scenes", [])
+                clips_dir = os.path.join(job_dir, "clips")
+
+                clip_paths = []
+                for s in scenes:
+                    cp = s.get("clip_path", "")
+                    if cp and os.path.isfile(cp):
+                        clip_paths.append(cp)
+                    else:
+                        expected = os.path.join(clips_dir, f"clip_{s['index']:02d}.mp4")
+                        if os.path.isfile(expected):
+                            clip_paths.append(expected)
+
+                if not clip_paths:
+                    step_data["status"] = "error"
+                    step_data["error"] = "No clips available for assembly"
+                else:
+                    from src.reels_pipeline.video_builder import concat_clips_with_audio
+                    audio_path = step_state.get("tts", {}).get("path", "")
+                    srt_path = step_state.get("srt", {}).get("path", "")
+                    script_json = step_state.get("script", {}).get("json", {})
+                    video_path = os.path.join(job_dir, "final.mp4")
+
+                    concat_clips_with_audio(
+                        clip_paths=clip_paths,
+                        audio_path=audio_path,
+                        srt_path=srt_path,
+                        output_path=video_path,
+                        transition_duration=0.3,
+                        script_json=script_json,
+                    )
+                    step_data["path"] = video_path
+                    step_data["status"] = "complete"
+                    job.video_path = video_path
+
                 # Generate platform metadata after video completes
                 platforms = job.platforms or ["instagram"]
-                if platforms:
+                if platforms and step_data.get("status") == "complete":
                     try:
                         from src.reels_pipeline.platform_metadata import generate_platform_metadata
                         platform_outputs = await generate_platform_metadata(
-                            script_json=script_json,
+                            script_json=step_state.get("script", {}).get("json", {}),
                             platforms=platforms,
                             video_url=job.video_url,
                         )
@@ -626,10 +665,11 @@ async def get_step_state(
         job_id=job.job_id,
         current_step=step_state.get("current_step", 0),
         prompt=step_state.get("prompt"),
-        images=step_state.get("images"),
         script=step_state.get("script"),
         tts=step_state.get("tts"),
         srt=step_state.get("srt"),
+        images=step_state.get("images"),
+        clips=step_state.get("clips"),
         video=step_state.get("video"),
     )
 
@@ -840,7 +880,7 @@ async def regenerate_step(
         ds = step_state.get(downstream_name, {})
         ds["approved"] = False
         # Clear artifact fields
-        for key in ["paths", "path", "json", "duration", "status", "error"]:
+        for key in ["paths", "path", "json", "duration", "status", "error", "scenes"]:
             ds.pop(key, None)
         step_state[downstream_name] = ds
 
@@ -1054,21 +1094,25 @@ async def _regenerate_single_image_task(
 
                 step_state["images"] = images_data
 
-                # Invalidate corresponding video clip — forces re-generation
-                video_data = step_state.get("video", {})
-                video_scenes = video_data.get("scenes", [])
-                if scene_index < len(video_scenes):
-                    video_scenes[scene_index]["status"] = "pending"
-                    video_scenes[scene_index].pop("clip_path", None)
-                    video_scenes[scene_index].pop("reused", None)
-                    video_scenes[scene_index].pop("source_asset_id", None)
-                    video_scenes[scene_index]["img_path"] = target_path
-                    video_data["scenes"] = video_scenes
+                # Invalidate corresponding clip — forces re-generation
+                clips_inv = step_state.get("clips", {}) or step_state.get("video", {})
+                clip_scenes = clips_inv.get("scenes", [])
+                if scene_index < len(clip_scenes):
+                    clip_scenes[scene_index]["status"] = "pending"
+                    clip_scenes[scene_index].pop("clip_path", None)
+                    clip_scenes[scene_index].pop("reused", None)
+                    clip_scenes[scene_index].pop("source_asset_id", None)
+                    clip_scenes[scene_index]["img_path"] = target_path
+                    clips_inv["scenes"] = clip_scenes
+                    clips_inv.pop("path", None)
+                    clips_inv["status"] = None
+                    step_state["clips"] = clips_inv
                     # Clear final video path since it's now stale
-                    video_data.pop("path", None)
-                    video_data["status"] = None
-                    step_state["video"] = video_data
-                    logger.info("Invalidated video clip %d after image regeneration", scene_index)
+                    vid_data = step_state.get("video", {})
+                    vid_data.pop("path", None)
+                    vid_data["status"] = None
+                    step_state["video"] = vid_data
+                    logger.info("Invalidated clip %d after image regeneration", scene_index)
 
                 job.step_state = step_state
                 flag_modified(job, "step_state")
@@ -1132,8 +1176,8 @@ async def regenerate_scene_video(
 
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = dict(job.step_state or {})
-    video_data = step_state.get("video", {})
-    scenes = video_data.get("scenes", [])
+    clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+    scenes = clips_data.get("scenes", [])
 
     if scene_index < 0 or scene_index >= len(scenes):
         raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
@@ -1145,8 +1189,8 @@ async def regenerate_scene_video(
     scene.pop("reused", None)
     scene.pop("source_asset_id", None)
     scenes[scene_index] = scene
-    video_data["scenes"] = scenes
-    step_state["video"] = video_data
+    clips_data["scenes"] = scenes
+    step_state["clips"] = clips_data
     job.step_state = step_state
     flag_modified(job, "step_state")
     await db.commit()
@@ -1278,8 +1322,8 @@ async def use_clip(
 
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = dict(job.step_state or {})
-    video_data = step_state.get("video", {})
-    scenes = video_data.get("scenes", [])
+    clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+    scenes = clips_data.get("scenes", [])
 
     if scene_index < 0 or scene_index >= len(scenes):
         raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
@@ -1315,8 +1359,8 @@ async def use_clip(
     scene["reused"] = True
     scene["source_asset_id"] = asset_id
     scenes[scene_index] = scene
-    video_data["scenes"] = scenes
-    step_state["video"] = video_data
+    clips_data["scenes"] = scenes
+    step_state["clips"] = clips_data
     job.step_state = step_state
     flag_modified(job, "step_state")
 
@@ -1343,8 +1387,8 @@ async def set_scene_static(
 
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = dict(job.step_state or {})
-    video_data = step_state.get("video", {})
-    scenes = video_data.get("scenes", [])
+    clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+    scenes = clips_data.get("scenes", [])
 
     if scene_index < 0 or scene_index >= len(scenes):
         raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
@@ -1375,8 +1419,8 @@ async def set_scene_static(
     scene["error"] = None
     scene.pop("reused", None)
     scenes[scene_index] = scene
-    video_data["scenes"] = scenes
-    step_state["video"] = video_data
+    clips_data["scenes"] = scenes
+    step_state["clips"] = clips_data
     job.step_state = step_state
     flag_modified(job, "step_state")
     await db.commit()
@@ -1401,8 +1445,8 @@ async def retry_scene(
 
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = dict(job.step_state or {})
-    video_data = step_state.get("video", {})
-    scenes = video_data.get("scenes", [])
+    clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+    scenes = clips_data.get("scenes", [])
 
     if scene_index < 0 or scene_index >= len(scenes):
         raise HTTPException(status_code=400, detail=f"Invalid scene index: {scene_index}")
@@ -1415,8 +1459,8 @@ async def retry_scene(
     scene["status"] = "generating"
     scene["error"] = None
     scenes[scene_index] = scene
-    video_data["scenes"] = scenes
-    step_state["video"] = video_data
+    clips_data["scenes"] = scenes
+    step_state["clips"] = clips_data
     job.step_state = step_state
     flag_modified(job, "step_state")
     await db.commit()
@@ -1463,8 +1507,8 @@ async def _retry_scene_task(
                 return
 
             step_state = dict(job.step_state or {})
-            video_data = step_state.get("video", {})
-            scenes = video_data.get("scenes", [])
+            clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+            scenes = clips_data.get("scenes", [])
             if scene_index >= len(scenes):
                 return
 
@@ -1500,8 +1544,8 @@ async def _retry_scene_task(
 
             # Update scene in step_state
             scenes[scene_index] = {**scene, **retry_result}
-            video_data["scenes"] = scenes
-            step_state["video"] = video_data
+            clips_data["scenes"] = scenes
+            step_state["clips"] = clips_data
 
             # Register clip in asset registry after successful generation
             if retry_result.get("status") == "success" and job.user_id:
@@ -1533,15 +1577,14 @@ async def _retry_scene_task(
                 for s in scenes
             )
             if all_have_clips:
-                clips_dir = os.path.join(job_dir, "clips")
+                clips_dir_path = os.path.join(job_dir, "clips")
                 clip_paths = []
                 for s in scenes:
                     cp = s.get("clip_path", "")
                     if cp and os.path.isfile(cp):
                         clip_paths.append(cp)
                     else:
-                        # Fallback to expected path
-                        expected = os.path.join(clips_dir, f"clip_{s['index']:02d}.mp4")
+                        expected = os.path.join(clips_dir_path, f"clip_{s['index']:02d}.mp4")
                         if os.path.isfile(expected):
                             clip_paths.append(expected)
 
@@ -1556,7 +1599,7 @@ async def _retry_scene_task(
                         output_path=video_path,
                         transition_duration=0.3,
                     )
-                    video_data["path"] = video_path
+                    step_state.setdefault("video", {})["path"] = video_path
                     job.video_path = video_path
                     logger.info(f"Auto-reassembled video after retry: {video_path}")
 
@@ -1568,11 +1611,13 @@ async def _retry_scene_task(
             logger.error(f"Retry scene {scene_index} for job {job_id} failed: {e}")
             try:
                 step_state = dict(job.step_state or {})
-                scenes = step_state.get("video", {}).get("scenes", [])
+                clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+                scenes = clips_data.get("scenes", [])
                 if scene_index < len(scenes):
                     scenes[scene_index]["status"] = "failed"
                     scenes[scene_index]["error"] = str(e)[:300]
-                    step_state["video"]["scenes"] = scenes
+                    clips_data["scenes"] = scenes
+                    step_state["clips"] = clips_data
                     job.step_state = step_state
                     flag_modified(job, "step_state")
                     await session.commit()
@@ -1593,11 +1638,11 @@ async def init_scenes(
     """
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = dict(job.step_state or {})
-    video_data = step_state.get("video", {})
+    clips_data = step_state.get("clips", {}) or step_state.get("video", {})
 
     # Don't overwrite existing scenes
-    if video_data.get("scenes"):
-        return {"scenes": len(video_data["scenes"]), "status": "already_initialized"}
+    if clips_data.get("scenes"):
+        return {"scenes": len(clips_data["scenes"]), "status": "already_initialized"}
 
     images_data = step_state.get("images", {})
     paths = images_data.get("paths", [])
@@ -1621,10 +1666,10 @@ async def init_scenes(
             "prompt": cena.get("legenda_overlay", ""),
         })
 
-    video_data["scenes"] = scenes
-    video_data["status"] = None
-    video_data.pop("path", None)
-    step_state["video"] = video_data
+    clips_data["scenes"] = scenes
+    clips_data["status"] = None
+    clips_data.pop("path", None)
+    step_state["clips"] = clips_data
     job.step_state = step_state
     flag_modified(job, "step_state")
     await db.commit()
@@ -1647,8 +1692,8 @@ async def reassemble_video(
 
     job = await _get_user_job(job_id, current_user.id, db)
     step_state = dict(job.step_state or {})
-    video_data = step_state.get("video", {})
-    scenes = video_data.get("scenes", [])
+    clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+    scenes = clips_data.get("scenes", [])
 
     if not scenes:
         raise HTTPException(status_code=400, detail="No scene clips available to reassemble")
@@ -1657,7 +1702,8 @@ async def reassemble_video(
     if not clips_with_success:
         raise HTTPException(status_code=400, detail="No completed scene clips to assemble")
 
-    # Mark as reassembling
+    # Mark video as reassembling
+    video_data = step_state.get("video", {})
     video_data["status"] = "generating"
     video_data.pop("path", None)
     step_state["video"] = video_data
@@ -1687,8 +1733,8 @@ async def _reassemble_video_task(job_id: str, session_factory):
                 return
 
             step_state = dict(job.step_state or {})
-            video_data = step_state.get("video", {})
-            scenes = video_data.get("scenes", [])
+            clips_data = step_state.get("clips", {}) or step_state.get("video", {})
+            scenes = clips_data.get("scenes", [])
             job_dir = step_state.get("prompt", {}).get("job_dir", "")
             clips_dir = os.path.join(job_dir, "clips")
 
@@ -1702,6 +1748,7 @@ async def _reassemble_video_task(job_id: str, session_factory):
                     if os.path.isfile(expected):
                         clip_paths.append(expected)
 
+            video_data = step_state.get("video", {})
             if not clip_paths:
                 video_data["status"] = "error"
                 video_data["error"] = "No clip files found on disk"
