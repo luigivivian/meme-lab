@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, RefreshCw, Check, Recycle } from "lucide-react";
+import { Loader2, RefreshCw, Check, Recycle, ThumbsUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,10 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
   const [loading, setLoading] = useState(false);
   const [editPrompts, setEditPrompts] = useState<Record<number, string>>({});
   const [showPrompt, setShowPrompt] = useState<Record<number, boolean>>({});
+  const [approved, setApproved] = useState<Record<number, boolean>>({});
+
+  const allApproved = paths.length > 0 && paths.every((_, i) => approved[i]);
+  const approvedCount = Object.values(approved).filter(Boolean).length;
 
   async function handleApprove() {
     setLoading(true);
@@ -128,8 +132,28 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
                     )}
                   </div>
 
-                  {/* Prompt editing */}
-                  <div className="px-2 pb-2 space-y-1">
+                  {/* Approve + Prompt editing */}
+                  <div className="px-2 pb-2 space-y-1.5">
+                    {!isThisGenerating && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setApproved((prev) => ({ ...prev, [i]: !prev[i] }));
+                        }}
+                        className={`w-full flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors ${
+                          approved[i]
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                            : "bg-secondary text-muted-foreground hover:text-foreground border border-transparent"
+                        }`}
+                      >
+                        {approved[i] ? (
+                          <><Check className="h-3 w-3" /> Aprovada</>
+                        ) : (
+                          <><ThumbsUp className="h-3 w-3" /> Aprovar</>
+                        )}
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -151,7 +175,10 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
                           size="sm"
                           variant="outline"
                           className="w-full"
-                          onClick={() => handleRegenSingle(i)}
+                          onClick={() => {
+                            setApproved((prev) => ({ ...prev, [i]: false }));
+                            handleRegenSingle(i);
+                          }}
                           disabled={isThisGenerating || loading}
                         >
                           {isThisGenerating ? (
@@ -174,19 +201,37 @@ export function StepImages({ jobId, stepState, mutate }: { jobId: string; stepSt
           </p>
         )}
 
-        <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={handleRegenAll} disabled={loading || isGenerating}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Regenerar Todas
-          </Button>
-          <Button onClick={handleApprove} disabled={loading || paths.length === 0}>
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="mr-2 h-4 w-4" />
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {approvedCount}/{paths.length} imagens aprovadas
+          </p>
+          <div className="flex gap-2">
+            {!allApproved && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const all: Record<number, boolean> = {};
+                  paths.forEach((_, i) => { all[i] = true; });
+                  setApproved(all);
+                }}
+              >
+                Aprovar Todas
+              </Button>
             )}
-            Aprovar e Gerar Clips
-          </Button>
+            <Button variant="outline" onClick={handleRegenAll} disabled={loading || isGenerating}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Regenerar Todas
+            </Button>
+            <Button onClick={handleApprove} disabled={loading || !allApproved}>
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="mr-2 h-4 w-4" />
+              )}
+              Gerar Clips
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
